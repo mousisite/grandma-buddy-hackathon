@@ -1,0 +1,26 @@
+# Secrets: the API key lives here
+.env
+
+# Grandma's data stays on this computer
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Voice recordings
+*.wav
+
+# Screenshots and files from browser checks
+test-output/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Windows and editor files
+Thumbs.db
+desktop.ini
+.DS_Store
