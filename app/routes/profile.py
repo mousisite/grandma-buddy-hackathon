@@ -24,6 +24,24 @@ PHONE = re.compile(r"^[0-9+()\-. ]*$")
 EMAIL = re.compile(r"^$|^[^@\s]+@[^@\s]+\.[^@\s]+$")
 KIND_NO = "Please check that entry and try again."
 
+# How the Family & settings form names each entry when one is refused.
+FIELD_WORDS = {
+    "name": "her full name",
+    "preferred_name": "the name Buddy calls her",
+    "family_name": "the family member’s name",
+    "family_email": "the family email address",
+    "family_phone": "the family phone number",
+    "doctor_name": "the doctor’s name",
+    "doctor_phone": "the doctor’s phone number",
+}
+
+
+def refuse(field: str, fix: str = ""):
+    """Stop the save and say which entry needs another look, and how to fix it."""
+    words = FIELD_WORDS.get(field)
+    message = f"Please check {words}. {fix}".strip() if words else KIND_NO
+    raise HTTPException(status_code=400, detail={"field": field, "message": message})
+
 
 @router.get("/api/profile")
 def read_profile():
@@ -43,24 +61,24 @@ def update_profile(changes: dict = Body(...)):
     for field, value in changes.items():
         if field in MAX_LENGTH:
             if not isinstance(value, str) or len(value.strip()) > MAX_LENGTH[field]:
-                raise HTTPException(status_code=400, detail=KIND_NO)
+                refuse(field, "It’s too long.")
             value = value.strip()
             # A phone number needs real digits (at least 3, like 911), or it is left empty.
             if field.endswith("phone") and value and (not PHONE.match(value) or sum(ch.isdigit() for ch in value) < 3):
-                raise HTTPException(status_code=400, detail=KIND_NO)
+                refuse(field, "Use numbers, like 555‑0123.")
             if field == "family_email" and not EMAIL.match(value):
-                raise HTTPException(status_code=400, detail=KIND_NO)
+                refuse(field, "It looks like name@example.com.")
             clean[field] = value
         elif field == "voice_on":
             if not isinstance(value, bool):
-                raise HTTPException(status_code=400, detail=KIND_NO)
+                refuse(field)
             clean[field] = int(value)
         elif field == "voice_rate":
             if not isinstance(value, (int, float)) or not 0.6 <= value <= 1.4:
-                raise HTTPException(status_code=400, detail=KIND_NO)
+                refuse(field)
             clean[field] = float(value)
         else:
-            raise HTTPException(status_code=400, detail=KIND_NO)
+            refuse(field)
 
     connection = db.get_connection()
     try:

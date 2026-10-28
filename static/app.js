@@ -1,13 +1,37 @@
 // Grandma Buddy: the page shell.
 // Greets her (by name once the family has set it up), shows the date,
-// grows the words on request (and remembers her choice), and shows a kind
-// note for features that aren't built yet. Talking lives in talk.js,
-// reading aloud in speech.js, and recording in recorder.js.
+// grows the words on request (and remembers her choice), moves between
+// screens (the router), opens the Menu on phones, and shows a kind note for
+// features that aren't built yet. Talking lives in talk.js, the other
+// screens in screens.js, reading aloud in speech.js, and recording in
+// recorder.js.
 
 "use strict";
 
 // Her profile from /api/profile: names, phone numbers, voice settings.
 var profile = { preferred_name: "", name: "", family_name: "", family_phone: "" };
+
+// Ask our own server. Resolves with its answer. If the server says no,
+// rejects with an error whose .detail says why (for example which entry
+// on the Family form needs another look). If there is no connection,
+// rejects with no .detail.
+function api(path, method, body) {
+  var options = { method: method || "GET" };
+  if (body !== undefined) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+  return fetch(path, options).then(function (response) {
+    return response.json().catch(function () { return {}; }).then(function (answer) {
+      if (!response.ok) {
+        var refused = new Error("Refused");
+        refused.detail = answer.detail;
+        throw refused;
+      }
+      return answer;
+    });
+  });
+}
 
 // Morning, afternoon, or evening, based on the real time, with her name
 // when it is known. From 6 AM to 6 PM the page is light; otherwise dark.
@@ -36,21 +60,103 @@ function showToday() {
   });
 }
 
-// Load her profile, then update the greeting and voice settings.
+// Use a freshly loaded or saved profile: greeting and voice settings.
+function useProfile(saved) {
+  profile = saved;
+  voiceSettings.on = saved.voice_on !== false;
+  voiceSettings.rate = saved.voice_rate || 0.9;
+  showGreeting();
+}
+
+// Load her profile, then refresh the screen she is on (the Family screen
+// shows the names and numbers).
 function loadProfile() {
-  return fetch("/api/profile")
-    .then(function (response) {
-      return response.ok ? response.json() : profile;
-    })
+  return api("/api/profile")
     .then(function (saved) {
-      profile = saved;
-      voiceSettings.on = saved.voice_on !== false;
-      voiceSettings.rate = saved.voice_rate || 0.9;
-      showGreeting();
+      useProfile(saved);
+      loadScreen(currentScreen());
     })
     .catch(function () {
       // No connection to our own server: keep the simple greeting.
     });
+}
+
+// ---------- Screens (the router) ----------
+
+// Each screen has its own address: #/diary, #/family… Today is #/ (or nothing).
+var SCREEN_TITLES = {
+  today: "Today",
+  diary: "My diary",
+  pills: "My pills",
+  notes: "Doctor notes",
+  scam: "Is this a scam?",
+  family: "Family",
+};
+
+function currentScreen() {
+  var name = location.hash.replace(/^#\/?/, "");
+  return SCREEN_TITLES.hasOwnProperty(name) ? name : "today";
+}
+
+// Fill a screen with fresh information (SCREEN_LOADERS is in screens.js).
+function loadScreen(name) {
+  if (SCREEN_LOADERS[name]) {
+    SCREEN_LOADERS[name]();
+  }
+}
+
+// Show the screen named in the address and hide the others. When she moved
+// there herself, start at the top with keyboard and screen-reader focus on
+// the screen's heading, so she hears where she is.
+function showScreen(moveFocus) {
+  var name = currentScreen();
+  // Leaving Today while Buddy is listening: finish up, so her words still
+  // reach the safety net.
+  if (name !== "today" && talkState === "listening") {
+    finishTalking();
+  }
+  document.querySelectorAll("[data-screen]").forEach(function (screen) {
+    screen.hidden = screen.getAttribute("data-screen") !== name;
+  });
+  document.querySelectorAll("[data-nav]").forEach(function (link) {
+    if (link.getAttribute("data-nav") === name) {
+      link.setAttribute("aria-current", "page");
+    } else {
+      link.removeAttribute("aria-current");
+    }
+  });
+  document.title = name === "today" ? "Grandma Buddy" : SCREEN_TITLES[name] + " · Grandma Buddy";
+  closeMenu();
+  loadScreen(name);
+  if (moveFocus) {
+    window.scrollTo(0, 0);
+    document.querySelector('[data-screen="' + name + '"] h1').focus();
+  }
+}
+
+// ---------- The Menu on phones and upright tablets ----------
+
+// The sidebar slides in over the page. While it is open, the page behind it
+// can't be reached (inert), so keyboard focus stays in the menu.
+function openMenu() {
+  document.getElementById("sidebar").setAttribute("data-open", "");
+  document.getElementById("scrim").hidden = false;
+  document.querySelector(".main").inert = true;
+  document.getElementById("menu-button").setAttribute("aria-expanded", "true");
+  document.querySelector(".side-item[aria-current]").focus();
+}
+
+function closeMenu() {
+  document.getElementById("sidebar").removeAttribute("data-open");
+  document.getElementById("scrim").hidden = true;
+  document.querySelector(".main").inert = false;
+  document.getElementById("menu-button").setAttribute("aria-expanded", "false");
+}
+
+// Closed with "Close", a tap beside it, or Escape: focus goes back to "Menu".
+function closeMenuAndReturn() {
+  closeMenu();
+  document.getElementById("menu-button").focus();
 }
 
 // Restart a short CSS animation (see "Motion" in styles.css), so
@@ -137,11 +243,29 @@ function start() {
   say(document.getElementById("message").textContent);
 
   startTalking(); // talk.js
+  startScreens(); // screens.js
 
-  // She is already on Today: the Today button just goes back to the top.
-  document.getElementById("home-tab").addEventListener("click", function () {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  // Show the screen in the address (Today when there is none), and follow
+  // every change after that, including the browser's Back button.
+  showScreen(false);
+  window.addEventListener("hashchange", function () {
+    showScreen(true);
   });
+
+  document.getElementById("skip-link").addEventListener("click", function () {
+    document.querySelector('[data-screen="' + currentScreen() + '"] h1').focus();
+  });
+  document.getElementById("menu-button").addEventListener("click", openMenu);
+  document.getElementById("menu-close").addEventListener("click", closeMenuAndReturn);
+  document.getElementById("scrim").addEventListener("click", closeMenuAndReturn);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && document.getElementById("sidebar").hasAttribute("data-open")) {
+      closeMenuAndReturn();
+    }
+  });
+  // A tablet turned sideways shows the sidebar for good: close the drawer
+  // so the page behind it can be used again.
+  matchMedia("(min-width: 1000px)").addEventListener("change", closeMenu);
 
   document.querySelectorAll("[data-coming-soon]").forEach(function (button) {
     button.addEventListener("click", function () {

@@ -63,12 +63,14 @@ grandma-buddy-hackathon/
       family.py              /api/family/summary
       profile.py             /api/profile
   static/
-    index.html               one page with sections: home, talk, diary, pills, scam, notes, family, settings
+    index.html               one page, one <section data-screen> per screen: today, diary, pills, notes, scam, family (with settings)
     styles.css               senior-friendly styles (see docs/DESIGN.md)
-    app.js                   navigation, API calls, reminder checks every 30 seconds
+    app.js                   page shell: greeting, Bigger words, api() helper, router (#/diary…), phone Menu drawer
+    talk.js                  voice box, /api/chat, call buttons, safety screens
+    screens.js               the screens other than Today (Family & settings so far)
     recorder.js              microphone -> 16 kHz mono 16-bit WAV
     speech.js                read-aloud wrapper around speechSynthesis (speed, voice, replay)
-    fonts/                   Atkinson Hyperlegible Next (the app's font) and its license, OFL.txt
+    fonts/                   Lexend (the app's font) and its license, OFL-Lexend.txt
   scripts/
     check_meta.py            one tiny real call to confirm the API key and billing work
     seed_demo.py             fills the database with made-up demo data ("Rose", 7 days)

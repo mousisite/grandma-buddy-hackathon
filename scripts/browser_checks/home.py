@@ -41,16 +41,17 @@ LAYOUT_PROBLEMS_JS = """() => {
     problems.push(`sideways scrolling: ${root.scrollWidth} > ${root.clientWidth}`);
   }
   // An icon squeezed by long words gets narrower than it is tall.
-  document.querySelectorAll("button .icon").forEach((icon) => {
+  document.querySelectorAll("button .icon, a .icon").forEach((icon) => {
     const box = icon.getBoundingClientRect();
     if (box.width < box.height - 1) {
       problems.push(`squashed icon on "${icon.parentElement.textContent.trim()}"`);
     }
   });
-  // Words must stay inside their button, even with the biggest words.
-  // Measures each line of text itself (decorations like the plate's rings
-  // may reach outside a button on purpose).
-  document.querySelectorAll("button").forEach((button) => {
+  // Words must stay inside their button or link, even with the biggest
+  // words. Measures each line of text itself (decorations like the voice
+  // box's glow may reach outside a button on purpose).
+  document.querySelectorAll("button, a, label").forEach((button) => {
+    if (!button.getClientRects().length) return; // hidden screens
     const box = button.getBoundingClientRect();
     const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
     const range = document.createRange();
@@ -64,15 +65,6 @@ LAYOUT_PROBLEMS_JS = """() => {
     }
     if (spilled) {
       problems.push(`words spill out of "${button.textContent.trim()}"`);
-    }
-  });
-  // Stars must stay beside the page column, never behind the words.
-  const page = document.querySelector(".page").getBoundingClientRect();
-  document.querySelectorAll(".sparkle").forEach((star) => {
-    const box = star.getBoundingClientRect();
-    const onScreen = box.right > 0 && box.left < root.clientWidth;
-    if (onScreen && box.right > page.left && box.left < page.right) {
-      problems.push(`star behind the words at x=${Math.round(box.left)}`);
     }
   });
   return problems;
@@ -91,9 +83,95 @@ def check_wav(upload: bytes) -> None:
 
 
 def check_layout(page, where: str) -> None:
-    """Fail if the page scrolls sideways, an icon is squashed, or a star sits behind words."""
+    """Fail if the page scrolls sideways, an icon is squashed, or words spill out."""
     problems = page.evaluate(LAYOUT_PROBLEMS_JS)
     assert not problems, f"layout problems at {where}: {problems}"
+
+
+def shown_screen(page) -> str:
+    """The name of the one screen on show (all the others must be hidden)."""
+    shown = page.eval_on_selector_all("[data-screen]:not([hidden])", "els => els.map(e => e.dataset.screen)")
+    assert len(shown) == 1, f"expected one screen on show, got {shown}"
+    return shown[0]
+
+
+def check_family_form(page, problems: list[str]) -> None:
+    """The Family screen: save names and numbers, get call buttons, and a
+    refused entry is named and focused."""
+    page.click(".side-item[data-nav='family']")
+    page.wait_for_function("document.title === 'Family · Grandma Buddy'")
+    assert shown_screen(page) == "family"
+    focused = page.evaluate("document.activeElement.id")
+    assert focused == "family-title", f"focus should move to the heading, not {focused!r}"
+    assert page.is_visible("#family-calls-empty"), "the no-numbers note should show before setup"
+
+    # Made-up demo people only.
+    page.fill("#set-preferred-name", "Rose")
+    page.fill("#set-family-name", "Maria")
+    page.fill("#set-family-phone", "555-0100")
+    page.fill("#set-doctor-name", "Dr. Lee")
+    page.fill("#set-doctor-phone", "soon")  # not a phone number
+    page.click("#settings-form button[type=submit]")
+    page.wait_for_selector("#set-doctor-phone[aria-invalid='true']")
+    # The note sits right under the refused entry and says how to fix it.
+    note = page.text_content("#set-doctor-phone + .field-problem") or ""
+    assert note == "Please check the doctor’s phone number. Use numbers, like 555‑0123.", note
+    assert page.evaluate("document.activeElement.id") == "set-doctor-phone", "the refused entry should get focus"
+    page.screenshot(path=str(OUT / "family-refused-entry.png"))
+
+    # Going back to Today and returning keeps what was typed but not saved.
+    page.click(".side-item[data-nav='today']")
+    page.click(".side-item[data-nav='family']")
+    page.wait_for_function("document.title === 'Family · Grandma Buddy'")
+    assert page.input_value("#set-family-name") == "Maria", "unsaved entries were lost"
+    # The browser logs that refusal as an error. It was expected: remove it.
+    problems.remove("Failed to load resource: the server responded with a status of 400 (Bad Request)")
+
+    page.fill("#set-doctor-phone", "555-0199")
+    page.click("text=Slower")
+    page.click("#settings-form button[type=submit]")
+    page.wait_for_selector("#settings-status:has-text('Saved')")
+    assert not page.query_selector(".field-problem"), "the old problem note should be gone after saving"
+    hrefs = page.eval_on_selector_all("#family-calls a", "links => links.map(a => a.getAttribute('href'))")
+    assert hrefs == ["tel:555-0100", "tel:555-0199"], hrefs
+    assert page.text_content("#family-calls a") == "Call Maria"
+    assert not page.is_visible("#family-calls-empty")
+    page.screenshot(path=str(OUT / "family-desktop.png"), full_page=True)
+    check_layout(page, "Family screen, desktop")
+
+    # The browser's Back button returns to Today, which now greets her by name.
+    page.go_back()
+    page.wait_for_function("document.querySelector('[data-screen=today]').hidden === false")
+    greeting = page.text_content("#greeting") or ""
+    assert greeting.endswith(", Rose"), f"greeting should use her name: {greeting!r}"
+    # A fresh visit to Family shows what was saved, Slower included.
+    page.goto(f"http://localhost:{PORT}/#/family", wait_until="networkidle")
+    page.wait_for_function("document.querySelector('#set-family-name').value === 'Maria'")
+    assert page.is_checked("input[name=voice_rate][value='0.75']"), "the voice speed was not remembered"
+
+
+def check_phone_menu(page) -> None:
+    """Phones: "Menu" slides the sidebar in, a choice opens that screen and
+    closes the menu, and Escape closes it too."""
+    assert not page.is_visible("#sidebar"), "the sidebar should be hidden on phones"
+    page.click("#menu-button")
+    page.wait_for_selector("#sidebar[data-open]")
+    page.wait_for_timeout(400)  # let it slide in
+    here = shown_screen(page)
+    assert page.evaluate("document.activeElement.dataset.nav") == here, "focus should start on the screen she is on"
+    assert page.evaluate("document.querySelector('.main').inert"), "the page behind the menu should be unreachable"
+    page.screenshot(path=str(OUT / "menu-375px.png"))
+    check_layout(page, "phone menu open")
+    page.click(".side-item[data-nav='pills']")
+    page.wait_for_function("!document.querySelector('#sidebar').hasAttribute('data-open')")
+    assert shown_screen(page) == "pills"
+    assert not page.evaluate("document.querySelector('.main').inert")
+
+    page.click("#menu-button")
+    page.wait_for_selector("#sidebar[data-open]")
+    page.keyboard.press("Escape")
+    page.wait_for_function("!document.querySelector('#sidebar').hasAttribute('data-open')")
+    assert page.evaluate("document.activeElement.id") == "menu-button", "focus should return to Menu"
 
 
 def main() -> int:
@@ -164,6 +242,10 @@ def main() -> int:
                 page.click("#actions button")
                 page.wait_for_selector("#actions button:has-text('Added to doctor notes')")
 
+                # Moving between screens, and the Family & settings form
+                # (the real /api/profile, throwaway database).
+                check_family_form(page, problems)
+
                 # The safety net, end to end: she says an emergency warning sign
                 # (faked speech-to-text), the real /api/chat answers with no AI,
                 # and the red full-screen message with Call 911 appears.
@@ -207,6 +289,27 @@ def main() -> int:
                 label = phone.text_content("#text-size-label") or ""
                 assert label == "Smaller words", f"words size not remembered: {label!r}"
 
+                # Every screen, opened by its address, at phone width with the
+                # biggest words: nothing spills, nothing scrolls sideways.
+                for name in ["diary", "pills", "notes", "scam", "family"]:
+                    phone.goto(f"http://localhost:{PORT}/#/{name}", wait_until="networkidle")
+                    assert shown_screen(phone) == name
+                    phone.wait_for_timeout(500)
+                    check_layout(phone, f"{name} screen, 375px with biggest words")
+                phone.screenshot(path=str(OUT / "family-375px-big.png"), full_page=True)
+                check_phone_menu(phone)
+
+                # The narrowest phones (360px) and an upright tablet (768px).
+                for width in [360, 768]:
+                    narrow = browser.new_page(viewport={"width": width, "height": 800})
+                    narrow.goto(f"http://localhost:{PORT}/#/family", wait_until="networkidle")
+                    narrow.wait_for_timeout(500)
+                    check_layout(narrow, f"Family screen at {width}px")
+                    narrow.goto(f"http://localhost:{PORT}/#/", wait_until="networkidle")
+                    narrow.wait_for_timeout(1200)
+                    check_layout(narrow, f"Today at {width}px")
+                    narrow.close()
+
                 # 200% browser zoom on a 1280px screen shows 640 CSS px: same check.
                 zoomed = browser.new_page(viewport={"width": 640, "height": 900})
                 zoomed.goto(f"http://localhost:{PORT}/", wait_until="networkidle")
@@ -222,7 +325,10 @@ def main() -> int:
                 print(" -", problem)
             return 1
 
-        print("Home check OK: talking works (16 kHz mono WAV sent, words shown), no layout problems. Screenshots in test-output/.")
+        print(
+            "Home check OK: talking works (16 kHz mono WAV sent, words shown), screens and the phone menu work, "
+            "the Family form saves and names a refused entry, no layout problems. Screenshots in test-output/."
+        )
         return 0
     finally:
         server.terminate()

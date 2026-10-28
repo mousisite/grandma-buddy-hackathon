@@ -220,9 +220,10 @@ function addQuestionButton(action) {
   return button;
 }
 
-// Opening another part of the app (the screens arrive in the next step).
+// Opening another part of the app ("Open My pills"): change the address,
+// and the router in app.js shows that screen.
 function openScreen(screen) {
-  sayComingSoon(screen === "notes" ? "Doctor notes" : screen.charAt(0).toUpperCase() + screen.slice(1));
+  location.hash = screen === "today" ? "#/" : "#/" + screen;
 }
 
 // Call 911, and family if their number is set up. Used when the internet

@@ -127,3 +127,16 @@ def test_profile_rejects_odd_values(client):
     assert client.put("/api/profile", json={"family_phone": ""}).status_code == 200    # clearing is fine
     assert client.put("/api/profile", json={"voice_rate": 9}).status_code == 400
     assert client.put("/api/profile", json={"preferred_name": "x" * 200}).status_code == 400
+
+
+def test_a_refused_profile_entry_is_named_so_the_form_can_point_to_it(client):
+    refused = client.put("/api/profile", json={"family_name": "Maria", "doctor_phone": "soon"})
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == {
+        "field": "doctor_phone",
+        "message": "Please check the doctor’s phone number. Use numbers, like 555‑0123.",
+    }
+    email = client.put("/api/profile", json={"family_email": "maria at home"}).json()["detail"]
+    assert email["message"] == "Please check the family email address. It looks like name@example.com."
+    # Nothing is half-saved: Maria was refused along with the bad number.
+    assert client.get("/api/profile").json()["family_name"] == ""

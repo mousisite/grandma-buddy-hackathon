@@ -1,8 +1,11 @@
 <!DOCTYPE html>
-<!-- Grandma Buddy home screen, in the style of AI assistant apps
-     (ChatGPT, Perplexity, Gemini): a sidebar on big screens, one big
-     centered question, a voice box with a round voice button,
-     suggestion cards, and an honest note at the bottom. -->
+<!-- Grandma Buddy, in the style of AI assistant apps (ChatGPT, Perplexity,
+     Gemini): a sidebar on big screens (a "Menu" drawer on phones), one big
+     centered question, a voice box with a round voice button, suggestion
+     cards, and an honest note at the bottom.
+     Every screen lives on this one page as a <section data-screen>. app.js
+     shows the one named in the address (#/diary, #/family…), so the
+     browser's Back button works. -->
 <html lang="en" data-time="day" data-talk="idle">
 <head>
   <meta charset="utf-8">
@@ -18,121 +21,273 @@
   THESIS: Buddy looks and moves like the AI assistants people know (ChatGPT, Perplexity, Gemini), made big and calm for her: one question, one voice box, a few clear suggestions.
   OWN-WORLD: Quiet white page (dark at night), a soft blue glow behind the voice box, a round black voice button, light gray suggestion cards with line icons, a sidebar on big screens, Lexend type, almost no color.
   STORY: Buddy asks how she is; she taps the voice box and talks; it listens, thinks, and her words appear; suggestions sit right under it.
-  FIRST VIEWPORT: Top bar with Buddy's mark and Bigger words; the date, greeting, and Buddy's question centered; the voice box; the first suggestion cards.
+  FIRST VIEWPORT: Top bar with Menu and Bigger words; the date, greeting, and Buddy's question centered; the voice box; the first suggestion cards.
   FORM: User-directed: match AI SaaS apps (ChatGPT, Perplexity, Gemini patterns), seed key 2daf57d9.
   FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
   -->
 
-  <div class="shell">
-    <!-- Sidebar (tablets lying sideways and computers only). -->
-    <aside class="sidebar" aria-label="Menu">
-      <div class="brand">
-        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c1.2 6.6 6.4 11.8 13 13-6.6 1.2-11.8 6.4-13 13-1.2-6.6-6.4-11.8-13-13 6.6-1.2 11.8-6.4 13-13Z"></path></svg>
-        <span>Buddy</span>
-      </div>
-      <nav class="side-nav" aria-label="Sections">
-        <button class="side-item" type="button" id="home-tab" aria-current="page">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18.5V7a2.5 2.5 0 0 1 2.5-2.5h9A2.5 2.5 0 0 1 19 7v6.5a2.5 2.5 0 0 1-2.5 2.5H9Z"></path></svg>
-          Today
-        </button>
-        <button class="side-item" type="button" data-coming-soon="My diary">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C9.5 4.8 6.5 4.6 4 5.5v13c2.5-.9 5.5-.7 8 1 2.5-1.7 5.5-1.9 8-1v-13c-2.5-.9-5.5-.7-8 1Z"></path><line x1="12" y1="6.5" x2="12" y2="19.5"></line></svg>
-          My diary
-        </button>
-        <button class="side-item" type="button" data-coming-soon="My pills">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8" width="17" height="8" rx="4"></rect><line x1="12" y1="8" x2="12" y2="16"></line></g></svg>
-          My pills
-        </button>
-        <button class="side-item" type="button" data-coming-soon="Doctor notes">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 2.5h6v3H9zM9 11h6M9 15h4"></path></svg>
-          Doctor notes
-        </button>
-        <button class="side-item" type="button" data-coming-soon="Family">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 19c.5-3.5 3-5.5 5.5-5.5s5 2 5.5 5.5M14.5 14.2c.8-.5 1.6-.7 2.5-.7 2 0 3.8 1.5 4 4.5"></path></svg>
-          Family
-        </button>
-      </nav>
-      <p class="side-note">Made for you and your family. Your notes stay on this device.</p>
-    </aside>
+  <!-- For keyboard users: the first Tab stop jumps past the menu to the
+       screen's heading. Hidden until it has keyboard focus. -->
+  <button id="skip-link" class="skip-link" type="button">Skip to the page</button>
 
-    <div class="main">
-      <!-- Top bar: Buddy's mark (on small screens) and Bigger words. -->
-      <header class="topbar">
-        <div class="brand brand--top">
+  <div class="shell">
+    <!-- The menu: always on the left on big screens; on phones and upright
+         tablets it slides in when she taps "Menu". -->
+    <aside id="sidebar" class="sidebar" aria-label="Menu">
+      <div class="sidebar-top">
+        <div class="brand">
           <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c1.2 6.6 6.4 11.8 13 13-6.6 1.2-11.8 6.4-13 13-1.2-6.6-6.4-11.8-13-13 6.6-1.2 11.8-6.4 13-13Z"></path></svg>
           <span>Buddy</span>
         </div>
+        <button id="menu-close" class="ghost-button menu-close" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          Close
+        </button>
+      </div>
+      <nav class="side-nav" aria-label="Sections">
+        <a class="side-item" href="#/" data-nav="today" aria-current="page">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18.5V7a2.5 2.5 0 0 1 2.5-2.5h9A2.5 2.5 0 0 1 19 7v6.5a2.5 2.5 0 0 1-2.5 2.5H9Z"></path></svg>
+          Today
+        </a>
+        <a class="side-item" href="#/diary" data-nav="diary">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C9.5 4.8 6.5 4.6 4 5.5v13c2.5-.9 5.5-.7 8 1 2.5-1.7 5.5-1.9 8-1v-13c-2.5-.9-5.5-.7-8 1Z"></path><line x1="12" y1="6.5" x2="12" y2="19.5"></line></svg>
+          My diary
+        </a>
+        <a class="side-item" href="#/pills" data-nav="pills">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8" width="17" height="8" rx="4"></rect><line x1="12" y1="8" x2="12" y2="16"></line></g></svg>
+          My pills
+        </a>
+        <a class="side-item" href="#/notes" data-nav="notes">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 2.5h6v3H9zM9 11h6M9 15h4"></path></svg>
+          Doctor notes
+        </a>
+        <a class="side-item" href="#/scam" data-nav="scam">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6Z"></path><path d="M9 12l2 2 4-4"></path></svg>
+          Scam check
+        </a>
+        <a class="side-item" href="#/family" data-nav="family">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 19c.5-3.5 3-5.5 5.5-5.5s5 2 5.5 5.5M14.5 14.2c.8-.5 1.6-.7 2.5-.7 2 0 3.8 1.5 4 4.5"></path></svg>
+          Family
+        </a>
+      </nav>
+      <p class="side-note">Made for you and your family. Your notes stay on this device.</p>
+    </aside>
+    <!-- Dims the page behind the menu on phones. Tapping it closes the menu. -->
+    <div id="scrim" class="scrim" hidden></div>
+
+    <div class="main">
+      <!-- Top bar: Menu (phones and upright tablets) and Bigger words. -->
+      <header class="topbar">
+        <button id="menu-button" class="ghost-button menu-button" type="button" aria-controls="sidebar" aria-expanded="false">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+          Menu
+        </button>
         <!-- The label always says what tapping it will do (app.js changes it). -->
-        <button id="text-size-button" class="ghost-button" type="button">
+        <button id="text-size-button" class="ghost-button text-size-button" type="button">
           <span id="text-size-glyph" class="glyph" aria-hidden="true">A+</span>
           <span id="text-size-label">Bigger words</span>
         </button>
       </header>
 
       <main class="page">
-        <!-- 1. The big centered question. -->
-        <section class="intro" aria-label="Hello">
-          <p id="today-date" class="date"></p>
-          <h1 id="greeting">Good morning</h1>
-          <!-- Buddy's words. Kind notes and "Listening…" appear here. -->
-          <p id="message" class="message" role="status" aria-live="polite">How are you feeling today?</p>
-          <!-- Call buttons Buddy offers (filled in by talk.js), and "Say it again". -->
-          <div id="actions" class="actions" aria-label="Call buttons" hidden></div>
-          <button id="say-again" class="say-again" type="button">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
-            Say it again
-          </button>
+        <!-- ========== Today ========== -->
+        <section class="screen" data-screen="today" aria-labelledby="greeting">
+          <!-- 1. The big centered question. -->
+          <div class="intro">
+            <p id="today-date" class="date"></p>
+            <h1 id="greeting" tabindex="-1">Good morning</h1>
+            <!-- Buddy's words. Kind notes and "Listening…" appear here. -->
+            <p id="message" class="message" role="status" aria-live="polite">How are you feeling today?</p>
+            <!-- Call buttons Buddy offers (filled in by talk.js), and "Say it again". -->
+            <div id="actions" class="actions" aria-label="Call buttons" hidden></div>
+            <button id="say-again" class="say-again" type="button">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
+              Say it again
+            </button>
+          </div>
+
+          <!-- What she said. Hidden until she has talked. -->
+          <section id="you-said" class="you-said said" aria-label="What you said" hidden>
+            <p id="you-said-text" class="said-text"></p>
+          </section>
+
+          <!-- 2. The voice box. The whole box is the button. -->
+          <div class="composer-wrap">
+            <span class="glow" aria-hidden="true"></span>
+            <button id="talk-button" class="composer" type="button" data-state="idle">
+              <span class="composer-text">
+                <span id="talk-label" class="composer-title">Tap to talk</span>
+                <span class="composer-hint">Buddy writes down what you say</span>
+              </span>
+              <!-- The round voice button: a waveform icon, live bars while
+                   listening, or a spinner while working. -->
+              <span class="voice" aria-hidden="true">
+                <svg class="icon voice-icon" viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"></path></svg>
+                <span class="wave"><i></i><i></i><i></i><i></i><i></i></span>
+                <span class="spinner"></span>
+              </span>
+            </button>
+          </div>
+
+          <!-- 3. Suggestions, like the cards under an AI app's box. -->
+          <nav class="suggestions" aria-label="Main choices">
+            <button class="suggestion" type="button" data-coming-soon="Something hurts">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(45 12 12)"><rect x="2" y="8.5" width="20" height="7" rx="3.5"></rect><rect x="9" y="8.5" width="6" height="7"></rect></g></svg>
+              <span class="suggestion-title">Something hurts</span>
+              <span class="suggestion-text">Write it down for your doctor</span>
+            </button>
+            <a class="suggestion" href="#/scam">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6Z"></path><path d="M9 12l2 2 4-4"></path></svg>
+              <span class="suggestion-title">Is this a scam?</span>
+              <span class="suggestion-text">Check a strange message</span>
+            </a>
+            <a class="suggestion" href="#/pills">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8" width="17" height="8" rx="4"></rect><line x1="12" y1="8" x2="12" y2="16"></line></g></svg>
+              <span class="suggestion-title">My pills</span>
+              <span id="pills-summary" class="suggestion-text">None set up yet</span>
+            </a>
+            <a class="suggestion" href="#/family">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 19c.5-3.5 3-5.5 5.5-5.5s5 2 5.5 5.5M14.5 14.2c.8-.5 1.6-.7 2.5-.7 2 0 3.8 1.5 4 4.5"></path></svg>
+              <span class="suggestion-title">Family</span>
+              <span class="suggestion-text">Call or send an update</span>
+            </a>
+          </nav>
         </section>
 
-        <!-- What she said. Hidden until she has talked. -->
-        <section id="you-said" class="you-said said" aria-label="What you said" hidden>
-          <p id="you-said-text" class="said-text"></p>
+        <!-- ========== My diary (built in the next step) ========== -->
+        <section class="screen" data-screen="diary" aria-labelledby="diary-title" hidden>
+          <header class="screen-head">
+            <a class="back-link" href="#/">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+              Back to Today
+            </a>
+            <h1 id="diary-title" tabindex="-1">My diary</h1>
+            <p class="lead">What you tell Buddy about how you feel, written down for your doctor.</p>
+          </header>
+          <p class="empty">This part of Buddy is still being built. It’s coming soon.</p>
         </section>
 
-        <!-- 2. The voice box. The whole box is the button. -->
-        <div class="composer-wrap">
-          <span class="glow" aria-hidden="true"></span>
-          <button id="talk-button" class="composer" type="button" data-state="idle">
-            <span class="composer-text">
-              <span id="talk-label" class="composer-title">Tap to talk</span>
-              <span class="composer-hint">Buddy writes down what you say</span>
-            </span>
-            <!-- The round voice button: a waveform icon, live bars while
-                 listening, or a spinner while working. -->
-            <span class="voice" aria-hidden="true">
-              <svg class="icon voice-icon" viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"></path></svg>
-              <span class="wave"><i></i><i></i><i></i><i></i><i></i></span>
-              <span class="spinner"></span>
-            </span>
-          </button>
-        </div>
+        <!-- ========== My pills (built later) ========== -->
+        <section class="screen" data-screen="pills" aria-labelledby="pills-title" hidden>
+          <header class="screen-head">
+            <a class="back-link" href="#/">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+              Back to Today
+            </a>
+            <h1 id="pills-title" tabindex="-1">My pills</h1>
+            <p class="lead">Your pills for today, and a reminder when it’s time.</p>
+          </header>
+          <p class="empty">This part of Buddy is still being built. It’s coming soon.</p>
+        </section>
 
-        <!-- 3. Suggestions, like the cards under an AI app's box. -->
-        <nav class="suggestions" aria-label="Main choices">
-          <button class="suggestion" type="button" data-coming-soon="Something hurts">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(45 12 12)"><rect x="2" y="8.5" width="20" height="7" rx="3.5"></rect><rect x="9" y="8.5" width="6" height="7"></rect></g></svg>
-            <span class="suggestion-title">Something hurts</span>
-            <span class="suggestion-text">Write it down for your doctor</span>
-          </button>
-          <button class="suggestion" type="button" data-coming-soon="Is this a scam?">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6Z"></path><path d="M9 12l2 2 4-4"></path></svg>
-            <span class="suggestion-title">Is this a scam?</span>
-            <span class="suggestion-text">Check a strange message</span>
-          </button>
-          <button class="suggestion" type="button" data-coming-soon="My pills">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8" width="17" height="8" rx="4"></rect><line x1="12" y1="8" x2="12" y2="16"></line></g></svg>
-            <span class="suggestion-title">My pills</span>
-            <span id="pills-summary" class="suggestion-text">None set up yet</span>
-          </button>
-          <button class="suggestion" type="button" data-coming-soon="Family">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 19c.5-3.5 3-5.5 5.5-5.5s5 2 5.5 5.5M14.5 14.2c.8-.5 1.6-.7 2.5-.7 2 0 3.8 1.5 4 4.5"></path></svg>
-            <span class="suggestion-title">Family</span>
-            <span class="suggestion-text">Call or send an update</span>
-          </button>
-        </nav>
+        <!-- ========== Doctor notes (built later) ========== -->
+        <section class="screen" data-screen="notes" aria-labelledby="notes-title" hidden>
+          <header class="screen-head">
+            <a class="back-link" href="#/">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+              Back to Today
+            </a>
+            <h1 id="notes-title" tabindex="-1">Doctor notes</h1>
+            <p class="lead">One page to bring to your next doctor visit.</p>
+          </header>
+          <p class="empty">This part of Buddy is still being built. It’s coming soon.</p>
+        </section>
 
-        <!-- 4. The honest note, like AI apps show under their box. -->
-        <p class="footnote">Buddy is an AI helper. It can't give medical advice. In an emergency, <a class="footnote-call" href="tel:911">call 911</a>.</p>
+        <!-- ========== Scam check (built later) ========== -->
+        <section class="screen" data-screen="scam" aria-labelledby="scam-title" hidden>
+          <header class="screen-head">
+            <a class="back-link" href="#/">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+              Back to Today
+            </a>
+            <h1 id="scam-title" tabindex="-1">Is this a scam?</h1>
+            <p class="lead">Read or paste a strange message, and Buddy looks for warning signs.</p>
+          </header>
+          <p class="empty">This part of Buddy is still being built. It’s coming soon.</p>
+        </section>
+
+        <!-- ========== Family and settings ========== -->
+        <section class="screen" data-screen="family" aria-labelledby="family-title" hidden>
+          <header class="screen-head">
+            <a class="back-link" href="#/">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+              Back to Today
+            </a>
+            <h1 id="family-title" tabindex="-1">Family</h1>
+            <p class="lead">Call the people who help you.</p>
+          </header>
+          <!-- Call buttons for family and doctor (screens.js fills these in). -->
+          <div id="family-calls" class="call-row" aria-label="Call buttons"></div>
+          <p id="family-calls-empty" class="empty">No phone numbers yet. A family member can add them below.</p>
+
+          <!-- Filled in once by a family member. novalidate: the server checks
+               every entry and says which one needs another look. -->
+          <form id="settings-form" class="settings" novalidate>
+            <h2>Set up Buddy</h2>
+            <p class="lead">For a family member. Fill this in once and change it any time.</p>
+
+            <fieldset class="card">
+              <legend>About her</legend>
+              <div class="field">
+                <label for="set-name">Her full name</label>
+                <input id="set-name" name="name" type="text" autocomplete="off" maxlength="80">
+              </div>
+              <div class="field">
+                <label for="set-preferred-name">What Buddy calls her</label>
+                <input id="set-preferred-name" name="preferred_name" type="text" autocomplete="off" maxlength="80">
+              </div>
+            </fieldset>
+
+            <fieldset class="card">
+              <legend>Family member to call</legend>
+              <div class="field">
+                <label for="set-family-name">Name</label>
+                <input id="set-family-name" name="family_name" type="text" autocomplete="off" maxlength="80">
+              </div>
+              <div class="field">
+                <label for="set-family-phone">Phone number</label>
+                <input id="set-family-phone" name="family_phone" type="tel" autocomplete="off" maxlength="30">
+              </div>
+              <div class="field">
+                <label for="set-family-email">Email, for daily updates</label>
+                <input id="set-family-email" name="family_email" type="email" autocomplete="off" spellcheck="false" maxlength="120">
+              </div>
+            </fieldset>
+
+            <fieldset class="card">
+              <legend>Her doctor</legend>
+              <div class="field">
+                <label for="set-doctor-name">Name</label>
+                <input id="set-doctor-name" name="doctor_name" type="text" autocomplete="off" maxlength="80">
+              </div>
+              <div class="field">
+                <label for="set-doctor-phone">Phone number</label>
+                <input id="set-doctor-phone" name="doctor_phone" type="tel" autocomplete="off" maxlength="30">
+              </div>
+            </fieldset>
+
+            <fieldset class="card">
+              <legend>Buddy’s voice</legend>
+              <label class="check">
+                <input name="voice_on" type="checkbox">
+                Read Buddy’s words aloud
+              </label>
+              <fieldset class="choices">
+                <legend>How fast Buddy talks</legend>
+                <label class="choice"><input type="radio" name="voice_rate" value="0.75"> Slower</label>
+                <label class="choice"><input type="radio" name="voice_rate" value="0.9"> Normal</label>
+                <label class="choice"><input type="radio" name="voice_rate" value="1.1"> Faster</label>
+              </fieldset>
+              <p class="hint">Emergency messages are always read aloud.</p>
+            </fieldset>
+
+            <p id="settings-status" class="form-status" role="status" aria-live="polite"></p>
+            <button class="primary-button" type="submit">Save</button>
+          </form>
+        </section>
+
+        <!-- The honest note, on every screen. "call 911" is always one tap away. -->
+        <p class="footnote">Buddy is an AI helper. It can’t give medical advice. In an emergency, <a class="footnote-call" href="tel:911">call 911</a>.</p>
       </main>
     </div>
   </div>
@@ -155,6 +310,7 @@
   <script src="/static/recorder.js"></script>
   <script src="/static/speech.js"></script>
   <script src="/static/talk.js"></script>
+  <script src="/static/screens.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
