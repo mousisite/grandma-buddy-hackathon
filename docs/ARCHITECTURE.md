@@ -32,6 +32,7 @@ The plan and agent setup come first. All app code (`app/`, `static/`, `scripts/`
 ```
 grandma-buddy-hackathon/
   AGENTS.md                  instructions the coding agent reads every session
+  CLAUDE.md                  one line (@AGENTS.md) so Claude Code loads AGENTS.md
   README.md                  project description for GitHub and judges (finish on Day 9)
   LICENSE                    MIT license (the repo must be public and open source)
   THIRD_PARTY_NOTICES.md     credits for the helper skills from other projects
@@ -39,8 +40,10 @@ grandma-buddy-hackathon/
   .env.example               shows which settings go in .env
   .gitignore                 keeps .env, .venv, the database, and recordings off GitHub
   requirements.txt           Python packages
+  PRODUCT.md                 who the app is for and its brand commitments (used by the design plugin)
+  .impeccable/               design plugin settings (its mockups and review screenshots are git-ignored)
   docs/                      SPEC, ARCHITECTURE, SAFETY, DESIGN, PLAN
-  .agents/skills/            project skills for Muse Code
+  .claude/skills/            project skills for the coding agent (Claude Code)
   app/
     __init__.py
     main.py                  creates the FastAPI app, serves static/, includes the routes
@@ -65,6 +68,7 @@ grandma-buddy-hackathon/
     app.js                   navigation, API calls, reminder checks every 30 seconds
     recorder.js              microphone -> 16 kHz mono 16-bit WAV
     speech.js                read-aloud wrapper around speechSynthesis (speed, voice, replay)
+    fonts/                   Atkinson Hyperlegible Next (the app's font) and its license, OFL.txt
   scripts/
     check_meta.py            one tiny real call to confirm the API key and billing work
     seed_demo.py             fills the database with made-up demo data ("Rose", 7 days)

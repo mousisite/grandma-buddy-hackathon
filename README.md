@@ -2,7 +2,7 @@
 
 A voice companion for older adults who live alone, built with Meta's Muse models during the Meta Global AI Developer Hackathon (Indie developer track, "Build for Your World").
 
-> Draft. Finish this on Day 9 with screenshots, run instructions, and the demo link (see `.agents/skills/demo-prep/SKILL.md`).
+> Draft. Finish this on Day 9 with screenshots, run instructions, and the demo link (see `.claude/skills/demo-prep/SKILL.md`).
 
 ## Why
 
@@ -28,11 +28,16 @@ The AI listens, writes things down, reminds, and connects her to real people: fa
 
 - **Muse Voice Transcribe** turns her speech into text, with keyword biasing so her medication and family names come out right.
 - **Muse Spark 1.3** runs the conversation, calls tools to write diary entries, track pills, and save doctor questions (function calling), returns scam verdicts and doctor notes as structured JSON, and reads photos of messages and pill labels.
-- Built with **Muse Code**, Meta's coding agent, plus helper skills credited in `THIRD_PARTY_NOTICES.md`.
+
+## How it was built
+
+- The Day 1 skeleton (server, database, first home screen) was made with **Muse Code**, Meta's coding agent.
+- Everything after that is built with **Claude Code**, Anthropic's coding agent.
+- Both used the same plan in `docs/` and the helper skills credited in `THIRD_PARTY_NOTICES.md`.
 
 ## Built during the hackathon
 
-This repository was created on October 26, 2026, the hackathon's kickoff day. I planned the idea and set up my tools before the event. The plan is in `docs/`, and the coding agent's instructions are in `AGENTS.md` and `.agents/skills/`. All of the app's code was written during the hackathon (October 26 to November 4, 2026), and the commit history shows it.
+This repository was created on October 26, 2026, the hackathon's kickoff day. I planned the idea and set up my tools before the event. The plan is in `docs/`, and the coding agent's instructions are in `AGENTS.md` (loaded through `CLAUDE.md`) and `.claude/skills/`. All of the app's code was written during the hackathon (October 26 to November 4, 2026), and the commit history shows it.
 
 ## Privacy
 

@@ -84,6 +84,23 @@ After a crisis response, keep the conversation open and gentle. Never end it abr
 - Never say things like "I'm all you need" or encourage her to rely only on the app.
 - Never pretend to be a human, a relative, or a romantic partner.
 - If she says no to calling someone, respect it kindly and try again another day.
+- If an AI reply ever slips into psychological advice or minimizing ("deep breaths", "cheer up", "you don't mean that"), the advice guard replaces it with this fixed text:
+
+> I'm here with you, and I'm glad you told me. The people who care about you can help with this more than I can. Would you like to call {family_name} or talk to your doctor?
+
+## 7a. The advice guard (`app/guard.py`)
+
+Every AI reply is checked by plain rules after it is written and before she sees or hears it. Dose amounts, instructions near a health action ("you should rest", "try ice"), guesses at a cause or condition ("could be a sprain", "caused by", "probably nothing"), and medicines or remedies that aren't her own pills are replaced with the fixed reply from section 2. Whenever she asks for advice herself ("should I…", "can I take…", "is it OK to…"), Call {doctor_name}, Call {family_name}, and "Add to doctor notes" are always shown. Side effects and missed doses always add the fixed lines from section 5. `scripts/check_advice.py` (run by hand) sends the section 10 phrases to the real model to confirm.
+
+## 7b. Safety-net details decided during the build
+
+- The safety net checks her whole message before anything else, even before the database, so a database problem or a very long message never skips it.
+- It also checks her last few messages together, so a symptom told across answers ("my chest" … "tight") still shows the screen.
+- If crisis words come together with an emergency or a pill mix-up, the more urgent screen shows, and Call 988 and Text 988 are added to its buttons.
+- When crisis words are involved, her words are never stored: only the kind of event and the time. An emergency diary entry then lists only the warning signs.
+- After a crisis screen, every reply that day keeps Call 988 and Call {family_name} visible, and the AI is told to stay gentle. A repeated crisis phrase always shows the crisis screen again.
+- If her words can't reach the safety net (no internet, microphone problem, words not understood), Call 911 and Call {family_name} are shown with the kind message. The note at the bottom of the home screen has a "call 911" phone link at all times.
+- Safety messages are read aloud even if voice is turned off.
 
 ## 8. Scams
 

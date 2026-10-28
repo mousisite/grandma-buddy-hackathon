@@ -1,0 +1,14 @@
+# Grandma Buddy packages (see docs/ARCHITECTURE.md).
+# All of these are free, open-source packages with permissive licenses
+# (MIT, Apache-2.0, or BSD), so they are safe for our public hackathon repo.
+# Install them with: .venv\Scripts\python -m pip install -r requirements.txt
+
+fastapi            # our web server framework (MIT)
+uvicorn[standard]  # runs the FastAPI app (BSD-3-Clause)
+python-multipart   # lets the server receive uploaded files, like voice recordings (Apache-2.0)
+openai             # official OpenAI package; we point it at Meta's API for chat (Apache-2.0)
+requests           # sends voice files to Muse Voice Transcribe (Apache-2.0)
+python-dotenv      # reads settings from the .env file (BSD-3-Clause)
+pytest             # runs our tests (MIT)
+httpx              # needed by FastAPI's test client (BSD-3-Clause)
+playwright         # checks our screens in a real browser (Apache-2.0)

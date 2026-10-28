@@ -1,0 +1,909 @@
+/* Grandma Buddy styles.
+
+   In the style of AI assistant apps (ChatGPT, Perplexity, Gemini),
+   made big and calm for weak eyes and shaky hands:
+   - a quiet white page with almost no color (dark mode at night);
+   - one big centered question;
+   - a voice box with a round black voice button;
+   - a soft blue glow behind the voice box;
+   - light gray suggestion cards with line icons;
+   - a sidebar on big screens;
+   - an honest note at the bottom;
+   - Lexend, a typeface designed to make reading easier.
+   Red is never used here. Red means emergency.
+   Every animation stops for people who prefer reduced motion. */
+
+/* Lexend: designed to make reading easier. Stored in static/fonts/
+   (SIL Open Font License 1.1, see static/fonts/OFL-Lexend.txt). */
+@font-face {
+  font-family: "Lexend";
+  src: url("/static/fonts/Lexend-latin.woff2") format("woff2");
+  font-weight: 300 800;
+  font-display: swap;
+}
+
+/* ---------- Colors (contrast measured October 26, 2026) ---------- */
+
+:root {
+  --level: 0;               /* how loud her voice is, 0 to 1 (app.js updates it) */
+  --page: #FFFFFF;
+  --soft: #F4F4F6;          /* suggestion cards and sidebar */
+  --border: #E4E4E9;
+  --text: #0D0E12;          /* 19.3:1 on white */
+  --text-2: #4B5060;        /* 8.0:1 on white, 7.3:1 on the soft gray */
+  --voice: #0D0E12;         /* the round voice button: white icon 19.3:1 */
+  --voice-icon: #FFFFFF;
+  --accent: #2E46D9;        /* focus ring and small accents: 7.0:1 */
+  --glow-1: rgba(84, 132, 255, 0.28);
+  --glow-2: rgba(150, 110, 255, 0.18);
+  --shadow: 0 1px 2px rgba(13, 14, 18, 0.04), 0 12px 40px rgba(13, 14, 18, 0.08);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-time="night"] {
+  --page: #111216;
+  --soft: #1C1D22;
+  --border: #2B2D34;
+  --text: #ECEDEF;          /* 16.0:1 */
+  --text-2: #B4B8C2;        /* 9.4:1 on the page, 8.5:1 on cards */
+  --voice: #ECEDEF;
+  --voice-icon: #0D0E12;    /* 16.5:1 */
+  --accent: #9DB0FF;
+  --glow-1: rgba(84, 132, 255, 0.22);
+  --glow-2: rgba(150, 110, 255, 0.16);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- The page ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Anything marked hidden stays hidden, even if a style says otherwise. */
+[hidden] {
+  display: none !important;
+}
+
+/* Text sizes use rem so the "Bigger words" button can grow them all. */
+html {
+  font-size: 100%;
+  color-scheme: light;
+  background: var(--page);
+  transition: font-size 0.3s var(--ease);
+}
+
+[data-time="night"] {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--page);
+  color: var(--text);
+  font-family: "Lexend", "Segoe UI", system-ui, sans-serif;
+  font-size: 1.375rem; /* 22px */
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(84, 132, 255, 0.25);
+}
+
+/* Line icons: one consistent stroke. They grow with the text. */
+.icon {
+  flex-shrink: 0;
+  width: 1.2em;
+  height: 1.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Buttons ---------- */
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation; /* shaky double-taps never zoom the page */
+  -webkit-tap-highlight-color: transparent;
+  min-width: 0;
+}
+
+button:focus-visible {
+  outline: 4px solid var(--accent);
+  outline-offset: 4px;
+}
+
+/* ---------- Layout: sidebar + main ---------- */
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* The glow behind the voice box may reach past the screen edge;
+     clip it so the page never scrolls sideways. */
+  overflow-x: clip;
+}
+
+/* Buddy's mark: a four-point star, and its name. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 1.375rem;
+}
+
+.mark {
+  width: 1.5em;
+  height: 1.5em;
+  fill: currentColor;
+  animation: twinkle 6s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%, 100% { transform: rotate(0) scale(1); }
+  50% { transform: rotate(45deg) scale(0.9); }
+}
+
+/* The sidebar only shows on big screens (see the end of this file). */
+.sidebar {
+  display: none;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+}
+
+/* A quiet button with an outline, like "Bigger words". */
+.ghost-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 1.125rem; /* 18px */
+  font-weight: 500;
+  transition: background-color 0.15s, transform 0.15s var(--ease);
+}
+
+.ghost-button:active {
+  transform: scale(0.96);
+  background: var(--soft);
+}
+
+.glyph {
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.page {
+  flex: 1;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 28px 20px 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 1. The big centered question ---------- */
+
+.intro {
+  text-align: center;
+  margin: 4vh 0 30px;
+}
+
+.date {
+  margin: 0 0 10px;
+  color: var(--text-2);
+  font-size: 1.25rem; /* 20px */
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.5rem; /* 40px */
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* Buddy's words: as big as the greeting, in the softer color. */
+.message {
+  min-height: 1.2em;
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font-size: 2.5rem; /* 40px */
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+/* Long messages (more than 12 words) are a little smaller, so the call
+   buttons under them stay on the screen. Still well above 22px. */
+.message.long {
+  font-size: 1.75rem; /* 28px */
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+/* New words appear one at a time, like an AI answer being written
+   (app.js wraps each word in a span and sets its delay). */
+.message .word {
+  display: inline-block;
+  animation: word-in 0.45s var(--ease) backwards;
+}
+
+@keyframes word-in {
+  from { opacity: 0; filter: blur(6px); transform: translateY(6px); }
+}
+
+/* While Buddy is working, its words shimmer, like "Thinking…". */
+[data-talk="working"] .message {
+  background: linear-gradient(90deg, var(--text-2) 0%, var(--text-2) 40%, var(--text) 50%, var(--text-2) 60%, var(--text-2) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
+}
+
+/* What she said: a gray bubble on the right, like a sent message. */
+.you-said {
+  align-self: flex-end;
+  max-width: 85%;
+  margin: 0 0 22px;
+  padding: 14px 22px;
+  border-radius: 26px 26px 8px 26px;
+  background: var(--soft);
+}
+
+.said-text {
+  margin: 0;
+  font-size: 1.625rem; /* 26px */
+  line-height: 1.35;
+}
+
+.said.fresh {
+  animation: pop-in 0.4s var(--ease);
+}
+
+/* ---------- 2. The voice box ---------- */
+
+.composer-wrap {
+  position: relative;
+  isolation: isolate;
+}
+
+/* The soft blue glow behind the box. It breathes slowly, and grows
+   brighter while she talks. */
+.glow {
+  position: absolute;
+  z-index: -1;
+  inset: -40% -10%;
+  background:
+    radial-gradient(40% 50% at 35% 50%, var(--glow-1), transparent 70%),
+    radial-gradient(40% 50% at 65% 50%, var(--glow-2), transparent 70%);
+  filter: blur(20px);
+  pointer-events: none;
+  animation: breathe 6s ease-in-out infinite alternate;
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+}
+
+@keyframes breathe {
+  from { opacity: 0.6; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1.04); }
+}
+
+[data-talk="listening"] .glow {
+  animation: none;
+  opacity: 1;
+  transform: scale(calc(1.05 + var(--level) * 0.25));
+}
+
+.composer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 7rem;
+  padding: 18px 18px 18px 28px;
+  border-radius: 32px;
+  background: var(--page);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: transform 0.2s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.composer:active {
+  transform: scale(0.985);
+}
+
+/* While listening, a moving colored ring runs around the box. */
+.composer::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from var(--angle, 0deg), #5484FF, #966EFF, #48C6FF, #5484FF);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+  pointer-events: none;
+}
+
+.composer[data-state="listening"]::before,
+.composer[data-state="working"]::before {
+  opacity: 1;
+  animation: ring 3s linear infinite;
+}
+
+@property --angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes ring {
+  to { --angle: 360deg; }
+}
+
+.composer-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.composer-title {
+  font-size: 1.625rem; /* 26px */
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.composer-hint {
+  font-size: 1.125rem; /* 18px */
+  color: var(--text-2);
+}
+
+/* The round voice button. */
+.voice {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  background: var(--voice);
+  color: var(--voice-icon);
+  transition: transform 0.15s var(--ease);
+}
+
+/* A soft ring pulses out of the voice button, inviting a tap. */
+.voice::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--voice);
+  animation: invite 2.8s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes invite {
+  from { transform: scale(1); opacity: 0.45; }
+  to { transform: scale(1.6); opacity: 0; }
+}
+
+.composer:active .voice {
+  transform: scale(0.92);
+}
+
+.voice-icon {
+  width: 2rem;
+  height: 2rem;
+  stroke-width: 2.4;
+}
+
+.wave,
+.spinner {
+  display: none;
+}
+
+.composer[data-state="listening"] .voice-icon,
+.composer[data-state="working"] .voice-icon,
+.composer[data-state="listening"] .voice::after,
+.composer[data-state="working"] .voice::after {
+  display: none;
+}
+
+/* Listening: live bars that move with her voice. */
+.composer[data-state="listening"] .wave {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 2.2rem;
+}
+
+.wave i {
+  display: block;
+  width: 5px;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--voice-icon);
+  transform: scaleY(calc(0.3 + var(--level) * var(--k)));
+  transition: transform 0.08s linear;
+}
+
+.wave i:nth-child(1) { --k: 0.5; }
+.wave i:nth-child(2) { --k: 0.85; }
+.wave i:nth-child(3) { --k: 1.1; }
+.wave i:nth-child(4) { --k: 0.85; }
+.wave i:nth-child(5) { --k: 0.5; }
+
+/* Working: a small spinner. */
+.composer[data-state="working"] { cursor: progress; }
+
+.composer[data-state="working"] .spinner {
+  display: block;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 3px solid rgba(127, 127, 140, 0.4);
+  border-top-color: var(--voice-icon);
+  animation: turn 0.9s linear infinite;
+}
+
+@keyframes turn {
+  to { transform: rotate(1turn); }
+}
+
+/* Her words arrived: the voice button gives one small nod. */
+.composer.heard .voice {
+  animation: nod 0.5s var(--ease);
+}
+
+@keyframes nod {
+  40% { transform: scale(1.12); }
+}
+
+/* ---------- 3. Suggestions ---------- */
+
+/* One per row on phones; a tidy two-by-two on wider screens. */
+.suggestions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 30px;
+}
+
+@media (min-width: 640px) {
+  .suggestions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.suggestion {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 8.5rem;
+  padding: 20px 22px 22px;
+  border-radius: 24px;
+  background: var(--soft);
+  border: 1px solid transparent;
+  transition: transform 0.2s var(--ease), border-color 0.2s, background-color 0.2s;
+}
+
+.suggestion .icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-bottom: auto;
+  transition: transform 0.3s var(--ease);
+}
+
+.suggestion-title {
+  margin-top: 14px;
+  font-size: 1.375rem; /* 22px */
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.suggestion-text {
+  font-size: 1.125rem; /* 18px */
+  color: var(--text-2);
+  line-height: 1.35;
+}
+
+.suggestion:active {
+  transform: scale(0.97);
+}
+
+/* ---------- 4. The honest note ---------- */
+
+.footnote {
+  margin: auto 0 0;
+  padding-top: 36px;
+  text-align: center;
+  color: var(--text-2);
+  font-size: 1.125rem; /* 18px */
+}
+
+/* "call 911" in the note is a real phone link, so help is always one tap away. */
+.footnote-call {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 2px;
+}
+
+.footnote-call:focus-visible {
+  outline: 4px solid var(--accent);
+  outline-offset: 4px;
+}
+
+/* Mouse users: soft outlines and a little lift. Touch screens skip this. */
+@media (hover: hover) {
+  .suggestion:hover {
+    border-color: var(--border);
+    background: var(--page);
+    transform: translateY(-2px);
+  }
+
+  .suggestion:hover .icon {
+    transform: scale(1.12);
+  }
+
+  .ghost-button:hover,
+  .side-item:hover {
+    background: var(--soft);
+  }
+
+  .composer:hover {
+    box-shadow: 0 1px 2px rgba(13, 14, 18, 0.05), 0 18px 50px rgba(13, 14, 18, 0.12);
+  }
+}
+
+/* ---------- While listening, everything else steps back ---------- */
+
+.topbar,
+.suggestions,
+.footnote,
+.date,
+h1 {
+  transition: opacity 0.3s ease-out;
+}
+
+[data-talk="listening"] .topbar,
+[data-talk="listening"] .suggestions,
+[data-talk="listening"] .footnote,
+[data-talk="listening"] .date,
+[data-talk="listening"] h1 {
+  opacity: 0.3;
+}
+
+/* ---------- Opening the app ---------- */
+
+.intro { animation: fade-up 0.6s var(--ease) backwards; }
+.composer-wrap { animation: fade-up 0.6s var(--ease) 0.12s backwards; }
+.suggestion:nth-child(1) { animation: fade-up 0.5s var(--ease) 0.25s backwards; }
+.suggestion:nth-child(2) { animation: fade-up 0.5s var(--ease) 0.31s backwards; }
+.suggestion:nth-child(3) { animation: fade-up 0.5s var(--ease) 0.37s backwards; }
+.suggestion:nth-child(4) { animation: fade-up 0.5s var(--ease) 0.43s backwards; }
+.footnote { animation: fade-up 0.5s var(--ease) 0.5s backwards; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+}
+
+/* ---------- Tablets lying sideways and computers: sidebar ---------- */
+
+@media (min-width: 1000px) {
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    width: 300px;
+    flex-shrink: 0;
+    padding: 22px 16px;
+    background: var(--soft);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .sidebar .brand {
+    padding: 6px 10px 10px;
+  }
+
+  .brand--top {
+    visibility: hidden; /* the sidebar shows the mark instead */
+  }
+
+  .topbar {
+    padding: 18px 28px;
+  }
+
+  .page {
+    padding-top: 4vh;
+  }
+
+  .intro {
+    margin-top: 6vh;
+  }
+}
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 1.25rem; /* 20px */
+  transition: background-color 0.15s;
+}
+
+.side-item[aria-current="page"] {
+  background: var(--page);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(13, 14, 18, 0.06);
+}
+
+.side-note {
+  margin: auto 0 0;
+  padding: 0 10px;
+  color: var(--text-2);
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.4;
+}
+
+/* ---------- Buddy's call buttons and "Say it again" ---------- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+/* A call button: a phone link that looks like a big rounded button. */
+.call-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  padding: 12px 26px;
+  border-radius: 999px;
+  background: var(--voice);
+  color: var(--voice-icon);
+  font-size: 1.25rem; /* 20px */
+  font-weight: 600;
+  text-decoration: none;
+  animation: fade-up 0.35s var(--ease) backwards;
+}
+
+/* A quieter button next to the call buttons ("Add to doctor notes"). */
+.call-pill--quiet {
+  background: var(--soft);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.call-pill:disabled {
+  cursor: default;
+}
+
+.call-pill:focus-visible,
+.call-big:focus-visible {
+  outline: 4px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.say-again {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  margin-top: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 1.125rem; /* 18px */
+  font-weight: 500;
+}
+
+.say-again .icon {
+  width: 1.4em;
+  height: 1.4em;
+}
+
+/* ---------- Safety screens (fixed text from docs/SAFETY.md) ---------- */
+
+/* Full screen. Emergency and Poison Control are red: the only red in the
+   app, so red always means "act now". The crisis screen is calm. */
+.safety {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  border: none;
+  background: #EEF1FF;   /* crisis: calm pale blue, dark words 17:1 */
+  color: #0D0E12;
+  font-family: inherit;
+}
+
+.safety::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.safety[data-kind="emergency"],
+.safety[data-kind="poison_control"] {
+  background: #B00020;   /* white words 7.3:1 */
+  color: #FFFFFF;
+}
+
+[data-time="night"] .safety[data-kind="crisis"] {
+  background: #161B33;
+  color: #FFFFFF;
+}
+
+.safety[open] {
+  animation: fade-up 0.3s var(--ease);
+}
+
+.safety-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+  max-width: 640px;
+  min-height: 100%;
+  margin: 0 auto;
+}
+
+.safety h2 {
+  margin: 0;
+  font-size: 2.5rem; /* 40px */
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.safety-message {
+  margin: 0;
+  font-size: 1.75rem; /* 28px */
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.safety-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* The big call buttons: white on the red screens, dark on the calm one. */
+.call-big {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 84px;
+  padding: 16px 24px;
+  border-radius: 22px;
+  background: #0D0E12;
+  color: #FFFFFF;
+  font-size: 1.75rem; /* 28px */
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.safety[data-kind="emergency"] .call-big,
+.safety[data-kind="poison_control"] .call-big,
+[data-time="night"] .safety[data-kind="crisis"] .call-big {
+  background: #FFFFFF;
+  color: #B00020;        /* 7.3:1 on white */
+}
+
+[data-time="night"] .safety[data-kind="crisis"] .call-big {
+  color: #0D0E12;
+}
+
+.safety-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.safety-secondary {
+  flex: 1;
+  min-height: 64px;
+  padding: 12px 22px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  font-size: 1.25rem; /* 20px */
+  font-weight: 600;
+  text-align: center;
+}
+
+.safety-secondary:focus-visible {
+  outline: 4px solid currentColor;
+  outline-offset: 4px;
+}
+
+/* People who prefer reduced motion: nothing glows, pulses, spins, or
+   slides. Fades and color changes that show what changed still happen. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-property: opacity, background-color, color, border-color !important;
+  }
+
+  .voice::after {
+    display: none;
+  }
+
+  [data-talk="listening"] .glow {
+    transform: none;
+  }
+
+  [data-talk="working"] .message {
+    color: var(--text-2);
+    background: none;
+  }
+}

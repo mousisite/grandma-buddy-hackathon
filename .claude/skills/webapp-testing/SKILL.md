@@ -105,7 +105,7 @@ Everything above this section is Anthropic's original. These notes win where the
 - Start our app and run a check in one command:
 
   ```
-  .venv\Scripts\python .agents/skills/webapp-testing/scripts/with_server.py --server ".venv\Scripts\python -m uvicorn app.main:app --port 8000" --port 8000 -- .venv\Scripts\python scripts/browser_checks/check_home.py
+  .venv\Scripts\python .claude/skills/webapp-testing/scripts/with_server.py --server ".venv\Scripts\python -m uvicorn app.main:app --port 8000" --port 8000 -- .venv\Scripts\python scripts/browser_checks/check_home.py
   ```
 
   If it says port 8000 is already in use, the app is already running in another terminal. Run the check script directly against http://localhost:8000 instead, or ask the user to stop the app first.

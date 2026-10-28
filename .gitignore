@@ -1,5 +1,8 @@
-# Secrets: the API key lives here
+# Secrets: the API key lives here. No .env file may ever be uploaded.
+# .env.example is the only exception: it holds no real key.
 .env
+.env.*
+!.env.example
 
 # Grandma's data stays on this computer
 data/
@@ -24,3 +27,7 @@ venv/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Design plugin work files (mockups and review screenshots)
+.impeccable/mocks/
+.impeccable/review/

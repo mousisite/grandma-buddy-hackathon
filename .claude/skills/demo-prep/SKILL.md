@@ -46,7 +46,7 @@ Update `README.md` so it covers:
 - "Built during the hackathon": the plan and coding-agent setup were written first, and all app code was written between Oct 26 and Nov 4, 2026, which the commit history shows
 - How to run it (Windows steps) and how to run the tests
 - What's next (ideas we didn't have time for)
-- Built with Muse Code, plus the helper skills listed in `THIRD_PARTY_NOTICES.md`
+- Built with coding agents: the Day 1 skeleton with Muse Code, everything after with Claude Code, plus the helper skills listed in `THIRD_PARTY_NOTICES.md`
 
 ## 6. Demo script (3 minutes maximum)
 

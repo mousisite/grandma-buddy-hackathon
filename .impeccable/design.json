@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-26T00:00:00Z",
+  "title": "Design System: Grandma Buddy",
+  "source": "docs/DESIGN.md (plain-English, no YAML frontmatter by project choice); token values are normative in static/styles.css :root and [data-time=night]",
+  "extensions": {
+    "colorMeta": {
+      "wall": { "role": "neutral", "displayName": "Turquoise Tile Wall", "canonical": "#5EC4BE", "night": "#1B2A55" },
+      "wall-edge": { "role": "neutral", "displayName": "Wall Shadow", "canonical": "#3A9E98", "night": "#0E1838" },
+      "on-wall": { "role": "neutral", "displayName": "Words on the Wall", "canonical": "#0E2422", "night": "#FFFFFF", "contrast": "7.8:1 day, 13.9:1 night" },
+      "enamel": { "role": "neutral", "displayName": "White Enamel", "canonical": "#FFFFFF", "night": "#E9EDF6" },
+      "enamel-key": { "role": "neutral", "displayName": "Enamel Key", "canonical": "#EEF4F3", "night": "#D9DFEC" },
+      "enamel-edge": { "role": "neutral", "displayName": "Enamel Key Edge", "canonical": "#B7CDCA", "night": "#8E9AB8" },
+      "ink": { "role": "neutral", "displayName": "Kitchen Ink", "canonical": "#0E2422", "contrast": "16.2:1 on white, 13.8:1 on night enamel" },
+      "ink-soft": { "role": "neutral", "displayName": "Soft Ink", "canonical": "#3A4F4D", "contrast": "8.7:1 on white" },
+      "sun": { "role": "primary", "displayName": "Sunflower", "canonical": "#F7C23E", "contrast": "ink 9.9:1" },
+      "sun-edge": { "role": "primary", "displayName": "Sunflower Edge", "canonical": "#C99220" },
+      "ring": { "role": "primary", "displayName": "Light Sunflower Ring", "canonical": "#FFD866" },
+      "shamrock": { "role": "secondary", "displayName": "Shamrock (Something hurts)", "canonical": "#8DD39A", "contrast": "ink 9.2:1" },
+      "shamrock-edge": { "role": "secondary", "displayName": "Shamrock Edge", "canonical": "#4F9B5C" },
+      "cobalt": { "role": "secondary", "displayName": "Cobalt (Is this a scam?)", "canonical": "#2A4A9C", "contrast": "white 8.2:1" },
+      "cobalt-edge": { "role": "secondary", "displayName": "Cobalt Edge", "canonical": "#172F6B" },
+      "lilac": { "role": "tertiary", "displayName": "Lilac (pills)", "canonical": "#CDB6EE", "contrast": "ink 8.9:1" },
+      "emergency-red": { "role": "reserved", "displayName": "Emergency Red", "canonical": "#B00020", "contrast": "white 7.3:1", "note": "Emergency and Poison Control screens only; never in the normal app." }
+    },
+    "typographyMeta": {
+      "family": "\"Atkinson Hyperlegible Next\", \"Segoe UI\", system-ui, sans-serif (self-hosted woff2, SIL OFL 1.1, weights 200-800)",
+      "scale": [
+        { "role": "display", "use": "Greeting", "size": "2.5rem", "weight": 800, "lineHeight": 1.1 },
+        { "role": "plate", "use": "Talk plate label", "size": "min(2.25rem, 9vw); listening min(1.875rem, 7.5vw)", "weight": 800, "lineHeight": 1.1 },
+        { "role": "headline", "use": "Card headings", "size": "2rem", "weight": 800, "lineHeight": 1.2 },
+        { "role": "said", "use": "What she said", "size": "1.75rem", "weight": 400 },
+        { "role": "title", "use": "Canister names", "size": "1.5rem (1.625rem at 900px+)", "weight": 800, "lineHeight": 1.15 },
+        { "role": "message", "use": "Message under the plate", "size": "1.5rem", "weight": 700 },
+        { "role": "body", "use": "Body, date, keys", "size": "1.375rem", "weight": 400, "lineHeight": 1.5 },
+        { "role": "label", "use": "Tab names only", "size": "min(1.1875rem, 5.2vw)", "weight": 800, "note": "Below the 22px body rule to fit four tabs; do not reuse." }
+      ],
+      "textSizeSteps": ["100%", "115%", "130%"]
+    },
+    "rounded": { "pill": "999px", "circle": "50%", "card": "24px", "canister": "20px 20px 28px 28px", "tab": "20px", "tabbar-top": "28px 28px 0 0" },
+    "spacing": { "page": "20px", "gap": "16px", "column-gap-wide": "56px", "card-padding": "18px 22px 20px" },
+    "shadows": [
+      { "name": "key-edge", "value": "0 6px 0 var(--enamel-edge), 0 12px 20px var(--drop)", "purpose": "Raised white key: solid edge plus soft drop." },
+      { "name": "plate-edge", "value": "0 10px 0 var(--wall-edge), 0 20px 34px var(--drop)", "purpose": "Talk plate." },
+      { "name": "canister-edge", "value": "0 7px 0 <feature>-edge, 0 14px 22px var(--drop)", "purpose": "Canisters, edge in their own darker shade." },
+      { "name": "tab-edge", "value": "0 5px 0 var(--enamel-edge)", "purpose": "Tabs; open tab uses --sun-edge." },
+      { "name": "flat-plate", "value": "0 6px 16px var(--drop)", "purpose": "Buddy's face plate: soft drop, no edge, because it is not tappable." },
+      { "name": "tabbar", "value": "0 -8px 24px var(--drop)", "purpose": "Fixed tab bar." }
+    ],
+    "motion": [
+      { "name": "key-sink", "value": "transform 0.1s ease-out; translateY(edge height), edge collapses to 0", "purpose": "Every tappable key on :active." },
+      { "name": "voice-ring", "value": "box-shadow 0 0 0 calc(8px + level*40px) var(--ring), 0.08s linear", "purpose": "Ring grows with her voice while listening." },
+      { "name": "listen-pulse", "value": "1.4s ease-in-out infinite alternate, scale 0.7 to 1", "purpose": "Dark dot on the plate while listening." },
+      { "name": "step-back", "value": "opacity 0.3 over 0.3s ease-out", "purpose": "Everything except the plate fades while listening." },
+      { "name": "reduced-motion", "value": "all animation and transition off; ring fixed at 16px", "purpose": "prefers-reduced-motion: reduce." }
+    ],
+    "breakpoints": [
+      { "name": "phone", "value": "< 900px", "note": "one column, max 560px" },
+      { "name": "wide", "value": "900px", "note": "two columns (talk | today), max 1040px; tab row max 720px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Raised Key",
+      "kind": "button",
+      "description": "White pill key with a solid edge that sinks when pressed.",
+      "html": "<button class=\"ds-key\"><span class=\"ds-glyph\">A+</span> Bigger words</button>",
+      "css": ".ds-key { display:inline-flex; align-items:center; gap:12px; min-height:64px; padding:14px 24px; border:none; border-radius:999px; background:#FFFFFF; color:#0E2422; font:800 22px/1.5 'Atkinson Hyperlegible Next','Segoe UI',sans-serif; box-shadow:0 6px 0 #B7CDCA, 0 12px 20px rgba(14,36,34,.22); transition:transform .1s ease-out, box-shadow .1s ease-out, filter .15s ease-out; cursor:pointer; } .ds-key:hover { filter:brightness(.95); } .ds-key:focus-visible { outline:5px solid #0E2422; outline-offset:5px; } .ds-key:active { transform:translateY(6px); box-shadow:0 0 0 #B7CDCA, 0 4px 8px rgba(14,36,34,.22); } .ds-glyph { color:#2A4A9C; }"
+    },
+    {
+      "name": "Talk Plate",
+      "kind": "custom",
+      "description": "The biggest thing on screen: white plate, sunflower well, sinks 10px.",
+      "html": "<button class=\"ds-plate\"><span class=\"ds-plate-face\">Tap to talk</span></button>",
+      "css": ".ds-plate { width:240px; aspect-ratio:1; padding:0; border:none; border-radius:50%; background:#FFFFFF; display:grid; place-items:center; box-shadow:0 10px 0 #3A9E98, 0 20px 34px rgba(14,36,34,.22); transition:transform .1s ease-out, box-shadow .1s ease-out; cursor:pointer; } .ds-plate:focus-visible { outline:5px solid #0E2422; outline-offset:5px; } .ds-plate:active { transform:translateY(10px); box-shadow:0 0 0 #3A9E98, 0 8px 16px rgba(14,36,34,.22); } .ds-plate-face { width:82%; height:82%; border-radius:50%; background:#F7C23E; box-shadow:inset 0 -9px 0 #C99220; display:flex; align-items:center; justify-content:center; padding:16px; color:#0E2422; font:800 30px/1.1 'Atkinson Hyperlegible Next','Segoe UI',sans-serif; text-align:center; }"
+    },
+    {
+      "name": "Canister",
+      "kind": "custom",
+      "description": "Feature-colored tappable block with a lid band; shamrock shown.",
+      "html": "<button class=\"ds-canister\">Something hurts</button>",
+      "css": ".ds-canister { position:relative; display:flex; align-items:flex-end; min-height:6.5rem; width:11rem; padding:28px 16px 16px; border:none; border-radius:20px 20px 28px 28px; background:#8DD39A; color:#0E2422; font:800 24px/1.15 'Atkinson Hyperlegible Next','Segoe UI',sans-serif; text-align:left; box-shadow:0 7px 0 #4F9B5C, 0 14px 22px rgba(14,36,34,.22); transition:transform .1s ease-out, box-shadow .1s ease-out; cursor:pointer; } .ds-canister::before { content:''; position:absolute; top:0; left:0; right:0; height:16px; border-radius:20px 20px 0 0; background:#4F9B5C; box-shadow:0 2px 0 rgba(0,0,0,.12); } .ds-canister:focus-visible { outline:5px solid #0E2422; outline-offset:5px; } .ds-canister:active { transform:translateY(7px); box-shadow:0 0 0 transparent, 0 4px 8px rgba(14,36,34,.22); }"
+    },
+    {
+      "name": "Reading Card",
+      "kind": "card",
+      "description": "Flat white enamel card for reading, never tapping.",
+      "html": "<section class=\"ds-note\"><h2>Today's pills</h2><p>No pills set up yet. Your family can add them.</p></section>",
+      "css": ".ds-note { background:#FFFFFF; color:#0E2422; border-radius:24px; padding:18px 22px 20px; font:400 22px/1.5 'Atkinson Hyperlegible Next','Segoe UI',sans-serif; } .ds-note h2 { font-size:32px; font-weight:800; line-height:1.2; margin:0 0 8px; } .ds-note p { margin:0; color:#3A4F4D; }"
+    },
+    {
+      "name": "Tab Bar",
+      "kind": "nav",
+      "description": "Fixed white bar with four tab keys; the open tab is sunflower.",
+      "html": "<nav class=\"ds-tabbar\"><button class=\"ds-tab ds-tab--on\">Home</button><button class=\"ds-tab\">Pills</button><button class=\"ds-tab\">Diary</button><button class=\"ds-tab\">Family</button></nav>",
+      "css": ".ds-tabbar { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; padding:12px 8px 16px; background:#FFFFFF; border-radius:28px 28px 0 0; box-shadow:0 -8px 24px rgba(14,36,34,.22); } .ds-tab { min-height:4.5rem; border:none; border-radius:20px; background:#EEF4F3; color:#0E2422; font:800 19px/1.2 'Atkinson Hyperlegible Next','Segoe UI',sans-serif; box-shadow:0 5px 0 #B7CDCA; transition:transform .1s ease-out, box-shadow .1s ease-out; cursor:pointer; } .ds-tab--on { background:#F7C23E; box-shadow:0 5px 0 #C99220; } .ds-tab:focus-visible { outline:5px solid #0E2422; outline-offset:5px; } .ds-tab:active { transform:translateY(5px); box-shadow:0 0 0 transparent; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Kitchen Canister Set",
+    "overview": "A cheerful 1950s-60s American kitchen: a tiled wall (turquoise by day, deep blue at night), white enamel plates and cards, and a solid-colored canister for each part of her day.",
+    "keyCharacteristics": [
+      "Everything tappable is a raised key with a solid darker edge that sinks when pressed; things to read are flat.",
+      "Each feature keeps one color: sunflower talk, shamrock hurts, cobalt scams, lilac pills.",
+      "Atkinson Hyperlegible Next, extra bold on every key, 22px body minimum.",
+      "One authored motion moment: the voice ring and pulsing dot while listening; everything else fades back.",
+      "Red is reserved for emergency and Poison Control screens."
+    ],
+    "rules": [
+      { "name": "The Raised Means Tappable Rule", "body": "Only things she can tap get a solid edge and sink; reading cards and Buddy's face stay flat.", "section": "elevation" },
+      { "name": "The One Color Per Feature Rule", "body": "A feature's color is the same everywhere it appears.", "section": "colors" },
+      { "name": "The Red Means Emergency Rule", "body": "No red in the normal app; red belongs only to emergency and Poison Control screens.", "section": "colors" }
+    ],
+    "dos": [
+      "Do keep body text at least 7:1 and buttons at least 4.5:1 against their background.",
+      "Do give every key an edge in a darker shade of its own color, and sink it by that edge height when pressed.",
+      "Do size drawings in em so they grow with Bigger words, and always put a word next to them."
+    ],
+    "donts": [
+      "Don't use red outside the emergency and Poison Control screens.",
+      "Don't put an edge or shadow-key look on something that can't be tapped.",
+      "Don't reuse the 19px tab-name size anywhere else."
+    ]
+  }
+}

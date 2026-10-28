@@ -1,0 +1,44 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          ".impeccable/mocks/decision/src/canon.html"
+        ],
+        "createdAt": "2026-10-27T01:01:12.235Z",
+        "reason": "Claude: canon card mock deliberately renders the category-standard health app, Inter played straight"
+      },
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "files": [
+          ".impeccable/mocks/decision-bw/src/challenger-minimal.html"
+        ],
+        "createdAt": "2026-10-27T01:35:51.808Z",
+        "reason": "Claude: decision mock deliberately follows the taste-skill minimalist grammar (Geist) to show the generic modern look"
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision-bw/src/canon.html"
+        ],
+        "createdAt": "2026-10-27T01:35:51.888Z",
+        "reason": "Claude: canon decision mock plays the category-standard simple phone screen straight"
+      },
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "static/styles.css"
+        ],
+        "createdAt": "2026-10-27T02:52:51.485Z",
+        "reason": "Claude: the only gradient text is the working-state 'thinking' shimmer on Buddy's status line, a functional loading cue from AI assistant apps the user asked to match; reduced motion shows solid text"
+      }
+    ]
+  }
+}

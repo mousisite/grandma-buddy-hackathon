@@ -1,12 +1,18 @@
 # Grandma Buddy: instructions for the coding agent
 
-Read this whole file at the start of every session. It is the source of truth for how to work in this project.
+Read this whole file at the start of every session. It is the source of truth for how to work in this project. The coding agent is Claude Code, which loads this file through `CLAUDE.md`. (Muse Code built the Day 1 skeleton.)
 
 ## Who you are working with
 
-- The builder is a beginner on Windows, using VS Code and PowerShell. Explain each step in plain, short sentences. Give PowerShell commands, never Bash.
+- The builder is a beginner on Windows, using VS Code and PowerShell. Explain each step in plain, short sentences. Any command you give them to run is PowerShell, never Bash.
 - After every feature, tell them exactly how to run it and what to click or say to test it by hand.
 - If something is ambiguous, ask one short question instead of guessing.
+
+## Your shell
+
+- You can run your own commands in PowerShell or Git Bash, whichever fits the job.
+- Python always comes from the project's `.venv`: `.venv\Scripts\python` in PowerShell, `.venv/Scripts/python` in Git Bash. Never `python3`, and never `Activate.ps1`.
+- Commands you hand to the user are always PowerShell, even if you tested them in Git Bash.
 
 ## What we are building
 
@@ -34,7 +40,7 @@ It's being built for the Meta Global AI Developer Hackathon (Indie developer tra
 
 Before starting any task, check this list and use every skill that applies. Say which skill you're using and why.
 
-Our project skills (in `.agents/skills/`):
+Our project skills (in `.claude/skills/`):
 
 | Skill | Use it when |
 | --- | --- |
@@ -43,7 +49,7 @@ Our project skills (in `.agents/skills/`):
 | `/senior-friendly-ui` | before calling any screen done |
 | `/demo-prep` | the final two days: demo video and submission |
 
-Helper skills from other projects (also in `.agents/skills/`; see `THIRD_PARTY_NOTICES.md`):
+Helper skills from other projects (also in `.claude/skills/`; see `THIRD_PARTY_NOTICES.md`):
 
 | Skill | Use it when |
 | --- | --- |
@@ -55,13 +61,13 @@ Helper skills from other projects (also in `.agents/skills/`; see `THIRD_PARTY_N
 | `/requesting-code-review` | after finishing a whole feature from `docs/SPEC.md`: have a fresh reviewer subagent check it |
 | `/receiving-code-review` | deciding what to do with review feedback |
 
-Built-in Muse skills: `/plan` for anything bigger than one small change, `/grill` to stress-test a plan, `/goal` for multi-step work, and `/taste` to polish screens.
+Claude Code tools that replace the old Muse Code built-ins: plan mode for anything bigger than one small change, and to stress-test a plan (was `/plan` and `/grill`); the task list for multi-step work (was `/goal`); the `frontend-design` skill to polish screens (was `/taste`).
 
 Rules for the helper skills:
 
 - The hard rules below always win over any skill.
 - If a skill says to commit, push, create branches, or use git worktrees, skip that part. The user saves progress with GitHub Desktop. Read-only git commands like `git diff`, `git log`, and `git show` are fine.
-- This is Windows with PowerShell: use `.venv\Scripts\python` for Python, never `python3`, and never run bash or `.sh` scripts.
+- Follow "Your shell" above when a skill shows a command (some skills were written for Mac or Linux).
 
 ## Stack (do not change without asking)
 
