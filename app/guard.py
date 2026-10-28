@@ -44,9 +44,9 @@ def gentle_reply(family_name: str = "") -> str:
 # A number with a dose unit: "200 mg", "2 tablets".
 DOSE = re.compile(r"\b\d+(\.\d+)? ?(mg|mcg|milligrams?|micrograms?|ml|milliliters?|tablets?|pills?|capsules?|drops?|units?)\b")
 
-# An instruction ("you should", "try") followed closely by a health action.
+# An instruction ("you should", "try", "have you tried") followed closely by a health action.
 INSTRUCTION = (
-    r"you should|you could|you can|you might want to|try|trying|i'd suggest|i suggest|i recommend"
+    r"you should|you could|you can|you might want to|try|trying|tried|i'd suggest|i suggest|i recommend"
     r"|i'd recommend|make sure to|be sure to|it's best to|it might help to|it may help to|consider"
     r"|don't forget to|remember to"
 )

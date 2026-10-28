@@ -75,6 +75,9 @@ After a crisis response, keep the conversation open and gentle. Never end it abr
 - Save her own words. Don't rewrite them into medical terms.
 - After saving, offer to tell {family_name} or call her doctor. Never comment on what the symptom means.
 - Doctor notes only organize what's in the logs. No summaries that interpret, like "this suggests" or "possibly".
+- The AI may fill in where it hurts, how bad (0 to 10), and since when, but each is kept only if she said those words. So "knee" stays when she said "my knee", while "patella", "possible sprain", or a pain number she never said is dropped. A number that is a time ("sore for 2 days") is not a pain level.
+- One entry per "Something hurts" talk, even if the AI saves twice or side effects come up in it. After an entry is saved, Call {doctor_name} and Call {family_name} always appear (when their numbers are set up).
+- The Diary screen shows her words in quotes, and "I'm an AI helper. I can't give medical advice." under its heading.
 
 ## 7. Companionship
 
@@ -90,14 +93,15 @@ After a crisis response, keep the conversation open and gentle. Never end it abr
 
 ## 7a. The advice guard (`app/guard.py`)
 
-Every AI reply is checked by plain rules after it is written and before she sees or hears it. Dose amounts, instructions near a health action ("you should rest", "try ice"), guesses at a cause or condition ("could be a sprain", "caused by", "probably nothing"), and medicines or remedies that aren't her own pills are replaced with the fixed reply from section 2. Whenever she asks for advice herself ("should I…", "can I take…", "is it OK to…"), Call {doctor_name}, Call {family_name}, and "Add to doctor notes" are always shown. Side effects and missed doses always add the fixed lines from section 5. `scripts/check_advice.py` (run by hand) sends the section 10 phrases to the real model to confirm.
+Every AI reply is checked by plain rules after it is written and before she sees or hears it. Dose amounts, instructions near a health action ("you should rest", "try ice", "have you tried resting it?"), guesses at a cause or condition ("could be a sprain", "caused by", "probably nothing"), and medicines or remedies that aren't her own pills are replaced with the fixed reply from section 2. Whenever she asks for advice herself ("should I…", "can I take…", "is it OK to…"), Call {doctor_name}, Call {family_name}, and "Add to doctor notes" are always shown. Side effects and missed doses always add the fixed lines from section 5. `scripts/check_advice.py` (run by hand) sends the section 10 phrases to the real model to confirm.
 
 ## 7b. Safety-net details decided during the build
 
 - The safety net checks her whole message before anything else, even before the database, so a database problem or a very long message never skips it.
-- It also checks her last few messages together, so a symptom told across answers ("my chest" … "tight") still shows the screen.
+- It also checks her last few messages together (up to 3, from the last 10 minutes, in any talk), so a symptom told across answers ("my chest" … "tight") still shows the screen, even across a tap on "Something hurts" or midnight.
+- In a "Something hurts" talk, and right after Buddy asks about pain ("Where does it hurt?"), her answer counts as "it hurts". So "my chest" alone shows the emergency screen, and so do "my left arm and my jaw" plus "I feel sweaty". "My knee" does not.
 - If crisis words come together with an emergency or a pill mix-up, the more urgent screen shows, and Call 988 and Text 988 are added to its buttons.
-- When crisis words are involved, her words are never stored: only the kind of event and the time. An emergency diary entry then lists only the warning signs.
+- When crisis words are involved, her words are never stored: only the kind of event and the time. That includes Buddy's conversation memory, where her words are replaced with a short note. An emergency diary entry then lists only the warning signs.
 - After a crisis screen, every reply that day keeps Call 988 and Call {family_name} visible, and the AI is told to stay gentle. A repeated crisis phrase always shows the crisis screen again.
 - If her words can't reach the safety net (no internet, microphone problem, words not understood), Call 911 and Call {family_name} are shown with the kind message. The note at the bottom of the home screen has a "call 911" phone link at all times.
 - Safety messages are read aloud even if voice is turned off.

@@ -26,8 +26,8 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 - [x] `/safety-check` passes.
 
 ### Day 4: Thu, Oct 29 (symptom diary)
-- [ ] Diary mode: "Something hurts" button, up to 3 follow-up questions by voice, `log_symptom`, call buttons, the no-advice answer.
-- [ ] Diary list screen. `/safety-check` and `/senior-friendly-ui` pass.
+- [x] Diary mode: "Something hurts" button, up to 3 follow-up questions by voice, `log_symptom`, call buttons, the no-advice answer. (Done early, Oct 27.)
+- [x] Diary list screen. `/safety-check` and `/senior-friendly-ui` pass. (Done early, Oct 27.)
 
 ### Day 5: Fri, Oct 30 (pills)
 - [ ] Medication screen (add, edit, remove with confirmation).
@@ -71,6 +71,8 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 ## Status log
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
+
+- Oct 27 (Day 4 work, done early): Symptom diary (Feature 3). "Something hurts" (Today card and Diary screen) starts a talk with its own conversation; Buddy asks up to 3 follow-ups, then `log_symptom` saves her own words, one entry per talk. Where, pain, and since are kept only if she said them ("possible sprain" or a made-up pain number never reaches her diary). Call {doctor} and Call {family} always follow a saved entry. The server says when a talk is done; her 4th answer tells Buddy to save now. `GET /api/diary`, Diary screen (entries by day, her words in quotes, AI-helper line). Safety net: in a "Something hurts" talk or right after Buddy asks about pain, "my chest" alone shows the emergency screen; her last messages are checked together across talks (last 10 minutes); crisis words are no longer kept in conversation memory. Advice guard also catches "have you tried ice?". Two real-API bugs found and fixed: Meta rejects `tool_choice` "none" (HTTP 400), and the model sometimes spent its whole token allowance thinking and replied with nothing (limit raised to 3000, empty replies asked again). A fresh reviewer found 1 critical and 4 important issues, all fixed with tests. 230/230 pytest; browser check covers the diary talk and screen; `scripts/check_diary.py` with the real AI: both talks saved correctly, the advice question got no advice. `/safety-check`, `/web-design-guidelines`, and `/senior-friendly-ui` pass. `/api/today` moves to the pills step (it only reports pills and check-ins).
 
 - Oct 27: App shell and Family & settings screen. One page with a section per screen (Today, My diary, My pills, Doctor notes, Scam check, Family); the address names the screen (`#/family`), so Back works, focus moves to each screen's heading, and the tab title changes. Sidebar and cards are real links; phones get a "Menu" drawer (Close, Escape, tap beside it; the page behind can't be reached while it's open). Buddy's "Open …" buttons now open real screens. Family screen: Call {family} and Call {doctor} buttons, and a "Set up Buddy" form (her names, family name/phone/email, doctor name/phone, voice on/off, Slower/Normal/Faster). The server names a refused entry and how to fix it ("Use numbers, like 555‑0123."), shown right under it; unsaved entries are kept when moving between screens. Diary, Pills, Notes, and Scam screens say honestly that they're coming soon. Skip link, 16px between all tap targets. `static/screens.js` added; docs/DESIGN.md rewritten for the AI-app look. 200/200 pytest; browser check covers moving between screens, the phone menu, saving and refusing on the form, Back, and layout at 360, 375 (biggest words), 640, 768, and 1280. `/web-design-guidelines` and `/senior-friendly-ui` pass after fixes.
 

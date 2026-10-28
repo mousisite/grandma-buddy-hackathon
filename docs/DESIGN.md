@@ -100,6 +100,8 @@ All screens live on one page (`static/index.html`), each in a `<section data-scr
 
 **Tablets lying sideways and computers (1000px and up):** the sidebar sits on the left; the cards form a two-by-two grid (from 640px up); the page column is at most 820px wide.
 
+**My diary:** under the heading, "I'm an AI helper. I can't give medical advice." Then one "Something hurts" button, then her entries grouped by day ("Today", "Yesterday", "Monday, October 26"), newest first. Each entry is a flat gray card (for reading only): the time, her own words in quotes (24px), and Where, Pain ("5 out of 10"), and Since, only when she said them. Entries from the emergency screen or the daily check-in say so in a second line.
+
 **Family:** big call buttons for her family member and doctor at the top, then "Set up Buddy" for a family member: her names, family name, phone and email, doctor name and phone, and Buddy's voice. One Save button.
 
 ## Screen checklist

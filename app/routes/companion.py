@@ -56,6 +56,9 @@ def chat(request: ChatRequest):
     # 1. The safety net on her whole message, before anything else, even
     #    before the database. It needs no database, AI, or internet.
     result = safety.check(text)
+    if request.mode == "diary":
+        # She tapped "Something hurts": "my chest" alone means her chest hurts.
+        result = safety.merge(result, safety.check(safety.as_hurting(text)))
 
     try:
         connection = db.get_connection()
@@ -68,16 +71,26 @@ def chat(request: ChatRequest):
 
     try:
         profile = db.get_profile(connection)
+        # Right after Buddy asked where it hurts, "my chest" means it hurts too.
+        pain_topic = safety.pain_is_the_topic(request.mode, db.buddy_last_words(connection, request.conversation_id))
+        if pain_topic and request.mode != "diary":  # (diary was checked above, before the database)
+            result = safety.merge(result, safety.check(safety.as_hurting(text)))
         saved_text = text[:MAX_TEXT]  # very long messages are kept short
         db.save_message(connection, request.conversation_id, "user", saved_text)
 
-        # Her last few messages together, so "my chest" ... "tight" still counts.
-        recent = db.her_recent_words(connection, request.conversation_id)
-        together = safety.check_recent(recent) if len(recent) > 1 else None
-        said = " ".join(recent) if together is not None else saved_text
+        # Her last few messages together (any talk, last 10 minutes), so
+        # "my chest" ... "tight" still counts.
+        recent = db.her_last_words(connection)
+        her_words = [row["content"] for row in recent]
+        checked = [safety.as_hurting(words) for words in her_words] if pain_topic else her_words
+        together = safety.check_recent(checked) if len(recent) > 1 else None
+        said = " ".join(her_words) if together is not None else saved_text
         result = safety.merge(result, together, profile["family_name"])
         if result is not None:
             result.message = safety.fixed_message(result.kind, profile["family_name"])
+            if "crisis" in result.kinds:
+                # Crisis words are never kept, not even in Buddy's memory (SAFETY.md 7b).
+                db.forget_her_words(connection, [row["id"] for row in recent])
             save_safety_records(connection, request.conversation_id, result, said)
             connection.commit()
             return safety_screen(result, profile)
@@ -116,5 +129,10 @@ def save_safety_records(connection, conversation_id: str, result: safety.SafetyR
         db.add_safety_event(connection, kind, result.matched, "" if crisis else said)
     if "emergency" in result.kinds:
         signs = ", ".join(name for name in result.matched if name != "thoughts of dying or self-harm")
-        db.add_symptom(connection, f"Emergency warning signs ({signs})" if crisis else said, source="safety_net")
+        db.add_symptom(
+            connection,
+            f"Emergency warning signs ({signs})" if crisis else said,
+            source="safety_net",
+            conversation_id=conversation_id,
+        )
     db.save_message(connection, conversation_id, "safety", result.message)

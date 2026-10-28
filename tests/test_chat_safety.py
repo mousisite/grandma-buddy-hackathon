@@ -60,7 +60,9 @@ def test_poison_control_screen(client):
 
 
 def test_symptom_split_across_two_answers_still_shows_the_screen(client, monkeypatch):
-    # "my chest" alone is not an emergency, so the AI may answer it ("How does it feel?").
+    # In ordinary chat, "my chest" alone is not an emergency, so the AI may
+    # answer it ("How does it feel?"). (In a "Something hurts" talk it would
+    # already be one: see the tests at the end of this file.)
     answers = [{"content": "How does it feel?", "tool_calls": [], "message": {"role": "assistant", "content": "How does it feel?"}}]
 
     def ai_answers_once(*args, **kwargs):
@@ -69,9 +71,9 @@ def test_symptom_split_across_two_answers_still_shows_the_screen(client, monkeyp
         return answers.pop(0)
 
     monkeypatch.setattr(meta_client, "chat", ai_answers_once)
-    client.post("/api/chat", json={"conversation_id": "t5", "text": "my chest", "mode": "diary"})
+    client.post("/api/chat", json={"conversation_id": "t5", "text": "my chest", "mode": "chat"})
     # "tight" completes it: the safety net answers, and the AI is not asked again.
-    body = client.post("/api/chat", json={"conversation_id": "t5", "text": "tight", "mode": "diary"}).json()
+    body = client.post("/api/chat", json={"conversation_id": "t5", "text": "tight", "mode": "chat"}).json()
     assert body["show"] == "emergency"
 
 
@@ -140,3 +142,72 @@ def test_a_refused_profile_entry_is_named_so_the_form_can_point_to_it(client):
     assert email["message"] == "Please check the family email address. It looks like name@example.com."
     # Nothing is half-saved: Maria was refused along with the bad number.
     assert client.get("/api/profile").json()["family_name"] == ""
+
+
+# ---------- Pain told as a place ("my chest"), and words told across talks ----------
+
+def ai_says(monkeypatch, *texts):
+    """A fake AI that may answer only these times; any other call fails the test."""
+    answers = [{"content": t, "tool_calls": [], "message": {"role": "assistant", "content": t}} for t in texts]
+
+    def fake(*args, **kwargs):
+        if not answers:
+            raise AssertionError("The AI was called, but the safety net should have answered.")
+        return answers.pop(0)
+
+    monkeypatch.setattr(meta_client, "chat", fake)
+
+
+def post(client, text, mode="chat", conversation="t20"):
+    return client.post("/api/chat", json={"conversation_id": conversation, "text": text, "mode": mode}).json()
+
+
+def test_in_a_something_hurts_talk_naming_the_chest_is_enough(client):
+    # She tapped "Something hurts", so "my chest" means her chest hurts.
+    assert post(client, "my chest", mode="diary")["show"] == "emergency"
+
+
+def test_pain_spreading_named_as_places_in_a_something_hurts_talk(client, monkeypatch):
+    ai_says(monkeypatch, "I'm sorry. Is anything else different?")
+    assert post(client, "my left arm and my jaw", mode="diary")["show"] is None
+    assert post(client, "I feel sweaty and sick to my stomach", mode="diary")["show"] == "emergency"
+
+
+def test_a_knee_in_a_something_hurts_talk_is_not_an_emergency(client, monkeypatch):
+    ai_says(monkeypatch, "I'm sorry your knee hurts. How bad is it, from 0 to 10?")
+    assert post(client, "my knee", mode="diary")["show"] is None
+
+
+def test_after_buddy_asks_where_it_hurts_my_chest_shows_the_screen(client, monkeypatch):
+    ai_says(monkeypatch, "I'm sorry you're not well. Where does it hurt?")
+    post(client, "I don't feel well")
+    assert post(client, "my chest")["show"] == "emergency"
+
+
+def test_my_chest_in_ordinary_chat_is_not_an_emergency(client, monkeypatch):
+    ai_says(monkeypatch, "Oh, what did you find?")
+    assert post(client, "I found my chest of old photos")["show"] is None
+
+
+def test_a_symptom_told_across_the_something_hurts_tap_still_shows_the_screen(client, monkeypatch):
+    ai_says(monkeypatch, "Oh no. Tell me more?")
+    post(client, "my chest", conversation="2026-10-27")
+    assert post(client, "it feels tight", mode="diary", conversation="2026-10-27-diary-1")["show"] == "emergency"
+
+
+def test_words_from_long_ago_are_not_joined(client, monkeypatch, safe_test_setup):
+    ai_says(monkeypatch, "Oh, a new chest?", "Tight? Tell me more.")
+    post(client, "I'm looking at my chest")
+    connection = db.get_connection(safe_test_setup)
+    connection.execute("UPDATE messages SET created_at = '2026-01-01T09:00:00'")
+    connection.commit()
+    connection.close()
+    assert post(client, "my shoes are tight")["show"] is None
+
+
+def test_crisis_words_are_never_kept_in_the_conversation_either(client, safe_test_setup):
+    post(client, "I want to die")
+    connection = db.get_connection(safe_test_setup)
+    said = [row["content"] for row in connection.execute("SELECT content FROM messages WHERE role = 'user'")]
+    connection.close()
+    assert said and all("die" not in text for text in said)

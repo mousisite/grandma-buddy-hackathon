@@ -1,10 +1,9 @@
 // Grandma Buddy: the page shell.
 // Greets her (by name once the family has set it up), shows the date,
 // grows the words on request (and remembers her choice), moves between
-// screens (the router), opens the Menu on phones, and shows a kind note for
-// features that aren't built yet. Talking lives in talk.js, the other
-// screens in screens.js, reading aloud in speech.js, and recording in
-// recorder.js.
+// screens (the router), and opens the Menu on phones. Talking lives in
+// talk.js, the other screens in screens.js, reading aloud in speech.js,
+// and recording in recorder.js.
 
 "use strict";
 
@@ -115,6 +114,11 @@ function showScreen(moveFocus) {
   if (name !== "today" && talkState === "listening") {
     finishTalking();
   }
+  // Leaving Today ends a "Something hurts" talk (unless her last words
+  // are still on their way, which belong to it).
+  if (name !== "today" && talkMode === "diary" && talkState === "idle") {
+    endDiaryTalk();
+  }
   document.querySelectorAll("[data-screen]").forEach(function (screen) {
     screen.hidden = screen.getAttribute("data-screen") !== name;
   });
@@ -193,10 +197,6 @@ function say(text, options) {
   });
 }
 
-function sayComingSoon(what) {
-  say("“" + what + "” isn’t ready yet. It’s coming soon.");
-}
-
 // The words button cycles: normal -> big -> biggest -> normal.
 var WORD_SIZES = [100, 115, 130];
 var WORD_NAMES = ["normal", "big", "biggest"];
@@ -266,12 +266,6 @@ function start() {
   // A tablet turned sideways shows the sidebar for good: close the drawer
   // so the page behind it can be used again.
   matchMedia("(min-width: 1000px)").addEventListener("change", closeMenu);
-
-  document.querySelectorAll("[data-coming-soon]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      sayComingSoon(button.getAttribute("data-coming-soon"));
-    });
-  });
 
   document.getElementById("text-size-button").addEventListener("click", growWords);
 }

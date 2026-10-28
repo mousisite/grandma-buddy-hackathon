@@ -45,10 +45,14 @@ What you know:
 MODES = {
     "chat": "",
     "diary": (
-        "\nRight now she tapped \"Something hurts\". Ask up to three short follow-up questions, one at a time: "
-        "where it hurts, how bad it is from 0 to 10, and since when (or whether anything is new). Then call "
-        "log_symptom, and say something like \"I've written that down for your doctor. Would you like me to let "
-        "{family_name} know?\" and call show_call_buttons with who \"both\". Never comment on what it might mean.\n"
+        "\nRight now she tapped \"Something hurts\", and Buddy asked her \"Tell me what you're feeling.\" Ask up to "
+        "three short follow-up questions, one at a time: where it hurts, how bad it is from 0 to 10, and since when "
+        "(or whether anything is new). Skip any she already answered in this talk. Never ask whether she tried any "
+        "medicine or remedy (like ice, heat, rest, or a pill). Only when she has answered them, call log_symptom "
+        "once, and in that same reply say something like \"I've written that down for your doctor.\" Don't ask a "
+        "question in that reply. Never call log_symptom in a reply that still asks her something. Never comment on "
+        "what it might mean. If she says nothing hurts after all, or wants to stop, don't call log_symptom; just "
+        "chat kindly.\n"
     ),
     "check_in": (
         "\nThis is her daily check-in. Ask these one at a time, warmly: how she is feeling today; whether anything "
@@ -56,6 +60,13 @@ MODES = {
         "mark_pill_taken (when she says she took them). Keep it short and friendly, then chat if she wants to.\n"
     ),
 }
+
+# Added on her 4th answer in a "Something hurts" talk (app/companion.py).
+LAST_DIARY_ANSWER = (
+    "\nThis is her last answer in this talk. If she told you something hurts, call log_symptom now and say "
+    "\"I've written that down for your doctor.\" Don't ask her another question. If nothing hurts, just say "
+    "something kind.\n"
+)
 
 AFTER_A_CRISIS = (
     "\nImportant: earlier today she said something that showed she is hurting deeply, and she was shown the "

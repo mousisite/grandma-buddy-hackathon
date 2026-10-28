@@ -79,7 +79,8 @@ def init_db(db_path: str | None = None) -> None:
                 acted_at TEXT NOT NULL DEFAULT ''
             );
 
-            -- The symptom diary, in her own words.
+            -- The symptom diary, in her own words. conversation_id ties an
+            -- entry to the talk it came from (one entry per "Something hurts").
             CREATE TABLE IF NOT EXISTS symptoms (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_at TEXT NOT NULL DEFAULT '',
@@ -87,7 +88,8 @@ def init_db(db_path: str | None = None) -> None:
                 body_area TEXT NOT NULL DEFAULT '',
                 pain_level INTEGER,
                 since TEXT NOT NULL DEFAULT '',
-                source TEXT NOT NULL DEFAULT 'chat'
+                source TEXT NOT NULL DEFAULT 'chat',
+                conversation_id TEXT NOT NULL DEFAULT ''
             );
 
             -- Daily moods from the check-in.
@@ -138,6 +140,11 @@ def init_db(db_path: str | None = None) -> None:
             CREATE UNIQUE INDEX IF NOT EXISTS med_events_once ON med_events (medication_id, due_at);
             """
         )
+        # A database made before October 27 has no conversation_id on its
+        # diary entries yet: add it, keeping every entry.
+        columns = [row["name"] for row in connection.execute("PRAGMA table_info(symptoms)")]
+        if "conversation_id" not in columns:
+            connection.execute("ALTER TABLE symptoms ADD COLUMN conversation_id TEXT NOT NULL DEFAULT ''")
         # WAL mode lets the 30-second reminder check read while a slow
         # AI reply is being saved, instead of waiting for it.
         connection.execute("PRAGMA journal_mode=WAL")
@@ -177,11 +184,8 @@ def save_message(connection: sqlite3.Connection, conversation_id: str, role: str
 
 
 def her_recent_words(connection: sqlite3.Connection, conversation_id: str, limit: int = 3) -> list[str]:
-    """Her last few messages since the safety net last answered, oldest first.
-
-    Used to catch a symptom told in pieces ("my chest" ... "tight"), without
-    showing the same safety screen again for later, unrelated messages.
-    """
+    """Her last few messages in this talk since the safety net last answered,
+    oldest first. Used for the words saved in a diary entry."""
     last_safety = connection.execute(
         "SELECT MAX(id) FROM messages WHERE conversation_id = ? AND role = 'safety'",
         (conversation_id,),
@@ -192,6 +196,41 @@ def her_recent_words(connection: sqlite3.Connection, conversation_id: str, limit
         (conversation_id, last_safety, limit),
     ).fetchall()
     return [row["content"] for row in reversed(rows)]
+
+
+def her_last_words(connection: sqlite3.Connection, minutes: int = 10, limit: int = 3) -> list[sqlite3.Row]:
+    """Her last few messages (id and content) from the last few minutes, in
+    ANY talk, oldest first, since the safety net last answered.
+
+    The safety net checks them together, so a symptom told in pieces ("my
+    chest" ... "tight") is caught even across a tap on "Something hurts" or
+    midnight, without showing a screen again for later, unrelated messages.
+    """
+    since = (datetime.now() - timedelta(minutes=minutes)).isoformat(timespec="seconds")
+    last_safety = connection.execute("SELECT MAX(id) FROM messages WHERE role = 'safety'").fetchone()[0] or 0
+    rows = connection.execute(
+        "SELECT id, content FROM messages WHERE role = 'user' AND id > ? AND created_at >= ? ORDER BY id DESC LIMIT ?",
+        (last_safety, since, limit),
+    ).fetchall()
+    return list(reversed(rows))
+
+
+def buddy_last_words(connection: sqlite3.Connection, conversation_id: str) -> str:
+    """What Buddy said last in this talk ("" before Buddy has said anything)."""
+    row = connection.execute(
+        "SELECT content FROM messages WHERE conversation_id = ? AND role IN ('assistant', 'safety') "
+        "ORDER BY id DESC LIMIT 1",
+        (conversation_id,),
+    ).fetchone()
+    return row["content"] if row else ""
+
+
+def forget_her_words(connection: sqlite3.Connection, message_ids: list[int]) -> None:
+    """Replace her words in these messages (docs/SAFETY.md 7b: crisis words are never kept)."""
+    connection.executemany(
+        "UPDATE messages SET content = ? WHERE id = ?",
+        [("(Not kept: she shared something painful, and Buddy showed the crisis screen.)", i) for i in message_ids],
+    )
 
 
 def add_safety_event(connection: sqlite3.Connection, kind: str, matched: list[str], excerpt: str = "") -> None:
@@ -243,14 +282,64 @@ def add_symptom(
     body_area: str = "",
     pain_level: int | None = None,
     since: str = "",
+    conversation_id: str = "",
 ) -> int:
     """Save a diary entry in her own words. Returns its id."""
     cursor = connection.execute(
-        "INSERT INTO symptoms (created_at, description, body_area, pain_level, since, source) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (now(), description, body_area, pain_level, since, source),
+        "INSERT INTO symptoms (created_at, description, body_area, pain_level, since, source, conversation_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (now(), description, body_area, pain_level, since, source, conversation_id),
     )
     return cursor.lastrowid
+
+
+def save_talk_entry(
+    connection: sqlite3.Connection,
+    conversation_id: str,
+    description: str,
+    body_area: str = "",
+    pain_level: int | None = None,
+    since: str = "",
+) -> int:
+    """The one diary entry of a "Something hurts" talk. Saving again in the
+    same talk updates it: all her words so far, plus any new facts (a fact
+    she gave earlier stays if nothing new replaces it). Returns its id."""
+    row = connection.execute(
+        "SELECT id, body_area, pain_level, since FROM symptoms WHERE conversation_id = ? AND source = 'diary' "
+        "ORDER BY id LIMIT 1",
+        (conversation_id,),
+    ).fetchone()
+    if row is None:
+        return add_symptom(connection, description, "diary", body_area, pain_level, since, conversation_id)
+    connection.execute(
+        "UPDATE symptoms SET description = ?, body_area = ?, pain_level = ?, since = ? WHERE id = ?",
+        (
+            description,
+            body_area or row["body_area"],
+            row["pain_level"] if pain_level is None else pain_level,
+            since or row["since"],
+            row["id"],
+        ),
+    )
+    return row["id"]
+
+
+def talk_has_entry(connection: sqlite3.Connection, conversation_id: str) -> bool:
+    """True once a "Something hurts" talk has saved its diary entry."""
+    return connection.execute(
+        "SELECT 1 FROM symptoms WHERE conversation_id = ? AND source = 'diary'", (conversation_id,)
+    ).fetchone() is not None
+
+
+def diary_entries(connection: sqlite3.Connection, days: int) -> list[dict]:
+    """Her diary entries from the last `days` days, newest first."""
+    since = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+    rows = connection.execute(
+        "SELECT id, created_at, description, body_area, pain_level, since, source FROM symptoms "
+        "WHERE created_at >= ? ORDER BY created_at DESC, id DESC",
+        (since,),
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def get_keywords(db_path: str | None = None) -> list[str]:

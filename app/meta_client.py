@@ -36,9 +36,17 @@ def _client() -> OpenAI:
     )
 
 
-def chat(messages: list[dict], tools: list[dict] | None = None, tool_choice: str | None = None,
-         reasoning: str = "low", max_tokens: int = 1200) -> dict:
+def chat(messages: list[dict], tools: list[dict] | None = None,
+         reasoning: str = "low", max_tokens: int = 3000) -> dict:
     """Ask Muse Spark for the next reply.
+
+    There is no tool_choice: Meta only supports "auto" (the default) and
+    answers "none" or "required" with HTTP 400. To get words instead of a
+    tool call, ask for words in the messages (see companion.words_only).
+
+    max_tokens counts the model's hidden thinking too. At 1200, longer talks
+    sometimes used it all on thinking and came back with no words, so it
+    has room to spare; the prompt keeps the spoken reply itself short.
 
     Returns a plain dictionary:
       content     her reply text (may be empty when it asks for tools)
@@ -54,8 +62,6 @@ def chat(messages: list[dict], tools: list[dict] | None = None, tool_choice: str
     }
     if tools:
         request["tools"] = tools
-    if tool_choice:
-        request["tool_choice"] = tool_choice
 
     if not settings.model_api_key:
         raise MetaError("no API key is set up in .env")
@@ -73,6 +79,8 @@ def chat(messages: list[dict], tools: list[dict] | None = None, tool_choice: str
         except (openai.APITimeoutError, openai.APIConnectionError) as problem:
             raise MetaError(f"chat failed: {type(problem).__name__}")
 
+    if response.choices[0].finish_reason == "length":
+        print("Chat reply ran out of room (max_completion_tokens).")  # never her words
     message = response.choices[0].message
     calls = [
         {"id": call.id, "name": call.function.name, "arguments": call.function.arguments or "{}"}

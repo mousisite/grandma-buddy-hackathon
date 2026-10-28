@@ -936,6 +936,78 @@ h1 {
   gap: 16px;
 }
 
+/* The screen's main button, under its heading. */
+.screen-actions {
+  margin-bottom: 28px;
+}
+
+/* ---------- My diary: entries by day, like a journal ---------- */
+
+.diary-day + .diary-day {
+  margin-top: 32px;
+}
+
+/* 32px like every heading (golden rule 3). */
+.day-heading {
+  margin-bottom: 14px;
+}
+
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A flat card: only for reading, nothing to tap. */
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 22px;
+  border-radius: 24px;
+  background: var(--soft);
+}
+
+.entry-when,
+.entry-note {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 1.125rem; /* 18px */
+}
+
+/* Her own words, a little bigger than body text. */
+.entry-words {
+  margin: 0;
+  font-size: 1.5rem; /* 24px */
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.entry-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+  margin: 0;
+}
+
+.entry-facts div {
+  display: flex;
+  gap: 8px;
+}
+
+.entry-facts dt {
+  color: var(--text-2);
+}
+
+.entry-facts dd {
+  margin: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Forms (Family and settings) ---------- */
 
 .settings {
@@ -1069,8 +1141,11 @@ h2 {
   font-weight: 500;
 }
 
-/* The main button on a form ("Save"). */
+/* The main button on a screen ("Save", "Something hurts"). */
 .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   align-self: flex-start;
   min-height: 64px;
   padding: 12px 44px;

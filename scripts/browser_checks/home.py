@@ -150,6 +150,38 @@ def check_family_form(page, problems: list[str]) -> None:
     assert page.is_checked("input[name=voice_rate][value='0.75']"), "the voice speed was not remembered"
 
 
+def check_diary_talk(page) -> None:
+    """"Something hurts" from the empty Diary screen: Buddy asks what she
+    feels on Today, her answer goes to /api/chat in diary mode with its own
+    conversation id, and diary mode ends once the entry is saved."""
+    sent = []
+
+    def fake_chat(route):
+        sent.append(route.request.post_data_json)
+        route.fulfill(json={"reply": "I've written that down for your doctor.", "show": None,
+                            "actions": [], "diary_saved": True, "diary_done": True})
+
+    page.unroute("**/api/chat")
+    page.route("**/api/chat", fake_chat)
+    page.click(".side-item[data-nav='diary']")
+    page.wait_for_selector("#diary-status:not([hidden])")
+    assert "Nothing written down in the last 30 days" in (page.text_content("#diary-status") or "")
+    assert page.is_visible("text=I’m an AI helper. I can’t give medical advice.")
+    page.screenshot(path=str(OUT / "diary-empty.png"))
+
+    page.click("[data-screen='diary'] [data-start-diary]")
+    page.wait_for_function("document.querySelector('[data-screen=today]').hidden === false")
+    page.wait_for_function("document.querySelector('#message').textContent.includes('Tell me what you’re feeling')")
+    assert page.text_content("#talk-hint") == "Buddy is writing in your diary"
+    page.click("#talk-button")
+    page.wait_for_selector("#talk-button[data-state='listening']")
+    page.wait_for_timeout(600)
+    page.click("#talk-button")
+    page.wait_for_function("document.querySelector('#talk-hint').textContent === 'Buddy writes down what you say'")
+    assert sent[-1]["mode"] == "diary", sent[-1]
+    assert "-diary-" in sent[-1]["conversation_id"], sent[-1]
+
+
 def check_phone_menu(page) -> None:
     """Phones: "Menu" slides the sidebar in, a choice opens that screen and
     closes the menu, and Escape closes it too."""
@@ -245,6 +277,7 @@ def main() -> int:
                 # Moving between screens, and the Family & settings form
                 # (the real /api/profile, throwaway database).
                 check_family_form(page, problems)
+                check_diary_talk(page)
 
                 # The safety net, end to end: she says an emergency warning sign
                 # (faked speech-to-text), the real /api/chat answers with no AI,
@@ -267,6 +300,15 @@ def main() -> int:
                 assert not safety_page.is_visible("#safety-screen"), "the safety screen did not close"
                 # Behind it, the Call 911 button stays under Buddy's words.
                 assert safety_page.get_attribute("#actions a", "href") == "tel:911"
+                # Her words went into the diary, marked as an emergency screen.
+                safety_page.goto(f"http://localhost:{PORT}/#/diary", wait_until="networkidle")
+                safety_page.wait_for_selector(".entry")
+                assert safety_page.text_content(".day-heading") == "Today"
+                assert safety_page.text_content(".entry-words") == "“my chest feels really tight”"
+                assert safety_page.text_content(".entry-note") == "Buddy showed the emergency screen."
+                safety_page.wait_for_timeout(500)
+                safety_page.screenshot(path=str(OUT / "diary-390px.png"), full_page=True)
+                check_layout(safety_page, "Diary screen at 390px")
 
                 # Phone width: nothing cut off, no sideways scrolling.
                 phone = browser.new_page(viewport={"width": 375, "height": 812})
@@ -327,7 +369,8 @@ def main() -> int:
 
         print(
             "Home check OK: talking works (16 kHz mono WAV sent, words shown), screens and the phone menu work, "
-            "the Family form saves and names a refused entry, no layout problems. Screenshots in test-output/."
+            "the Family form saves and names a refused entry, \"Something hurts\" talks in diary mode and the "
+            "Diary screen lists entries, no layout problems. Screenshots in test-output/."
         )
         return 0
     finally:

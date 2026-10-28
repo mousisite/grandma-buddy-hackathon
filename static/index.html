@@ -117,7 +117,7 @@
             <button id="talk-button" class="composer" type="button" data-state="idle">
               <span class="composer-text">
                 <span id="talk-label" class="composer-title">Tap to talk</span>
-                <span class="composer-hint">Buddy writes down what you say</span>
+                <span id="talk-hint" class="composer-hint">Buddy writes down what you say</span>
               </span>
               <!-- The round voice button: a waveform icon, live bars while
                    listening, or a spinner while working. -->
@@ -131,7 +131,7 @@
 
           <!-- 3. Suggestions, like the cards under an AI app's box. -->
           <nav class="suggestions" aria-label="Main choices">
-            <button class="suggestion" type="button" data-coming-soon="Something hurts">
+            <button class="suggestion" type="button" data-start-diary>
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(45 12 12)"><rect x="2" y="8.5" width="20" height="7" rx="3.5"></rect><rect x="9" y="8.5" width="6" height="7"></rect></g></svg>
               <span class="suggestion-title">Something hurts</span>
               <span class="suggestion-text">Write it down for your doctor</span>
@@ -154,7 +154,7 @@
           </nav>
         </section>
 
-        <!-- ========== My diary (built in the next step) ========== -->
+        <!-- ========== My diary ========== -->
         <section class="screen" data-screen="diary" aria-labelledby="diary-title" hidden>
           <header class="screen-head">
             <a class="back-link" href="#/">
@@ -162,9 +162,19 @@
               Back to Today
             </a>
             <h1 id="diary-title" tabindex="-1">My diary</h1>
-            <p class="lead">What you tell Buddy about how you feel, written down for your doctor.</p>
+            <p class="lead">What you told Buddy about how you feel, in your own words, for your doctor.</p>
+            <!-- Required on diary screens: docs/SAFETY.md section 1. -->
+            <p class="hint">I’m an AI helper. I can’t give medical advice.</p>
           </header>
-          <p class="empty">This part of Buddy is still being built. It’s coming soon.</p>
+          <div class="screen-actions">
+            <button class="primary-button" type="button" data-start-diary>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(45 12 12)"><rect x="2" y="8.5" width="20" height="7" rx="3.5"></rect><rect x="9" y="8.5" width="6" height="7"></rect></g></svg>
+              Something hurts
+            </button>
+          </div>
+          <!-- "Nothing yet" or "couldn't open it", and the entries by day (screens.js). -->
+          <p id="diary-status" class="empty" role="status" hidden></p>
+          <div id="diary-list"></div>
         </section>
 
         <!-- ========== My pills (built later) ========== -->

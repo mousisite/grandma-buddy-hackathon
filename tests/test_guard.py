@@ -23,6 +23,10 @@ ADVICE = [
     "Eating more salt is bad for blood pressure, so try to avoid it.",
     "You might have a cold.",
     "Make sure to take two tablets with food.",
+    # Remedy hints asked as questions (found by the diary review).
+    "Have you tried ice or heat on it?",
+    "Have you tried resting it?",
+    "Did you try putting your feet up and resting?",
 ]
 
 THERAPY = [
@@ -36,6 +40,8 @@ THERAPY = [
 # Normal replies that must NOT be touched.
 NORMAL = [
     "That sounds like a lovely day.",
+    "Have you tried calling Maria today?",
+    "Did you try the new recipe from your sister?",
     "It could be a nice afternoon for a walk with Maria.",
     "Did you take your Vitamin D this morning?",
     "Would you like to call Maria today?",

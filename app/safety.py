@@ -273,6 +273,26 @@ def check(text: str, family_name: str = "") -> SafetyResult | None:
     )
 
 
+def as_hurting(text: str) -> str:
+    """Her words with "it hurts" made plain.
+
+    After she taps "Something hurts", or Buddy asks where it hurts, "my
+    chest" means "my chest hurts". The rules for chest pain, pain spreading
+    to the arm or jaw, and belly pain need a body part AND a pain word, so
+    "hurts" is added on both sides, wherever she named the place.
+    """
+    return f"it hurts {text} hurts"
+
+
+# Buddy's last words were about pain ("Where does it hurt?").
+PAIN_TOPIC = words(r"pain\w*|hurt\w*|ache|aches|aching|sore\w*")
+
+
+def pain_is_the_topic(mode: str, buddy_last_words: str) -> bool:
+    """True in a "Something hurts" talk, or right after Buddy asked about pain."""
+    return mode == "diary" or PAIN_TOPIC.search(normalize(buddy_last_words)) is not None
+
+
 def check_recent(recent_messages: list[str], family_name: str = "") -> SafetyResult | None:
     """Check her last few messages together.
 

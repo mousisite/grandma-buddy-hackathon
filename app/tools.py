@@ -8,6 +8,7 @@
 # tool call.
 
 import json
+import re
 
 from app import db
 
@@ -17,6 +18,48 @@ SCREEN_NAMES = {
     "today": "Today", "diary": "My diary", "pills": "My pills",
     "notes": "Doctor notes", "family": "Family", "scam": "Scam check",
 }
+
+# ---------- Her own words in the diary (docs/SAFETY.md section 6) ----------
+
+# Small words the AI may add around her words ("her left knee", "since Tuesday").
+FILLER = {"a", "an", "the", "my", "her", "since", "about", "around", "in", "on", "of", "and", "at"}
+NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+# A number followed by one of these is a time or a count, not a pain level ("for 2 days").
+NOT_PAIN_AFTER = r"(minutes?|hours?|days?|weeks?|months?|years?|times?|o'clock|am|pm|of)\b"
+
+
+def words_in(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9']+", text.lower())
+
+
+def joined(parts: list[str]) -> str:
+    """Her messages as one text: a period after each, unless she ended it with one."""
+    return " ".join(part if part[-1:] in ".!?" else part + "." for part in parts)
+
+
+def from_her_words(fact, her_words: str) -> str:
+    """Keep a fact the AI filled in (where, since when) only if she said it.
+
+    So "knee" is kept when she said "my knee", but "patella" or "possible
+    sprain" is dropped. Her full words are always saved anyway. Small words
+    in front ("her left knee", "since Tuesday") are left out, because the
+    screen already says "Where:" and "Since:".
+    """
+    words = str(fact or "").strip()[:60].split()
+    while words and words[0].lower() in FILLER:
+        words = words[1:]
+    said = set(words_in(her_words))
+    meaningful = [word for word in words_in(" ".join(words)) if word not in FILLER]
+    return " ".join(words) if meaningful and all(word in said for word in meaningful) else ""
+
+
+def pain_she_said(pain, her_words: str):
+    """Keep a pain number (0 to 10) only if she said it, as "5" or "five",
+    and not as a time or a count ("sore for 2 days", "one of my knees")."""
+    if not (isinstance(pain, int) and not isinstance(pain, bool) and 0 <= pain <= 10):
+        return None
+    number = rf"\b({pain}|{NUMBER_WORDS[pain]})\b(?!\s+{NOT_PAIN_AFTER})"
+    return pain if re.search(number, her_words.lower()) else None
 
 
 def tool(name: str, description: str, properties: dict, required: list[str]) -> dict:
@@ -106,20 +149,23 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
         return {"ok": True}, []
 
     if name == "log_symptom":
-        # Her own words, never the AI's: docs/SAFETY.md section 6.
-        her_words = ". ".join(db.her_recent_words(connection, context["conversation_id"]))
-        pain = args.get("pain_level")
-        if not (isinstance(pain, int) and 0 <= pain <= 10):
-            pain = None
-        source = {"diary": "diary", "check_in": "check_in"}.get(context["mode"], "chat")
-        db.add_symptom(
-            connection,
-            her_words,
-            source=source,
-            body_area=str(args.get("body_area", ""))[:60],
-            pain_level=pain,
-            since=str(args.get("since", ""))[:60],
-        )
+        # Her own words, never the AI's: docs/SAFETY.md section 6. Her first
+        # message plus up to three follow-ups (4). A "Something hurts" talk
+        # has its own conversation, so all of it is kept (6, with room to spare).
+        diary = context["mode"] == "diary"
+        her_words = joined(db.her_recent_words(connection, context["conversation_id"], limit=6 if diary else 4))
+        facts = {
+            "body_area": from_her_words(args.get("body_area"), her_words),
+            "pain_level": pain_she_said(args.get("pain_level"), her_words),
+            "since": from_her_words(args.get("since"), her_words),
+        }
+        if diary:
+            # One entry per "Something hurts" talk, even if the AI saves again.
+            db.save_talk_entry(connection, context["conversation_id"], her_words, **facts)
+        elif not context.get("diary_saved"):  # one entry per reply, even if the AI asks twice
+            source = "check_in" if context["mode"] == "check_in" else "chat"
+            db.add_symptom(connection, her_words, source, conversation_id=context["conversation_id"], **facts)
+        context["diary_saved"] = True
         return {"ok": True, "saved": her_words}, []
 
     if name == "add_doctor_question":

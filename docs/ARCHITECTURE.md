@@ -73,6 +73,8 @@ grandma-buddy-hackathon/
     fonts/                   Lexend (the app's font) and its license, OFL-Lexend.txt
   scripts/
     check_meta.py            one tiny real call to confirm the API key and billing work
+    check_advice.py          hand-run: SAFETY.md advice phrases through the real AI (no advice given?)
+    check_diary.py           hand-run: two "Something hurts" talks through the real AI (entry saved, no advice?)
     seed_demo.py             fills the database with made-up demo data ("Rose", 7 days)
     browser_checks/          Playwright scripts that check screens in a real browser (/webapp-testing)
   tests/
@@ -105,7 +107,7 @@ grandma-buddy-hackathon/
 | `profile` (one row) | id, name, preferred_name, language, family_name, family_email, family_phone, doctor_name, doctor_phone, voice_on, voice_rate, text_size |
 | `medications` | id, name, label_dose (exactly as on the label), times (JSON list like `["08:00","20:00"]`), notes, active, created_at |
 | `med_events` | id, medication_id, due_at, status (`due`, `snoozed`, `taken`, `missed`), snooze_until, acted_at |
-| `symptoms` (the diary) | id, created_at, description (her own words), body_area, pain_level (0 to 10, optional), since (her words, like "since Tuesday"), source (`check_in`, `diary`, `chat`, `safety_net`) |
+| `symptoms` (the diary) | id, created_at, description (her own words), body_area, pain_level (0 to 10, optional), since (her words, like "since Tuesday"), source (`check_in`, `diary`, `chat`, `safety_net`), conversation_id (the talk it came from; one entry per "Something hurts" talk) |
 | `moods` | id, created_at, mood (`great`, `good`, `okay`, `low`, `very_low`), note |
 | `doctor_questions` | id, created_at, question, resolved |
 | `messages` | id, conversation_id, created_at, role, content |
@@ -118,8 +120,8 @@ grandma-buddy-hackathon/
 |---|---|---|
 | `GET /api/ping` | | `{"ok": true}` (server check) |
 | `POST /api/transcribe` | WAV file | `{"transcript": "..."}` |
-| `POST /api/chat` | `{"conversation_id", "text", "mode"}` where `mode` is `"chat"`, `"check_in"`, or `"diary"` | `{"reply", "show", "actions"}` where `show` is `null`, `"emergency"`, `"poison_control"`, `"crisis"`, `"call_buttons"`, or `"call_family"` |
-| `GET /api/diary?days=7` | | diary entries, newest first |
+| `POST /api/chat` | `{"conversation_id", "text", "mode"}` where `mode` is `"chat"`, `"check_in"`, or `"diary"` | `{"reply", "show", "actions", "diary_saved", "diary_done"}` where `show` is `null`, `"emergency"`, `"poison_control"`, or `"crisis"`; `diary_saved` is true when a diary entry was saved this turn, and `diary_done` when a "Something hurts" talk is over |
+| `GET /api/diary?days=7` | `days` from 1 to 90 (the Diary screen asks for 30) | diary entries, newest first |
 | `GET/POST/PUT/DELETE /api/meds` | medication fields | medication list |
 | `GET /api/reminders/due` | | reminders due right now |
 | `POST /api/reminders/{id}/taken` and `/snooze` | | updated reminder |
@@ -135,16 +137,18 @@ grandma-buddy-hackathon/
 **Talking (`/api/chat`)**
 
 1. Save the message.
-2. `safety.check(text)` runs the plain rules. On an emergency, medication mix-up, or crisis match, save a safety event (and a diary entry for emergencies), and return `show` with the fixed message from `docs/SAFETY.md`. No AI call.
-3. Otherwise call Muse Spark with the companion prompt, the mode, today's context (pills due, recent mood, family and doctor names), the recent messages, and the tools. `reasoning_effort: "low"` for speed. Run tool calls, up to 3 rounds. Return the reply.
+2. `safety.check(text)` runs the plain rules, first on this message (before the database), then on her last few messages together (up to 3 from the last 10 minutes, in any talk). In a "Something hurts" talk, or right after Buddy asked about pain, her words count as "it hurts" (`safety.as_hurting`). On an emergency, medication mix-up, or crisis match, save a safety event (and a diary entry for emergencies), and return `show` with the fixed message from `docs/SAFETY.md`. No AI call. With crisis words, her words are replaced in the saved conversation too.
+3. Otherwise call Muse Spark with the companion prompt, the mode, today's context (pills due, recent mood, family and doctor names), the recent messages, and the tools. `reasoning_effort: "low"` for speed, with room for 3000 output tokens (hidden thinking counts too; at 1200 it sometimes ran out before writing anything). Run tool calls, up to 3 rounds; an empty reply is asked again the same way. Meta only supports `tool_choice: "auto"`, so when words are needed after 3 rounds, a short developer message asks for them. Return the reply.
 4. After a crisis match, later AI turns get a note to stay gentle and keep encouraging real help.
 
 **Symptom diary (`mode: "diary"`)**
 
-1. The "Something hurts" button opens the talk screen in diary mode, and the companion asks "Tell me what you're feeling."
-2. Safety rules run first on every message, as above.
-3. The companion asks up to 3 short follow-ups, one at a time (where, how bad from 0 to 10, since when), then calls `log_symptom` with her own words.
-4. It confirms the entry and calls `show_call_buttons`, offering to tell family or call the doctor. It never comments on what the symptom means.
+1. The "Something hurts" button (on Today and on the Diary screen) starts a diary talk on Today. The page says and speaks the fixed opening "I'm sorry something hurts. Tell me what you're feeling." The talk gets its own conversation id (`<day>-diary-<time>`), so its entry holds exactly what she said in it.
+2. Safety rules run first on every message, as above. In this talk her answers count as "it hurts", so "my chest" alone shows the emergency screen.
+3. The companion asks up to 3 short follow-ups, one at a time (where, how bad from 0 to 10, since when), skipping any she already answered, then calls `log_symptom` once.
+4. `log_symptom` saves all her messages in the talk, in her own words. The AI may fill in where, pain, and since, but each is kept only if she said those words (so "possible sprain" or a made-up pain number never reaches her diary). Saving again in the same talk updates the same entry.
+5. The reply says "I've written that down for your doctor" with Call {doctor} and Call {family}; Python adds those buttons whenever an entry is saved, even if the AI forgot. It never comments on what the symptom means.
+6. The server says when the talk is done (`diary_done`): once the entry is saved and Buddy's own words aren't asking anything more, or at her 4th answer, when Buddy is told "this is her last answer: save it now if something hurts". The page also ends it after a safety screen, when she leaves Today, or after 10 minutes without an answer.
 
 **Pill reminders**
 

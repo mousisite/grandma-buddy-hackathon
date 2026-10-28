@@ -13,6 +13,15 @@ var talkState = "idle"; // "idle", "listening", or "working"
 var talkTimer = null;
 var talkMode = "chat"; // "chat", "check_in", or "diary"
 
+// "Something hurts": a short talk that ends in a diary entry. It gets its
+// own conversation id, so the entry holds exactly what she said in it. The
+// server says when the talk is done (diary_done in its answer).
+var DIARY_OPENING = "I’m sorry something hurts. Tell me what you’re feeling.";
+var DIARY_IDLE_MS = 10 * 60 * 1000; // a talk left alone for 10 minutes is over
+var TALK_HINT = "Buddy writes down what you say";
+var diaryConversation = "";
+var diaryLastAnswer = 0;
+
 // One conversation per day, so each day's talk is kept together.
 function conversationId() {
   var today = new Date();
@@ -112,12 +121,44 @@ function sendForTranscript(wav) {
     });
 }
 
+// Start a "Something hurts" talk: Buddy asks what she feels, on Today,
+// and the voice box says it is writing in her diary.
+function startDiaryTalk() {
+  // Not while the microphone is open (it would record Buddy's question) or
+  // while Buddy is still answering (that answer belongs to the last talk).
+  if (talkState !== "idle") {
+    return;
+  }
+  talkMode = "diary";
+  diaryConversation = conversationId() + "-diary-" + Date.now();
+  diaryLastAnswer = Date.now();
+  document.getElementById("talk-hint").textContent = "Buddy is writing in your diary";
+  // Call buttons already under Buddy's words (like Call 988) stay.
+  if (currentScreen() === "today") {
+    document.querySelector(".intro").scrollIntoView({ block: "start" });
+  } else {
+    location.hash = "#/";
+  }
+  say(DIARY_OPENING);
+  speak(DIARY_OPENING);
+}
+
+function endDiaryTalk() {
+  talkMode = "chat";
+  document.getElementById("talk-hint").textContent = TALK_HINT;
+}
+
 // Send her words to Buddy. The safety net answers first if it needs to.
 function askBuddy(text) {
+  if (talkMode === "diary" && Date.now() - diaryLastAnswer > DIARY_IDLE_MS) {
+    endDiaryTalk(); // left alone too long: this is ordinary talk again
+  }
+  diaryLastAnswer = Date.now();
+  var conversation = talkMode === "diary" ? diaryConversation : conversationId();
   return fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversation_id: conversationId(), text: text, mode: talkMode }),
+    body: JSON.stringify({ conversation_id: conversation, text: text, mode: talkMode }),
   })
     .catch(function () {
       throw problem("Offline");
@@ -129,6 +170,12 @@ function askBuddy(text) {
       return response.json();
     })
     .then(function (answer) {
+      // A diary talk ends when the server says so (entry saved and Buddy
+      // isn't asking anything more, or her last answer), or after a safety
+      // screen, so she is never stuck in it.
+      if (talkMode === "diary" && (answer.show || answer.diary_done)) {
+        endDiaryTalk();
+      }
       if (answer.show) {
         openSafetyScreen(answer.show, answer.reply, answer.actions);
       } else {
@@ -302,6 +349,9 @@ function startTalking() {
   document.getElementById("safety-close").addEventListener("click", closeSafetyScreen);
   document.getElementById("safety-again").addEventListener("click", sayAgain);
   document.getElementById("say-again").addEventListener("click", sayAgain);
+  document.querySelectorAll("[data-start-diary]").forEach(function (button) {
+    button.addEventListener("click", startDiaryTalk);
+  });
   // The Escape key closes a dialog by itself; keep speech in step with it.
   document.getElementById("safety-screen").addEventListener("close", function () {
     safetySpeaking = false;

@@ -1,13 +1,111 @@
 // Grandma Buddy: the screens other than Today.
 // Each time the router (app.js) shows a screen, it runs that screen's
 // loader below, so the screen always shows fresh information.
-// Diary, pills, doctor notes, and scam check arrive in the next steps.
+// Pills, doctor notes, and scam check arrive in the next steps.
 
 "use strict";
 
 var SCREEN_LOADERS = {
+  diary: showDiary,
   family: showFamily,
 };
+
+// ---------- My diary ----------
+
+// A short line under an entry that didn't come from a "Something hurts" talk.
+var DIARY_SOURCES = {
+  safety_net: "Buddy showed the emergency screen.",
+  check_in: "From the daily check-in.",
+};
+
+// Her entries from the last 30 days, newest first, under a heading per day.
+function showDiary() {
+  var list = document.getElementById("diary-list");
+  var status = document.getElementById("diary-status");
+  api("/api/diary?days=30")
+    .then(function (entries) {
+      list.textContent = "";
+      status.hidden = entries.length > 0;
+      status.textContent =
+        "Nothing written down in the last 30 days. When something hurts, tap “Something hurts” and tell Buddy.";
+      var shownDay = "";
+      var dayList = null;
+      entries.forEach(function (entry) {
+        var when = new Date(entry.created_at); // local time, like "2026-10-27T14:15:00"
+        var day = dayName(when);
+        if (day !== shownDay) {
+          shownDay = day;
+          var section = document.createElement("section");
+          section.className = "diary-day";
+          var heading = document.createElement("h2");
+          heading.className = "day-heading";
+          heading.textContent = day;
+          dayList = document.createElement("ol");
+          dayList.className = "entries";
+          dayList.setAttribute("role", "list"); // stays a list for screen readers without bullets
+          section.append(heading, dayList);
+          list.appendChild(section);
+        }
+        dayList.appendChild(diaryEntry(entry, when));
+      });
+    })
+    .catch(function () {
+      status.hidden = false;
+      status.textContent = "I couldn’t open your diary just now. Please try again in a moment.";
+    });
+}
+
+// "Today", "Yesterday", or a date like "Monday, October 26".
+function dayName(date) {
+  var yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === new Date().toDateString()) {
+    return "Today";
+  }
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  }
+  return date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
+
+// One entry: the time, her own words, and where, how bad, and since when
+// (only the ones she said). Always textContent: her words are never HTML.
+function diaryEntry(entry, when) {
+  var item = document.createElement("li");
+  item.className = "entry";
+  addText(item, "p", "entry-when", when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
+  // Her words in quotes. "Emergency warning signs (…)" is written by Buddy
+  // instead of her words when crisis words were involved, so it isn't quoted.
+  var herWords = !/^Emergency warning signs \(/.test(entry.description);
+  addText(item, "p", "entry-words", herWords ? "“" + entry.description + "”" : entry.description);
+  var facts = [
+    ["Where:", entry.body_area],
+    ["Pain:", entry.pain_level === null ? "" : entry.pain_level + " out of 10"],
+    ["Since:", entry.since],
+  ].filter(function (fact) { return fact[1]; });
+  if (facts.length) {
+    var list = document.createElement("dl");
+    list.className = "entry-facts";
+    facts.forEach(function (fact) {
+      var pair = document.createElement("div");
+      addText(pair, "dt", "", fact[0]);
+      addText(pair, "dd", "", fact[1]);
+      list.appendChild(pair);
+    });
+    item.appendChild(list);
+  }
+  if (DIARY_SOURCES[entry.source]) {
+    addText(item, "p", "entry-note", DIARY_SOURCES[entry.source]);
+  }
+  return item;
+}
+
+function addText(parent, tag, className, text) {
+  var element = document.createElement(tag);
+  element.className = className;
+  element.textContent = text;
+  parent.appendChild(element);
+}
 
 // ---------- Family and settings ----------
 

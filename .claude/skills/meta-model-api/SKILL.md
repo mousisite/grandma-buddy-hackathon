@@ -53,6 +53,7 @@ Rules:
 - These return HTTP 400 on Chat Completions: `stop`, `n` greater than 1, `verbosity`, `logit_bias`, `prediction`, `web_search_options`, `modalities`, `audio`, `logprobs: true`, and `text.format` (that belongs to the Responses API).
 - Leave `temperature` at the default. Never set both `temperature` and `top_p`.
 - The API keeps no state. Send the conversation every time, trimmed to the prompt plus the last 20 or so messages.
+- `tool_choice`: only `"auto"` (the default) is supported. `"none"`, `"required"`, and named functions return HTTP 400 ("only `auto` is supported for `tool_choice`", seen October 27, 2026). So never send it. To get words instead of another tool call, add a short `developer` message at the end ("Now answer her in a few warm words. Don't call any tools.") and keep `tools` as they were; Meta accepts that after `tool` messages too.
 - Message order is validated strictly. An assistant message with `tool_calls` must be followed by one `tool` message per call, each with the matching `tool_call_id`, before the next assistant turn. Replay the whole assistant message, not just its text, or you get HTTP 400.
 - Non-streaming calls have a time limit (HTTP 504). If that happens, lower the reasoning effort or use `stream=True`.
 
@@ -90,9 +91,12 @@ for _ in range(3):  # at most 3 tool rounds
         result = run_tool(call.function.name, json.loads(call.function.arguments or "{}"))
         messages.append({"role": "tool", "tool_call_id": call.id, "content": json.dumps(result)})
 else:
-    # still asking for tools after 3 rounds: one last call that must answer in words
+    # still asking for tools after 3 rounds: one last call that asks for words
+    # (no tool_choice="none": Meta rejects it with HTTP 400)
     resp = client.chat.completions.create(
-        model=settings.chat_model, messages=messages, tools=TOOLS, tool_choice="none",
+        model=settings.chat_model,
+        messages=messages + [{"role": "developer", "content": "Now answer her in a few warm words. Don't call any tools."}],
+        tools=TOOLS,
         reasoning_effort="low",
     )
 ```
