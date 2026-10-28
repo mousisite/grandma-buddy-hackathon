@@ -245,6 +245,10 @@ function start() {
   startTalking(); // talk.js
   startScreens(); // screens.js
 
+  // Pill reminders: check now and every 30 seconds while the app is open.
+  loadReminders();
+  setInterval(loadReminders, 30 * 1000);
+
   // Show the screen in the address (Today when there is none), and follow
   // every change after that, including the browser's Back button.
   showScreen(false);

@@ -8,6 +8,7 @@
 
 import os
 import struct
+from datetime import datetime
 import subprocess
 import tempfile
 import sys
@@ -182,6 +183,89 @@ def check_diary_talk(page) -> None:
     assert "-diary-" in sent[-1]["conversation_id"], sent[-1]
 
 
+def check_pills(page, problems: list[str]) -> None:
+    """Pills, with the real server and a pill due right now: a refused entry
+    is named; the banner repeats the label exactly; "I took it" and "Remind
+    me in 10 minutes" work; the Today card follows; Change, and Remove with
+    "Are you sure?" and Undo, work."""
+    now = datetime.now()
+    time_now = now.strftime("%H:%M")
+    part = "morning" if now.hour < 12 else "afternoon" if now.hour < 17 else "evening"
+
+    page.click(".side-item[data-nav='pills']")
+    page.wait_for_function("document.title === 'My pills · Grandma Buddy'")
+    page.wait_for_selector("#pills-today-status:not([hidden])")
+    assert "No pills set up yet" in (page.text_content("#pills-today-status") or "")
+
+    # No time chosen: refused, and the note sits under the time box.
+    page.fill("#pill-name", "Lisinopril")
+    page.fill("#pill-label", "10 mg tablet, take 1 by mouth daily")
+    page.click("#pill-save")
+    page.wait_for_selector("#pill-times .field-problem")
+    problems.remove("Failed to load resource: the server responded with a status of 400 (Bad Request)")
+
+    # Due now: the banner repeats the label exactly as typed.
+    page.fill("#pill-form .time-input", time_now)
+    page.click("#pill-save")
+    page.wait_for_selector("#pill-banner:not([hidden])")
+    words = page.text_content("#pill-banner-words") or ""
+    assert words == f"It’s time for your {part} pill: Lisinopril, 10 mg tablet, take 1 by mouth daily.", words
+    assert page.text_content("#pill-taken") == "I took it"
+    # Spoken one sentence at a time, but a dose like "0.5 mg" is never split.
+    parts = page.evaluate("sentencesOf('It’s time for your morning pills: Lorazepam, 0.5 mg tablet; Take 1.5 daily.')")
+    assert parts == ["It’s time for your morning pills: Lorazepam, 0.5 mg tablet;", "Take 1.5 daily."], parts
+    # Brought into view, even though the page was scrolled down to the form.
+    page.wait_for_function("document.getElementById('pill-banner').getBoundingClientRect().top >= 0")
+    top = page.evaluate("document.getElementById('pill-banner').getBoundingClientRect().top")
+    assert top < 200, f"the banner should be on screen, top={top}"
+    page.wait_for_timeout(500)
+    page.screenshot(path=str(OUT / "pills-banner-desktop.png"))
+    check_layout(page, "pill banner, desktop")
+    page.click("#pill-taken")
+    page.wait_for_selector("#pill-banner", state="hidden")
+    assert "Taken at" in (page.text_content("#pills-today .pill-status") or "")
+
+    # A second pill: "Remind me in 10 minutes".
+    page.fill("#pill-name", "Vitamin D")
+    page.fill("#pill-label", "1 softgel daily")
+    page.fill("#pill-form .time-input", time_now)
+    page.click("#pill-save")
+    page.wait_for_selector("#pill-banner:not([hidden])")
+    page.click("#pill-snooze")
+    page.wait_for_selector("#pill-banner", state="hidden")
+    assert "Reminding you again at" in (page.text_content("#pills-today .entry:last-child .pill-status") or "")
+
+    # The Today card follows.
+    page.click(".side-item[data-nav='today']")
+    summary = page.text_content("#pills-summary") or ""
+    assert summary.startswith("Reminder at"), summary
+    page.click(".side-item[data-nav='pills']")
+
+    # Change a label.
+    page.click("[aria-label='Change Vitamin D']")
+    assert page.text_content("#pill-form-title") == "Change Vitamin D"
+    page.fill("#pill-label", "2 softgels daily")
+    page.click("#pill-save")
+    page.wait_for_selector("#pills-list .pill-label:has-text('2 softgels daily')")
+
+    # Remove: "Keep it" keeps it; "Yes, remove it" removes it; Undo brings it back.
+    page.click("[aria-label='Remove Vitamin D']")
+    page.wait_for_selector("#confirm-dialog[open]")
+    assert page.evaluate("document.activeElement.id") == "confirm-no", "the cursor should start on Keep it"
+    page.screenshot(path=str(OUT / "pills-confirm.png"))
+    page.click("#confirm-no")
+    assert page.is_visible("[aria-label='Remove Vitamin D']")
+    page.click("[aria-label='Remove Vitamin D']")
+    page.click("#confirm-yes")
+    page.wait_for_selector("#pills-undo:has-text('Removed Vitamin D.')")
+    assert not page.is_visible("[aria-label='Remove Vitamin D']")
+    page.click("#pills-undo button")
+    page.wait_for_selector("#pills-undo:has-text('Vitamin D is back.')")
+    page.wait_for_selector("[aria-label='Remove Vitamin D']")
+    page.screenshot(path=str(OUT / "pills-desktop.png"), full_page=True)
+    check_layout(page, "Pills screen, desktop")
+
+
 def check_phone_menu(page) -> None:
     """Phones: "Menu" slides the sidebar in, a choice opens that screen and
     closes the menu, and Escape closes it too."""
@@ -278,6 +362,7 @@ def main() -> int:
                 # (the real /api/profile, throwaway database).
                 check_family_form(page, problems)
                 check_diary_talk(page)
+                check_pills(page, problems)
 
                 # The safety net, end to end: she says an emergency warning sign
                 # (faked speech-to-text), the real /api/chat answers with no AI,
@@ -370,7 +455,8 @@ def main() -> int:
         print(
             "Home check OK: talking works (16 kHz mono WAV sent, words shown), screens and the phone menu work, "
             "the Family form saves and names a refused entry, \"Something hurts\" talks in diary mode and the "
-            "Diary screen lists entries, no layout problems. Screenshots in test-output/."
+            "Diary screen lists entries, pill reminders work (banner, I took it, remind me, change, remove, undo), "
+            "no layout problems. Screenshots in test-output/."
         )
         return 0
     finally:

@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import db
 from app.config import get_settings
-from app.routes import companion, diary, notes, profile
+from app.routes import companion, diary, meds, notes, profile
 
 # The folder with index.html, styles.css, and app.js.
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -37,6 +37,8 @@ app.include_router(profile.router)
 app.include_router(notes.router)
 # Her symptom diary.
 app.include_router(diary.router)
+# Her pills and pill reminders.
+app.include_router(meds.router)
 
 
 @app.get("/api/ping")

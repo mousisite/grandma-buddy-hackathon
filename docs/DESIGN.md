@@ -102,6 +102,10 @@ All screens live on one page (`static/index.html`), each in a `<section data-scr
 
 **My diary:** under the heading, "I'm an AI helper. I can't give medical advice." Then one "Something hurts" button, then her entries grouped by day ("Today", "Yesterday", "Monday, October 26"), newest first. Each entry is a flat gray card (for reading only): the time, her own words in quotes (24px), and Where, Pain ("5 out of 10"), and Since, only when she said them. Entries from the emergency screen or the daily check-in say so in a second line.
 
+**Pill reminder banner:** on every screen, at the very top, while a pill is due. A dark card (light at night) so it stands out without red: "Pill time" (32px), the words "It's time for your morning pill: …" with each label exactly as typed (26px), then "I took it" (light, filled), "Remind me in 10 minutes" (outline), and "Say it again". Read aloud once when it appears, brought into view once, and it stays until she answers.
+
+**My pills:** "Today": each reminder as a flat card with the time, the pill's name, its label, and what it is now ("Time to take it now" with a dark outline, "Taken at 8:05 AM ✓", "Reminding you again at 8:40 AM", "Later today", or "Missed. Please check the label or call your pharmacist about what to do."). Then "Set up pills" for a family member: each pill with Change and Remove, a calm "Remove this pill?" dialog where the cursor starts on "Keep it", an Undo line that stays, and the "Add a pill" form (name, label word for word, times of day).
+
 **Family:** big call buttons for her family member and doctor at the top, then "Set up Buddy" for a family member: her names, family name, phone and email, doctor name and phone, and Buddy's voice. One Save button.
 
 ## Screen checklist

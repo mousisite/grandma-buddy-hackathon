@@ -43,8 +43,16 @@ if (canSpeak()) {
   });
 }
 
+// The sentences of a text, one per utterance. Split only where . ! ? or ;
+// is followed by a space, so "1.5 tablets" and "0.5 mg" are never broken
+// apart (and each pill in a reminder is its own sentence).
+function sentencesOf(text) {
+  return text.split(/(?<=[.!?;])\s+/).filter(function (sentence) { return sentence.trim(); });
+}
+
 // Read text aloud. options.safety marks a safety-screen message, which
-// nothing else may cut off.
+// nothing else may cut off. options.onStart runs when the voice actually
+// starts (Chrome stays silent until her first tap on the page).
 function speak(text, options) {
   options = options || {};
   // Safety messages are always read aloud, even if voice is turned off.
@@ -56,9 +64,11 @@ function speak(text, options) {
   }
   lastSpoken = text;
   speechSynthesis.cancel();
-  var sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
-  currentUtterances = sentences.map(function (sentence) {
+  currentUtterances = sentencesOf(text).map(function (sentence, index) {
     var utterance = new SpeechSynthesisUtterance(sentence.trim());
+    if (index === 0 && options.onStart) {
+      utterance.onstart = options.onStart;
+    }
     utterance.rate = voiceSettings.rate;
     if (chosenVoice) {
       utterance.voice = chosenVoice;
@@ -67,6 +77,11 @@ function speak(text, options) {
     speechSynthesis.speak(utterance);
     return utterance;
   });
+}
+
+// True while Buddy is reading something aloud.
+function isSpeaking() {
+  return canSpeak() && speechSynthesis.speaking;
 }
 
 function stopSpeaking() {

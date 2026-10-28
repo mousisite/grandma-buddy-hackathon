@@ -90,6 +90,30 @@
       </header>
 
       <main class="page">
+        <!-- Pill reminder, on every screen when a pill is due (screens.js).
+             The words repeat each label exactly as the family typed it. -->
+        <section id="pill-banner" class="pill-banner" aria-labelledby="pill-banner-title" hidden>
+          <h2 id="pill-banner-title" class="pill-banner-title">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8" width="17" height="8" rx="4"></rect><line x1="12" y1="8" x2="12" y2="16"></line></g></svg>
+            Pill time
+          </h2>
+          <!-- After a Poison Control screen today: its fixed message first. -->
+          <div id="pill-banner-poison" class="pill-banner-poison" hidden>
+            <p id="pill-banner-poison-words" class="pill-banner-words"></p>
+            <a class="pill-button" href="tel:18002221222">Call Poison Control</a>
+          </div>
+          <p id="pill-banner-words" class="pill-banner-words" aria-live="polite"></p>
+          <div class="pill-banner-actions">
+            <button id="pill-taken" class="pill-button" type="button">I took it</button>
+            <button id="pill-snooze" class="pill-button pill-button--quiet" type="button">Remind me in 10 minutes</button>
+            <button id="pill-again" class="say-again" type="button">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
+              Say it again
+            </button>
+          </div>
+          <p id="pill-banner-note" class="pill-banner-note" role="status"></p>
+        </section>
+
         <!-- ========== Today ========== -->
         <section class="screen" data-screen="today" aria-labelledby="greeting">
           <!-- 1. The big centered question. -->
@@ -177,7 +201,7 @@
           <div id="diary-list"></div>
         </section>
 
-        <!-- ========== My pills (built later) ========== -->
+        <!-- ========== My pills ========== -->
         <section class="screen" data-screen="pills" aria-labelledby="pills-title" hidden>
           <header class="screen-head">
             <a class="back-link" href="#/">
@@ -185,9 +209,47 @@
               Back to Today
             </a>
             <h1 id="pills-title" tabindex="-1">My pills</h1>
-            <p class="lead">Your pills for today, and a reminder when it’s time.</p>
+            <p class="lead">Your pills for today. When it’s time, Buddy reminds you.</p>
           </header>
-          <p class="empty">This part of Buddy is still being built. It’s coming soon.</p>
+          <h2 class="day-heading">Today</h2>
+          <!-- Today's reminders (screens.js), or a note when there are none. -->
+          <p id="pills-today-status" class="empty" role="status" hidden></p>
+          <ol id="pills-today" class="entries" role="list"></ol>
+
+          <!-- For a family member: the pills, exactly as on their labels. -->
+          <div class="settings">
+            <h2>Set up pills</h2>
+            <p class="lead">For a family member. Type each label exactly as it is on the bottle. Buddy reads it to her word for word and never changes it.</p>
+            <ul id="pills-list" class="entries" role="list"></ul>
+            <!-- "Removed Lisinopril. Undo" appears here. -->
+            <p id="pills-undo" class="form-status" role="status"></p>
+
+            <form id="pill-form" class="card" novalidate>
+              <h3 id="pill-form-title" class="card-title">Add a pill</h3>
+              <div class="field">
+                <label for="pill-name">Name, as on the bottle</label>
+                <input id="pill-name" name="name" type="text" autocomplete="off" spellcheck="false" maxlength="80">
+              </div>
+              <div class="field">
+                <label for="pill-label">Label, word for word</label>
+                <input id="pill-label" name="label_dose" type="text" autocomplete="off" spellcheck="false" maxlength="200">
+              </div>
+              <fieldset id="pill-times" class="choices">
+                <legend>Times of day</legend>
+                <!-- One time to start; "Add another time" adds more (screens.js). -->
+                <input class="time-input" name="time" type="time" aria-label="Time 1">
+              </fieldset>
+              <button id="pill-add-time" class="ghost-button" type="button">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+                Add another time
+              </button>
+              <p id="pill-status" class="form-status" role="status" aria-live="polite"></p>
+              <div class="form-actions">
+                <button id="pill-save" class="primary-button" type="submit">Save pill</button>
+                <button id="pill-cancel" class="ghost-button" type="button" hidden>Cancel</button>
+              </div>
+            </form>
+          </div>
         </section>
 
         <!-- ========== Doctor notes (built later) ========== -->
@@ -314,6 +376,16 @@
         <button id="safety-again" class="safety-secondary" type="button">Say it again</button>
         <button id="safety-close" class="safety-secondary" type="button">Go back</button>
       </div>
+    </div>
+  </dialog>
+
+  <!-- "Are you sure?" before removing something (screens.js). Calm, not red. -->
+  <dialog id="confirm-dialog" class="confirm" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <h2 id="confirm-title">Remove this pill?</h2>
+    <p id="confirm-text"></p>
+    <div class="form-actions">
+      <button id="confirm-yes" class="primary-button" type="button">Yes, remove it</button>
+      <button id="confirm-no" class="ghost-button" type="button" autofocus>Keep it</button>
     </div>
   </dialog>
 

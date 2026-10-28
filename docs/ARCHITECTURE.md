@@ -12,7 +12,7 @@
                                                       2. companion prompt + tools  -------->  Muse Spark 1.3
                                                       3. tools read/write SQLite             (function calling,
                                                                                               structured outputs,
- Pill banner (checks every 30 seconds)   <--JSON--  /api/reminders/due                        image input)
+ Pill banner (checks every 30 seconds)   <--JSON--  /api/reminders                            image input)
  Diary, pills, scam, notes, family       <--JSON--  feature routes
                                                     SQLite file: data/grandma_buddy.db
 ```
@@ -54,6 +54,7 @@ grandma-buddy-hackathon/
     prompts.py               system prompts for companion, diary, scam, notes, family
     schemas.py               JSON schemas for structured outputs
     tools.py                 companion tool definitions and what each one does
+    reminders.py             pill reminder rules (upcoming, due, snoozed, taken, missed) with a clock tests can set
     routes/
       companion.py           /api/chat, /api/transcribe
       diary.py               /api/diary
@@ -75,12 +76,13 @@ grandma-buddy-hackathon/
     check_meta.py            one tiny real call to confirm the API key and billing work
     check_advice.py          hand-run: SAFETY.md advice phrases through the real AI (no advice given?)
     check_diary.py           hand-run: two "Something hurts" talks through the real AI (entry saved, no advice?)
+    check_pills.py           hand-run: pill questions through the real AI (no doses said, "I took my pills" recorded?)
     seed_demo.py             fills the database with made-up demo data ("Rose", 7 days)
     browser_checks/          Playwright scripts that check screens in a real browser (/webapp-testing)
   tests/
     conftest.py              temporary database + fake Meta client for every test
     test_safety.py           safety-net phrases (see docs/SAFETY.md)
-    test_diary.py, test_meds.py, test_scam.py, test_tools.py
+    test_diary.py, test_meds.py, test_reminders.py, test_scam.py, test_tools.py
   test-output/               screenshots from browser checks. Git-ignored.
   data/
     grandma_buddy.db         created when the app runs. Git-ignored.
@@ -106,7 +108,7 @@ grandma-buddy-hackathon/
 |---|---|
 | `profile` (one row) | id, name, preferred_name, language, family_name, family_email, family_phone, doctor_name, doctor_phone, voice_on, voice_rate, text_size |
 | `medications` | id, name, label_dose (exactly as on the label), times (JSON list like `["08:00","20:00"]`), notes, active, created_at |
-| `med_events` | id, medication_id, due_at, status (`due`, `snoozed`, `taken`, `missed`), snooze_until, acted_at |
+| `med_events` | id, medication_id, due_at, status (`due`, `snoozed`, or `taken`: only her answers are stored; `upcoming` and `missed` follow from the clock), snooze_until, acted_at. One row per pill per time (`med_events_once` unique index) |
 | `symptoms` (the diary) | id, created_at, description (her own words), body_area, pain_level (0 to 10, optional), since (her words, like "since Tuesday"), source (`check_in`, `diary`, `chat`, `safety_net`), conversation_id (the talk it came from; one entry per "Something hurts" talk) |
 | `moods` | id, created_at, mood (`great`, `good`, `okay`, `low`, `very_low`), note |
 | `doctor_questions` | id, created_at, question, resolved |
@@ -122,9 +124,10 @@ grandma-buddy-hackathon/
 | `POST /api/transcribe` | WAV file | `{"transcript": "..."}` |
 | `POST /api/chat` | `{"conversation_id", "text", "mode"}` where `mode` is `"chat"`, `"check_in"`, or `"diary"` | `{"reply", "show", "actions", "diary_saved", "diary_done"}` where `show` is `null`, `"emergency"`, `"poison_control"`, or `"crisis"`; `diary_saved` is true when a diary entry was saved this turn, and `diary_done` when a "Something hurts" talk is over |
 | `GET /api/diary?days=7` | `days` from 1 to 90 (the Diary screen asks for 30) | diary entries, newest first |
-| `GET/POST/PUT/DELETE /api/meds` | medication fields | medication list |
-| `GET /api/reminders/due` | | reminders due right now |
-| `POST /api/reminders/{id}/taken` and `/snooze` | | updated reminder |
+| `GET/POST/PUT/DELETE /api/meds` | `{"name", "label_dose", "times": ["08:00", …]}` (1 to 6 times) | medication list; DELETE only hides it |
+| `POST /api/meds/{id}/restore` | | brings a removed pill back (Undo) |
+| `GET /api/reminders` | | `{"reminders", "due_words", "has_pills", "after_poison_control", "poison_control_words"}`: today's reminders with their status, the banner's words, and whether a Poison Control screen came up today |
+| `POST /api/reminders/taken` and `/snooze` | `{"ids": [...]}` | the same as `GET /api/reminders`, updated |
 | `POST /api/meds/read-label` (P2) | photo | suggested fields for a family member to confirm |
 | `POST /api/scam-check` | `{"text"}` or a photo | scam result (below) |
 | `POST /api/doctor-notes` | `{"days": 7}` | doctor notes (below) |
@@ -152,9 +155,11 @@ grandma-buddy-hackathon/
 
 **Pill reminders**
 
-- The page asks `/api/reminders/due` every 30 seconds while open.
-- On the first check each day, the backend creates that day's `med_events`.
-- A reminder is due when its time has come (or its snooze ended) and it isn't taken. After 2 hours with no answer it becomes `missed`.
+- The page asks `/api/reminders` every 30 seconds while open, and after each reply from Buddy.
+- Each check creates today's missing `med_events` rows, only for times later today or in the last 2 hours (just after midnight, that includes last night's late pill), and never more rows in a day than the pill has times. So a pill added at noon gets no "missed" 8 AM reminder, and moving a time later can't remind her again for a dose she took. Rows are created for the whole rest of the day at once, so a reminder that comes due while the tablet sleeps can still end up missed.
+- A reminder is due when its time has come (or its snooze ended) and it isn't taken. After 2 hours with no answer since it was last shown, it is `missed`. "I took it" still counts after that.
+- The banner repeats each label exactly as typed (`reminders.reminder_words`), is read aloud once per new set of due pills (never while she is talking, over a safety message, or over Buddy's own words), and stays until she answers.
+- Changing or removing a pill drops its waiting reminders; taken and missed ones stay as a record.
 
 ## AI design
 
@@ -166,8 +171,8 @@ grandma-buddy-hackathon/
 |---|---|---|
 | `log_mood` | mood, note | saves to `moods` |
 | `log_symptom` | description, body_area, pain_level, since | saves a diary entry to `symptoms` |
-| `get_pills_due` | none | lists today's reminders and their status |
-| `mark_pill_taken` | medication_name | marks today's matching due reminder as taken |
+| `get_pills_due` | none | today's reminders: name, time, and status. Never the label, so the AI can't repeat or change a dose |
+| `mark_pill_taken` | medication_name | marks pills taken with `reminders.pick_taken`: at most one reminder per pill; due ones first, else one within the hour; a missed one only when she names it |
 | `add_doctor_question` | question | saves to `doctor_questions` |
 | `show_call_buttons` | who (`doctor`, `family`, or both) | tells the screen to show big call buttons |
 | `suggest_calling_family` | none | tells the screen to show a big "Call {family_name}" button |

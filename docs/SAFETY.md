@@ -66,7 +66,10 @@ After a crisis response, keep the conversation open and gentle. Never end it abr
 - Never recommend any medicine, painkiller, vitamin, or supplement.
 - Missed dose: "Please check the label or call your pharmacist about what to do."
 - Side effects (dizzy, sick, sleepy): "Please call your doctor or pharmacist today and tell them." Add it to the diary. Don't guess which pill is causing it.
-- Reminders repeat the label text exactly as a family member entered it. The app never invents or edits dose information.
+- Reminders repeat the label text exactly as a family member entered it. The app never invents or edits dose information. When read aloud, a dose like "0.5 mg" or "1.5 tablets" is never split into two sentences.
+- The AI never sees a label: it gets pill names (without any strength typed into the name), times, and whether each is taken, due, or missed. It never says a dose or how many pills.
+- "I took my pills" marks at most one reminder per pill, and never a missed one unless she names that pill, so a missed dose isn't hidden from her family.
+- After a Poison Control screen, for the rest of that day pill reminders are not read aloud, and the reminder card shows the fixed Poison Control message and its call button first.
 - Pill bottle photos (P2): the AI only suggests what it reads from the label. A family member must confirm every field.
 
 ## 6. Symptom diary

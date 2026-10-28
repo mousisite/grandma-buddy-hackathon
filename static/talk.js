@@ -182,6 +182,7 @@ function askBuddy(text) {
         say(answer.reply);
         speak(answer.reply);
         showActions(answer.actions || []);
+        loadReminders(); // she may have told Buddy she took her pills
       }
     });
 }

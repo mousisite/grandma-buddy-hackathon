@@ -373,3 +373,23 @@ def test_a_pain_level_of_zero_is_kept(client, monkeypatch, safe_test_setup):
     use_fake(monkeypatch, tool_call("c1", "log_symptom", {"pain_level": 0}), reply("Written down."))
     chat(client, "my wrist, it's a 0 now", mode="diary")
     assert symptom_rows(safe_test_setup)[0][2] == 0
+
+
+def test_the_database_is_free_while_the_ai_thinks_after_a_tool(monkeypatch, safe_test_setup):
+    # A tool's write is saved before the next AI call, so "I took it" and the
+    # 30-second pill check never wait on a slow AI reply.
+    connection = db.get_connection(safe_test_setup)
+    profile = db.get_profile(connection)
+    db.save_message(connection, "x", "user", "I feel good")
+    connection.commit()
+    busy = []
+    answers = [tool_call("c1", "log_mood", {"mood": "good", "note": "good"}), reply("Glad to hear it!")]
+
+    def fake(messages, tools=None):
+        busy.append(connection.in_transaction)
+        return answers.pop(0)
+
+    monkeypatch.setattr(meta_client, "chat", fake)
+    companion.answer(connection, profile, "x", "I feel good", "chat")
+    connection.close()
+    assert busy == [False, False]

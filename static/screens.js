@@ -1,14 +1,391 @@
-// Grandma Buddy: the screens other than Today.
+// Grandma Buddy: the screens other than Today, and the pill reminders.
 // Each time the router (app.js) shows a screen, it runs that screen's
 // loader below, so the screen always shows fresh information.
-// Pills, doctor notes, and scam check arrive in the next steps.
+// Doctor notes and scam check arrive in the next steps.
 
 "use strict";
 
 var SCREEN_LOADERS = {
   diary: showDiary,
+  pills: showPillsScreen,
   family: showFamily,
 };
+
+// ---------- Pill reminders (on every screen) ----------
+
+// Today's reminders from /api/reminders, checked every 30 seconds (app.js).
+// One answer drives the banner, the "My pills" card on Today, and the
+// Pills screen's list.
+var pillState = { reminders: [], due_words: "", has_pills: false };
+var shownReminders = ""; // which due reminders the banner was already brought into view for
+var spokenReminders = ""; // which due reminders were already read aloud
+
+var reminderRequests = 0; // so an older answer never replaces a newer one
+
+function loadReminders() {
+  var mine = ++reminderRequests;
+  return api("/api/reminders")
+    .then(function (state) {
+      if (mine === reminderRequests) {
+        showReminders(state);
+      }
+    })
+    .catch(function () {
+      // No connection to our own server: keep what is shown.
+    });
+}
+
+// Change words on the page only when they are different, so screen readers
+// aren't told the same thing again every 30 seconds.
+function setText(element, text) {
+  if (element.textContent !== text) {
+    element.textContent = text;
+  }
+}
+
+// Put keyboard focus on the heading of the screen she is on.
+function focusScreenHeading() {
+  document.querySelector('[data-screen="' + currentScreen() + '"] h1').focus({ preventScroll: true });
+}
+
+function showReminders(state) {
+  pillState = state;
+  showPillBanner();
+  showPillsSummary();
+  showTodaysPills();
+}
+
+function duePills() {
+  return pillState.reminders.filter(function (r) { return r.status === "due"; });
+}
+
+// "8:00 AM" from "2026-10-27T08:00:00" (local time) or from "08:00".
+function clockTime(text) {
+  var time = new Date(text.length === 5 ? "2000-01-01T" + text : text);
+  return time.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+// The banner: the label words exactly as the family typed them, "I took
+// it", and "Remind me in 10 minutes". Read aloud once for each new set of
+// due pills, but never while she is talking (the microphone would hear it),
+// never over a safety message, and never cutting Buddy off mid-sentence
+// (then it waits for the next check, 30 seconds later).
+function showPillBanner() {
+  var due = duePills();
+  var banner = document.getElementById("pill-banner");
+  var hadFocus = banner.contains(document.activeElement);
+  banner.hidden = due.length === 0;
+  if (!due.length) {
+    shownReminders = "";
+    spokenReminders = "";
+    if (hadFocus) {
+      focusScreenHeading(); // the button she tapped is gone
+    }
+    return;
+  }
+  var which = due.map(function (r) { return r.id; }).join(",");
+  if (which !== shownReminders) {
+    setText(document.getElementById("pill-banner-note"), ""); // an old note is about old pills
+  }
+  setText(document.getElementById("pill-banner-words"), pillState.due_words);
+  setText(document.getElementById("pill-taken"), due.length > 1 ? "I took them" : "I took it");
+  // After a Poison Control screen today: the fixed Poison Control message
+  // with its call button, and the reminder is not read aloud.
+  var poison = document.getElementById("pill-banner-poison");
+  poison.hidden = !pillState.after_poison_control;
+  setText(document.getElementById("pill-banner-poison-words"), pillState.poison_control_words || "");
+  // A new reminder is brought into view once, unless she is talking or
+  // someone is typing in a box. The banner is the first thing on the page,
+  // so going to the top shows all of it (even while it is still easing in).
+  var typing = document.activeElement && document.activeElement.matches("input, textarea, select");
+  if (which !== shownReminders && talkState === "idle" && !typing) {
+    shownReminders = which;
+    window.scrollTo(0, 0);
+  }
+  // It counts as read only once the voice really starts (Chrome stays
+  // silent until her first tap), so a blocked reminder is tried again.
+  var quiet = talkState !== "idle" || safetySpeaking || isSpeaking() || pillState.after_poison_control;
+  if (which !== spokenReminders && !quiet) {
+    speak(pillState.due_words, { onStart: function () { spokenReminders = which; } });
+  }
+}
+
+// "I took it" or "Remind me in 10 minutes", for every pill in the banner.
+function answerReminder(answer) {
+  var ids = duePills().map(function (r) { return r.id; });
+  var buttons = document.querySelectorAll(".pill-button");
+  var note = document.getElementById("pill-banner-note");
+  if (!ids.length) {
+    return;
+  }
+  buttons.forEach(function (button) { button.disabled = true; });
+  note.textContent = "";
+  var mine = ++reminderRequests;
+  api("/api/reminders/" + answer, "POST", { ids: ids })
+    .then(function (state) {
+      if (mine === reminderRequests) {
+        showReminders(state);
+      }
+      var words = answer === "taken" ? "Thank you. I wrote that down." : "Okay. I’ll remind you again in 10 minutes.";
+      if (currentScreen() === "today") {
+        say(words);
+      }
+      if (talkState === "idle") {
+        speak(words); // never into an open microphone
+      }
+    })
+    .catch(function () {
+      note.textContent = "I couldn’t save that just now. Please tap it again.";
+    })
+    .then(function () {
+      buttons.forEach(function (button) { button.disabled = false; });
+    });
+}
+
+// The second line of the "My pills" card on Today.
+function showPillsSummary() {
+  var reminders = pillState.reminders;
+  var snoozed = reminders.filter(function (r) { return r.status === "snoozed"; })[0];
+  var next = reminders.filter(function (r) { return r.status === "upcoming"; })[0];
+  var text = "No more pills today";
+  if (!pillState.has_pills) {
+    text = "None set up yet";
+  } else if (duePills().length) {
+    text = "Time for your pills now";
+  } else if (snoozed) {
+    text = "Reminder at " + clockTime(snoozed.snooze_until);
+  } else if (next) {
+    text = "Next at " + clockTime(next.due_at);
+  } else if (reminders.length && reminders.every(function (r) { return r.status === "taken"; })) {
+    text = "All taken today";
+  }
+  document.getElementById("pills-summary").textContent = text;
+}
+
+// What each reminder is now, in plain words. Missed uses the fixed text
+// from docs/SAFETY.md section 5.
+var PILL_STATUS = {
+  upcoming: function () { return "Later today"; },
+  due: function () { return "Time to take it now"; },
+  snoozed: function (r) { return "Reminding you again at " + clockTime(r.snooze_until); },
+  taken: function (r) { return "Taken at " + clockTime(r.acted_at) + " ✓"; },
+  missed: function () { return "Missed. Please check the label or call your pharmacist about what to do."; },
+};
+
+// Today's list on the Pills screen: time, name, label, and what it is now.
+function showTodaysPills() {
+  var list = document.getElementById("pills-today");
+  var status = document.getElementById("pills-today-status");
+  list.textContent = "";
+  pillState.reminders.forEach(function (reminder) {
+    var item = document.createElement("li");
+    item.className = "entry entry--" + reminder.status;
+    // Just after midnight, last night's late reminder can still be due.
+    var lastNight = new Date(reminder.due_at).toDateString() !== new Date().toDateString();
+    addText(item, "p", "entry-when", (lastNight ? "Last night, " : "") + clockTime(reminder.due_at));
+    addText(item, "p", "entry-words", reminder.name);
+    if (reminder.label_dose) {
+      addText(item, "p", "pill-label", reminder.label_dose);
+    }
+    addText(item, "p", "pill-status", PILL_STATUS[reminder.status](reminder));
+    list.appendChild(item);
+  });
+  status.hidden = pillState.reminders.length > 0;
+  setText(status, pillState.has_pills
+    ? "No more pill reminders today."
+    : "No pills set up yet. A family member can add them below.");
+}
+
+// ---------- Setting up pills (for a family member) ----------
+
+var MAX_TIMES = 6;
+var editingPill = null; // the pill being changed, or null when adding one
+var pillToRemove = null;
+
+function showPillsScreen() {
+  loadReminders();
+  api("/api/meds")
+    .then(showPillList)
+    .catch(function () {
+      document.getElementById("pills-undo").textContent = "I couldn’t open the pill list just now. Please try again in a moment.";
+    });
+}
+
+// Each pill with its label and times, and buttons to change or remove it.
+function showPillList(pills) {
+  var list = document.getElementById("pills-list");
+  list.textContent = "";
+  pills.forEach(function (pill) {
+    var item = document.createElement("li");
+    item.className = "entry";
+    addText(item, "p", "entry-words", pill.name);
+    if (pill.label_dose) {
+      addText(item, "p", "pill-label", pill.label_dose);
+    }
+    addText(item, "p", "entry-when", pill.times.map(clockTime).join(", "));
+    var actions = document.createElement("div");
+    actions.className = "form-actions";
+    actions.append(
+      smallButton("Change", "Change " + pill.name, function () { editPill(pill); }),
+      smallButton("Remove", "Remove " + pill.name, function () { confirmRemove(pill); })
+    );
+    item.appendChild(actions);
+    list.appendChild(item);
+  });
+}
+
+function smallButton(text, label, onClick) {
+  var button = document.createElement("button");
+  button.type = "button";
+  button.className = "ghost-button";
+  button.textContent = text;
+  button.setAttribute("aria-label", label);
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+// One more "time of day" box, up to 6.
+function addTimeInput(value) {
+  var times = document.getElementById("pill-times");
+  var count = times.querySelectorAll(".time-input").length;
+  if (count >= MAX_TIMES) {
+    return null;
+  }
+  var input = document.createElement("input");
+  input.type = "time";
+  input.name = "time";
+  input.className = "time-input";
+  input.setAttribute("aria-label", "Time " + (count + 1));
+  input.value = value || "";
+  times.appendChild(input);
+  document.getElementById("pill-add-time").hidden = count + 1 >= MAX_TIMES;
+  return input;
+}
+
+// Back to "Add a pill" with empty boxes and one time.
+function resetPillForm() {
+  var form = document.getElementById("pill-form");
+  editingPill = null;
+  form.reset();
+  clearProblem(form);
+  form.querySelectorAll(".time-input").forEach(function (input, index) {
+    if (index > 0) {
+      input.remove();
+    }
+  });
+  document.getElementById("pill-add-time").hidden = false;
+  document.getElementById("pill-form-title").textContent = "Add a pill";
+  document.getElementById("pill-cancel").hidden = true;
+}
+
+// "Change": the pill's details go into the form.
+function editPill(pill) {
+  var form = document.getElementById("pill-form");
+  resetPillForm();
+  editingPill = pill;
+  form.elements.name.value = pill.name;
+  form.elements.label_dose.value = pill.label_dose;
+  pill.times.forEach(function (time, index) {
+    if (index === 0) {
+      form.querySelector(".time-input").value = time;
+    } else {
+      addTimeInput(time);
+    }
+  });
+  document.getElementById("pill-form-title").textContent = "Change " + pill.name;
+  document.getElementById("pill-cancel").hidden = false;
+  document.getElementById("pill-status").textContent = "";
+  form.scrollIntoView({ block: "start" });
+  form.elements.name.focus({ preventScroll: true });
+}
+
+// Save the form. The server checks every entry and names the one to fix.
+function savePill(event) {
+  event.preventDefault();
+  var form = event.target;
+  var status = document.getElementById("pill-status");
+  var times = [];
+  var unfinished = null; // a time box with only the hour typed in
+  form.querySelectorAll(".time-input").forEach(function (input) {
+    if (input.value) {
+      times.push(input.value);
+    } else if (input.validity.badInput && !unfinished) {
+      unfinished = input;
+    }
+  });
+  clearProblem(form);
+  if (unfinished) {
+    // Never drop a half-typed time: that dose would get no reminder.
+    showProblem(unfinished, "Please finish this time, or clear it.");
+    status.textContent = "Please finish this time, or clear it.";
+    return;
+  }
+  var pill = { name: form.elements.name.value, label_dose: form.elements.label_dose.value, times: times };
+  var changing = editingPill;
+  status.textContent = "Saving…";
+  var saving = changing ? api("/api/meds/" + changing.id, "PUT", pill) : api("/api/meds", "POST", pill);
+  saving
+    .then(function (saved) {
+      resetPillForm();
+      status.textContent = (changing ? "Saved the changes to " : "Added ") + saved.name + ".";
+      showPillsScreen();
+    })
+    .catch(function (problem) {
+      var detail = problem.detail || {};
+      var input = detail.field === "times" ? form.querySelector(".time-input") : form.elements[detail.field];
+      if (input) {
+        showProblem(input, detail.message);
+        status.textContent = detail.message;
+      } else if (typeof problem.detail === "string") {
+        status.textContent = problem.detail; // like "That pill isn't there anymore."
+      } else {
+        status.textContent = "I couldn’t save that just now. Please try again.";
+      }
+    });
+}
+
+// "Are you sure?" first. Keep it is where the cursor starts.
+function confirmRemove(pill) {
+  pillToRemove = pill;
+  document.getElementById("confirm-text").textContent =
+    "Buddy will stop reminding her about " + pill.name + ". You can undo this.";
+  document.getElementById("confirm-dialog").showModal();
+}
+
+function removePill() {
+  var pill = pillToRemove;
+  document.getElementById("confirm-dialog").close();
+  api("/api/meds/" + pill.id, "DELETE")
+    .then(function () {
+      if (editingPill && editingPill.id === pill.id) {
+        resetPillForm();
+      }
+      showUndo(pill);
+      showPillsScreen();
+    })
+    .catch(function () {
+      document.getElementById("pills-undo").textContent = "I couldn’t remove that just now. Please try again.";
+    });
+}
+
+// "Removed Lisinopril. Undo" (it stays until something else happens).
+function showUndo(pill) {
+  var line = document.getElementById("pills-undo");
+  line.textContent = "Removed " + pill.name + ". ";
+  var undo = smallButton("Undo", "Undo: bring back " + pill.name, function () {
+    api("/api/meds/" + pill.id + "/restore", "POST")
+      .then(function () {
+        line.textContent = pill.name + " is back.";
+        focusScreenHeading(); // the Undo button she tapped is gone
+        showPillsScreen();
+      })
+      .catch(function () {
+        line.textContent = "I couldn’t bring it back just now. Please try again.";
+      });
+  });
+  line.appendChild(undo);
+  undo.focus();
+}
 
 // ---------- My diary ----------
 
@@ -163,22 +540,21 @@ function clearProblem(form) {
     input.removeAttribute("aria-invalid");
     input.removeAttribute("aria-describedby");
   });
-  var note = document.getElementById("settings-problem");
-  if (note) {
+  form.querySelectorAll(".field-problem").forEach(function (note) {
     note.remove();
-  }
+  });
 }
 
 // Mark the entry the server sent back, say why right under it, and put
-// the cursor there.
+// the cursor there. (Used by the Family form and the pill form.)
 function showProblem(input, message) {
   var note = document.createElement("p");
-  note.id = "settings-problem";
+  note.id = input.form.id + "-problem";
   note.className = "field-problem";
   note.textContent = message;
   input.insertAdjacentElement("afterend", note);
   input.setAttribute("aria-invalid", "true");
-  input.setAttribute("aria-describedby", "settings-problem");
+  input.setAttribute("aria-describedby", note.id);
   input.focus();
 }
 
@@ -219,6 +595,29 @@ function saveSettings(event) {
 }
 
 function startScreens() {
+  document.getElementById("pill-taken").addEventListener("click", function () { answerReminder("taken"); });
+  document.getElementById("pill-snooze").addEventListener("click", function () { answerReminder("snooze"); });
+  document.getElementById("pill-again").addEventListener("click", function () {
+    if (talkState === "idle") {
+      speak(pillState.due_words); // never into an open microphone
+    }
+  });
+  document.getElementById("pill-form").addEventListener("submit", savePill);
+  document.getElementById("pill-add-time").addEventListener("click", function () {
+    var input = addTimeInput("");
+    if (input) {
+      input.focus();
+    }
+  });
+  document.getElementById("pill-cancel").addEventListener("click", function () {
+    resetPillForm();
+    document.getElementById("pill-status").textContent = "";
+  });
+  document.getElementById("confirm-yes").addEventListener("click", removePill);
+  document.getElementById("confirm-no").addEventListener("click", function () {
+    document.getElementById("confirm-dialog").close();
+  });
+
   var form = document.getElementById("settings-form");
   form.addEventListener("submit", saveSettings);
   form.addEventListener("input", function () {

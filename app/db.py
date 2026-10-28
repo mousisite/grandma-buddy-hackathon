@@ -145,8 +145,9 @@ def init_db(db_path: str | None = None) -> None:
         columns = [row["name"] for row in connection.execute("PRAGMA table_info(symptoms)")]
         if "conversation_id" not in columns:
             connection.execute("ALTER TABLE symptoms ADD COLUMN conversation_id TEXT NOT NULL DEFAULT ''")
-        # WAL mode lets the 30-second reminder check read while a slow
-        # AI reply is being saved, instead of waiting for it.
+        # WAL mode lets one connection read while another writes. Writers
+        # still take turns, so the companion saves after each round of tools
+        # (app/companion.py) and never holds the lock while the AI thinks.
         connection.execute("PRAGMA journal_mode=WAL")
         connection.commit()
     finally:

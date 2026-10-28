@@ -30,9 +30,9 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 - [x] Diary list screen. `/safety-check` and `/senior-friendly-ui` pass. (Done early, Oct 27.)
 
 ### Day 5: Fri, Oct 30 (pills)
-- [ ] Medication screen (add, edit, remove with confirmation).
-- [ ] Reminder banner, spoken reminder, "I took it", "Remind me in 10 minutes", missed after 2 hours.
-- [ ] Companion tools: `get_pills_due`, `mark_pill_taken`.
+- [x] Medication screen (add, edit, remove with confirmation). (Done early, Oct 28.)
+- [x] Reminder banner, spoken reminder, "I took it", "Remind me in 10 minutes", missed after 2 hours. (Done early, Oct 28.)
+- [x] Companion tools: `get_pills_due`, `mark_pill_taken`. (Done early, Oct 28.)
 
 ### Day 6: Sat, Oct 31 (check-in and companion)
 - [ ] Daily check-in on first open each day: feeling, anything hurting or different, morning pills.
@@ -71,6 +71,8 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 ## Status log
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
+
+- Oct 28 (Day 5 work, done early): Pill reminders (Feature 4). `app/reminders.py` holds the rules with a clock tests can set (upcoming, due, snoozed, taken, missed after 2 hours with no answer; only her answers are stored). `/api/meds` (add, change, remove that only hides, Undo) and `/api/reminders` (today's list, "I took it", "Remind me in 10 minutes"). A banner on every screen repeats each label exactly as typed, is read aloud once (never into the open microphone, over a safety message, or over Buddy), and stays until she answers. Pills screen: today's list (missed shows the fixed SAFETY.md line) and "Set up pills" with Change, Remove ("Are you sure?", focus on Keep it) and Undo. AI tools `get_pills_due` (names and times, never a label) and `mark_pill_taken`. A fresh reviewer found 2 critical issues (a spoken "1.5" split into "1." and "5"; "I took my pills" could mark a missed dose or a later pill), both fixed with tests, plus: a moved time no longer re-reminds a taken dose, the database is no longer locked while the AI thinks, half-typed times are refused, and reminders go quiet after a Poison Control screen. 281/281 pytest; browser check covers the whole pill flow; `scripts/check_pills.py` with the real AI: names without doses, "I took my pills" recorded, no advice on "an extra one". `/safety-check`, `/web-design-guidelines`, `/senior-friendly-ui` pass.
 
 - Oct 27 (Day 4 work, done early): Symptom diary (Feature 3). "Something hurts" (Today card and Diary screen) starts a talk with its own conversation; Buddy asks up to 3 follow-ups, then `log_symptom` saves her own words, one entry per talk. Where, pain, and since are kept only if she said them ("possible sprain" or a made-up pain number never reaches her diary). Call {doctor} and Call {family} always follow a saved entry. The server says when a talk is done; her 4th answer tells Buddy to save now. `GET /api/diary`, Diary screen (entries by day, her words in quotes, AI-helper line). Safety net: in a "Something hurts" talk or right after Buddy asks about pain, "my chest" alone shows the emergency screen; her last messages are checked together across talks (last 10 minutes); crisis words are no longer kept in conversation memory. Advice guard also catches "have you tried ice?". Two real-API bugs found and fixed: Meta rejects `tool_choice` "none" (HTTP 400), and the model sometimes spent its whole token allowance thinking and replied with nothing (limit raised to 3000, empty replies asked again). A fresh reviewer found 1 critical and 4 important issues, all fixed with tests. 230/230 pytest; browser check covers the diary talk and screen; `scripts/check_diary.py` with the real AI: both talks saved correctly, the advice question got no advice. `/safety-check`, `/web-design-guidelines`, and `/senior-friendly-ui` pass. `/api/today` moves to the pills step (it only reports pills and check-ins).
 

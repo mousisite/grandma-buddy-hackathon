@@ -46,6 +46,9 @@ def ask_the_ai(messages: list[dict], context: dict, buttons: list[dict]) -> str:
             result, new_buttons = tools.run_tool(call["name"], call["arguments"], context)
             buttons.extend(new_buttons)
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
+        # Save what the tools wrote before asking the AI again, so "I took it"
+        # and the 30-second pill check never wait on a slow AI reply.
+        context["connection"].commit()
     # Still no words after 3 rounds: one last call that asks for words.
     return words_only(messages)
 

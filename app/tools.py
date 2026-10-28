@@ -9,8 +9,9 @@
 
 import json
 import re
+from datetime import datetime
 
-from app import db
+from app import db, reminders
 
 MOODS = ["great", "good", "okay", "low", "very_low"]
 SCREENS = ["today", "diary", "pills", "notes", "family", "scam"]
@@ -98,6 +99,14 @@ TOOLS = [
          {}, []),
     tool("open_screen", "Open a part of the app she asked to see.",
          {"screen": {"type": "string", "enum": SCREENS}}, ["screen"]),
+    tool("get_pills_due",
+         "List today's pill reminders: each pill's name, its time, and whether it is upcoming, due, taken, or "
+         "missed. Doses are not included: never tell her a dose.",
+         {}, []),
+    tool("mark_pill_taken",
+         "Write down that she took a pill, when she says she did. Use the pill's name, or \"all\" for every "
+         "pill that is due now.",
+         {"medication_name": {"type": "string"}}, ["medication_name"]),
 ]
 
 
@@ -120,6 +129,35 @@ def call_family(profile: dict) -> list[dict]:
 
 def add_question_action(question: str) -> dict:
     return {"type": "add_question", "label": "Add to doctor notes", "question": question[:300]}
+
+
+# ---------- Pills ----------
+
+def clock_time(due_at: str) -> str:
+    """ "2026-10-27T08:00:00" -> "8:00 AM"."""
+    return datetime.fromisoformat(due_at).strftime("%I:%M %p").lstrip("0")
+
+
+def name_for_ai(name: str) -> str:
+    """A pill's name without a strength the family may have typed with it
+    ("Lisinopril 10 mg" -> "Lisinopril"): the AI never hears a dose."""
+    words = []
+    for word in name.split():
+        if word[0].isdigit():
+            break
+        words.append(word)
+    return " ".join(words) or name
+
+
+def mark_pill_taken(connection, pill_name: str) -> dict:
+    """She says she took a pill: mark the right reminders taken
+    (reminders.pick_taken decides which, with plain tested rules)."""
+    now = reminders.current_time()
+    chosen = reminders.pick_taken(reminders.reminders_now(connection, now), pill_name, now)
+    if not chosen:
+        return {"ok": False, "error": "No pill like that is due right now."}
+    reminders.mark_taken(connection, [r["id"] for r in chosen], now)
+    return {"ok": True, "marked": [name_for_ai(r["name"]) for r in chosen]}
 
 
 # ---------- Running a tool ----------
@@ -167,6 +205,18 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
             db.add_symptom(connection, her_words, source, conversation_id=context["conversation_id"], **facts)
         context["diary_saved"] = True
         return {"ok": True, "saved": her_words}, []
+
+    if name == "get_pills_due":
+        # Names, times, and status only: the AI never sees the label, so it
+        # can't repeat or change dose information (docs/SAFETY.md section 5).
+        pills = [
+            {"name": name_for_ai(r["name"]), "time": clock_time(r["due_at"]), "status": r["status"]}
+            for r in reminders.reminders_now(connection, reminders.current_time())
+        ]
+        return {"ok": True, "pills": pills}, []
+
+    if name == "mark_pill_taken":
+        return mark_pill_taken(connection, str(args.get("medication_name", ""))), []
 
     if name == "add_doctor_question":
         question = str(args.get("question", "")).strip()[:300]
