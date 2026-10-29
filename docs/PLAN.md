@@ -40,7 +40,7 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 - [ ] Lonely conversations end with a gentle nudge to call family. `/safety-check` passes.
 
 ### Day 7: Sun, Nov 1 (scam checker)
-- [ ] `/api/scam-check` for spoken, pasted, and photographed messages. Scam test messages pass.
+- [x] `/api/scam-check` for spoken, pasted, and photographed messages. Scam test messages pass. (Done early, Oct 28.)
 
 ### Day 8: Mon, Nov 2 (doctor notes and family)
 - [ ] `/api/doctor-notes`, printable one-page notes, add-a-question by voice.
@@ -71,6 +71,8 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 ## Status log
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
+
+- Oct 28 (Day 7 work, done early): Check a message (Feature 7). Paste it, read it out loud (written down with Voice Transcribe), or take a photo (shrunk on the device, sent to Muse Spark as an image). `app/scam.py`: plain red-flag rules from SAFETY.md 8 set a floor the AI can't lower and answer alone when the AI is down; Muse Spark fills in a strict form (new `meta_client.structured()`, structured output with medium thinking); "what to do" and "if you already paid" are fixed SAFETY.md lines; links and phone numbers never repeated; Call {family} and the Elder Fraud Hotline on likely scams; a 120-character excerpt with long numbers hidden (photos never stored). The emergency safety net deliberately doesn't run on someone else's message (documented in SAFETY.md 7b). Verdict card with words and an icon (warning color and a stop sign, never red), read aloud. 333/333 pytest (29 new); browser check covers paste, read aloud, photo, and the AI being down; real AI (`scripts/check_scam.py`): the 3 SAFETY.md scams are likely scams, Dr. Lee's reminder looks safe, and a photo of the gift-card text is read correctly. The prompt now also asks for no pet names ("dear"). `/safety-check` passes.
 
 - Oct 28 (Day 6 work, done early): Daily check-in (Feature 5). On her first visit each day, a card at the top of Home offers it (Start check-in, Not today); the Today list has a check-in row with her mood and "Start" to do it any time. Start opens voice mode, Buddy asks a fixed opening ("Good evening, Rose. How are you feeling today?", saved in the talk so the AI knows), then the AI asks whether anything hurts and about her morning pills in `check_in` mode, using `log_mood`, `log_symptom`, and `mark_pill_taken`. New `check_ins` table and `/api/check-in` (due, start, skip). The real AI (`scripts/check_checkin.py`) found three record problems, each fixed test-first: her mood was saved on every turn (now once per talk, latest words win), the check-in made a new diary entry on every turn (now one entry per check-in, like "Something hurts"), and her mood and pill answers ended up in the diary entry (now only her words between Buddy's "anything hurt?" and its pill question, recognized by "pills" or a pill's name). It also called Dr. Lee "him", so the prompt now asks for names, never he or she. 304/304 pytest (20 new, including "my chest" alone after "does anything hurt?" in a check-in showing the emergency screen without the AI); browser check passes with the new check-in flow (card, Not today, Start, `check_in` mode, back to chat on leaving); real AI: one mood, one diary entry about her left knee, pill taken, no advice, and two advice questions during a check-in got the no-advice reply with Call Dr. Lee, Call Maria, Add to doctor notes. `/safety-check` passes.
 

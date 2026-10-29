@@ -49,10 +49,10 @@ grandma-buddy-hackathon/
     main.py                  creates the FastAPI app, serves static/, includes the routes
     config.py                reads settings from .env (only place that does)
     db.py                    SQLite connection, creates tables, small query helpers
-    meta_client.py           ALL calls to Meta: chat(), chat_json(), transcribe()
+    meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), transcribe()
     safety.py                emergency, crisis, and medication mix-up rules with fixed messages
     prompts.py               system prompts for companion, diary, scam, notes, family
-    schemas.py               JSON schemas for structured outputs
+    scam.py                  Check a message: red-flag rules (a floor the AI can't lower), the AI's verdict, fixed what-to-do
     tools.py                 companion tool definitions and what each one does
     reminders.py             pill reminder rules (upcoming, due, snoozed, taken, missed) with a clock tests can set
     routes/
@@ -81,6 +81,7 @@ grandma-buddy-hackathon/
     check_diary.py           hand-run: two "Something hurts" talks through the real AI (entry saved, no advice?)
     check_pills.py           hand-run: pill questions through the real AI (no doses said, "I took my pills" recorded?)
     check_checkin.py         hand-run: a whole daily check-in through the real AI (mood, diary entry, pill taken, no advice?)
+    check_scam.py            hand-run: the SAFETY.md scam messages and one photo through the real AI (right verdicts?)
     check_contrast.py        measures the contrast of every color pair the screens use
     seed_demo.py             fills the database with made-up demo data ("Rose", 7 days)
     browser_checks/          Playwright scripts that check screens in a real browser (/webapp-testing)
@@ -135,7 +136,7 @@ grandma-buddy-hackathon/
 | `GET /api/reminders` | | `{"reminders", "due_words", "has_pills", "after_poison_control", "poison_control_words"}`: today's reminders with their status, the banner's words, and whether a Poison Control screen came up today |
 | `POST /api/reminders/taken` and `/snooze` | `{"ids": [...]}` | the same as `GET /api/reminders`, updated |
 | `POST /api/meds/read-label` (P2) | photo | suggested fields for a family member to confirm |
-| `POST /api/scam-check` | `{"text"}` or a photo | scam result (below) |
+| `POST /api/scam-check` | `{"text", "kind"}` or `{"image": "data:image/jpeg;base64,…", "kind": "photo"}`; `kind` is `text` (pasted), `voice` (read out loud, written down by `/api/transcribe` first), or `photo` | scam result (below) |
 | `POST /api/doctor-notes` | `{"days": 7}` | doctor notes (below) |
 | `POST /api/doctor-questions` | `{"question"}` | saved question |
 | `GET /api/family/summary?date=YYYY-MM-DD` | | `{"text", "mailto"}` |
@@ -186,18 +187,22 @@ grandma-buddy-hackathon/
 | `show_call_buttons` | who (`doctor`, `family`, or both) | tells the screen to show big call buttons |
 | `suggest_calling_family` | none | tells the screen to show a big "Call {family_name}" button |
 
-**Structured outputs (`app/schemas.py`)**
+**Structured outputs (`meta_client.structured()`)**
 
-Scam result:
+`response_format` with a strict `json_schema`; the answer is parsed, asked for once more if it isn't valid JSON, and every field is checked in Python. A photo is sent as an `image_url` part with a base64 data URL (the page shrinks it to about 1600px JPEG first).
+
+Scam check (`app/scam.py`). The AI fills in only:
 
 ```json
-{
-  "verdict": "likely_scam | suspicious | looks_safe",
-  "red_flags": ["plain-word reasons"],
-  "what_to_do": ["clear steps"],
-  "explanation": "2 or 3 short sentences"
-}
+{"verdict": "likely_scam | suspicious | looks_safe", "red_flags": ["plain words"], "explanation": "2 or 3 short sentences"}
 ```
+
+The route returns `{"verdict", "title", "red_flags", "explanation", "what_to_do", "if_you_paid", "actions"}`:
+- The plain red-flag rules set a floor: the verdict is the stronger of the rules' and the AI's. If the rules found more, or the AI's words slip into advice, its explanation is replaced with fixed words.
+- `what_to_do` and `if_you_paid` are fixed lines from `docs/SAFETY.md` section 8, never AI text.
+- Links and phone numbers are taken out of the AI's words.
+- If the AI is down, the rules answer alone ("I'm not sure about this one…" when nothing matched).
+- Each check saves a `scam_checks` row: a 120-character excerpt with long numbers hidden, or "(photo)".
 
 Doctor notes (only facts from the logs, no interpretation):
 

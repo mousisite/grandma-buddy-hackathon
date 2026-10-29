@@ -296,20 +296,58 @@
     <section class="screen" data-screen="scam" aria-labelledby="scam-title" hidden>
       <header class="screen-head">
         <h1 id="scam-title" class="display" tabindex="-1">Check a message</h1>
-        <p class="lead">Paste a text or email you’re not sure about. Buddy looks for the warning signs of a scam.</p>
+        <p class="lead">A text, email, or letter you’re not sure about? Paste it, read it out loud, or take a photo. Buddy looks for the warning signs of a scam.</p>
       </header>
-      <div class="compose">
+      <!-- Three ways to give Buddy the message (screens.js). -->
+      <div id="scam-compose" class="compose">
         <label for="scam-text" class="visually-hidden">The message to check</label>
-        <textarea id="scam-text" rows="7" autocomplete="off" placeholder="Paste the message here…"></textarea>
+        <textarea id="scam-text" rows="6" autocomplete="off" placeholder="Paste the message here…"></textarea>
         <div class="form-actions">
           <button id="scam-check" class="pill-button pill-button--ink" type="button">Check message</button>
+          <button id="scam-read" class="pill-button pill-button--quiet" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+            <span id="scam-read-label">Read it out loud</span>
+          </button>
           <button id="scam-photo" class="pill-button pill-button--quiet" type="button">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg>
             Use a photo
           </button>
         </div>
+        <!-- The phone's camera or photos; the picture is shrunk before it is sent. -->
+        <input id="scam-photo-input" type="file" accept="image/*" capture="environment" hidden>
       </div>
-      <p id="scam-status" class="note" role="status"></p>
+      <p id="scam-status" class="note" role="status" aria-live="polite"></p>
+      <!-- A soft shimmer while Buddy reads it. -->
+      <div id="scam-reading" aria-busy="true" hidden></div>
+
+      <!-- The verdict: words and an icon, never color alone. "What to do" is
+           fixed text from docs/SAFETY.md section 8. The one raised card. -->
+      <section id="scam-result" class="verdict" aria-labelledby="scam-verdict" hidden>
+        <!-- The photo she checked, if she sent one (screens.js adds it). -->
+        <div id="scam-checked-photo" hidden></div>
+        <h2 id="scam-verdict" class="verdict-pill" tabindex="-1"></h2>
+        <p id="scam-explanation" class="verdict-explanation"></p>
+        <div id="scam-flags-block">
+          <h3 class="verdict-heading">Warning signs</h3>
+          <ul id="scam-flags" class="verdict-list"></ul>
+        </div>
+        <div>
+          <h3 class="verdict-heading">What to do</h3>
+          <ul id="scam-todo" class="verdict-list"></ul>
+        </div>
+        <details id="scam-paid" class="verdict-paid">
+          <summary class="text-button">If you already paid or shared information</summary>
+          <ul id="scam-paid-list" class="verdict-list"></ul>
+        </details>
+        <div id="scam-actions" class="actions verdict-actions"></div>
+        <div class="form-actions">
+          <button id="scam-again" class="text-button" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path></svg>
+            Say it again
+          </button>
+          <button id="scam-another" class="pill-button pill-button--quiet" type="button">Check another message</button>
+        </div>
+      </section>
     </section>
 
     <!-- ========== Doctor notes ========== -->

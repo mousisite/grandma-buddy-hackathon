@@ -63,7 +63,47 @@ def chat(messages: list[dict], tools: list[dict] | None = None,
     if tools:
         request["tools"] = tools
 
-    if not settings.model_api_key:
+    response = _create(request)
+    message = response.choices[0].message
+    calls = [
+        {"id": call.id, "name": call.function.name, "arguments": call.function.arguments or "{}"}
+        for call in (message.tool_calls or [])
+    ]
+    return {"content": message.content, "tool_calls": calls, "message": message.model_dump(exclude_none=True)}
+
+
+def structured(messages: list[dict], name: str, schema: dict, reasoning: str = "medium",
+               max_tokens: int = 3000) -> dict:
+    """Ask Muse Spark for an answer that fills in a form (a strict JSON schema,
+    "structured outputs"), like the scam checker's verdict. Returns it as a
+    dictionary. If the answer isn't valid JSON, asks once more, then gives up
+    with MetaError. The caller still checks every field.
+
+    A message's content can be words, or a list of parts with a photo:
+      [{"type": "text", "text": "..."},
+       {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}]
+    """
+    request = {
+        "model": get_settings().chat_model,  # muse-spark-1.3, standard (never -contributor)
+        "messages": messages,
+        "reasoning_effort": reasoning,  # "medium": a scam check is worth a little more thought
+        "max_completion_tokens": max_tokens,
+        "response_format": {"type": "json_schema", "json_schema": {"name": name, "schema": schema, "strict": True}},
+    }
+    for _ in range(2):
+        content = _create(request).choices[0].message.content or ""
+        try:
+            answer = json.loads(content)
+        except ValueError:
+            continue
+        if isinstance(answer, dict):
+            return answer
+    raise MetaError(f"{name} did not come back as a filled-in form, twice")
+
+
+def _create(request: dict):
+    """Send one Chat Completions request, waiting and retrying when Meta is busy."""
+    if not get_settings().model_api_key:
         raise MetaError("no API key is set up in .env")
     client = _client()
     for attempt in range(RETRIES + 1):
@@ -80,13 +120,8 @@ def chat(messages: list[dict], tools: list[dict] | None = None,
             raise MetaError(f"chat failed: {type(problem).__name__}")
 
     if response.choices[0].finish_reason == "length":
-        print("Chat reply ran out of room (max_completion_tokens).")  # never her words
-    message = response.choices[0].message
-    calls = [
-        {"id": call.id, "name": call.function.name, "arguments": call.function.arguments or "{}"}
-        for call in (message.tool_calls or [])
-    ]
-    return {"content": message.content, "tool_calls": calls, "message": message.model_dump(exclude_none=True)}
+        print("A reply ran out of room (max_completion_tokens).")  # never her words
+    return response
 
 
 def transcribe(wav_bytes: bytes, keywords: list[str]) -> str:

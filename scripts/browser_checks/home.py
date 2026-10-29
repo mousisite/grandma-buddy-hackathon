@@ -470,6 +470,70 @@ def check_check_in(browser) -> None:
     page.close()
 
 
+GRANDSON_SCAM = "Grandma it's me, I'm in jail, send $2,000 in gift cards and don't tell mom"
+
+
+def check_scam(browser) -> None:
+    """Check a message, with the real /api/scam-check. The test server has no
+    API key, so the AI is "down" and the plain rules answer (as they would
+    with no internet). Paste, read it out loud (faked speech-to-text), and a
+    photo; the verdict card with words and an icon, the fixed "what to do",
+    the call buttons, and "Check another message"."""
+    for theme, width, height in [("light", 390, 844), ("dark", 1440, 900)]:
+        page = browser.new_page(viewport={"width": width, "height": height}, color_scheme=theme,
+                                permissions=["microphone"])
+        page.route("**/api/transcribe", lambda route: route.fulfill(json={"transcript": GRANDSON_SCAM}))
+        visit(page, "scam")
+        # Nothing to check yet: a kind nudge.
+        page.click("#scam-check")
+        page.wait_for_selector("#scam-status:has-text('Please paste the message')")
+
+        # Pasted: the gift-card scam.
+        page.fill("#scam-text", GRANDSON_SCAM)
+        page.click("#scam-check")
+        page.wait_for_selector("#scam-result:not([hidden])")
+        assert page.text_content("#scam-verdict") == "Likely scam"
+        assert page.locator("#scam-verdict .icon").count() == 1, "a verdict needs its icon, never color alone"
+        assert page.evaluate("document.activeElement.id") == "scam-verdict"
+        todo = page.eval_on_selector_all("#scam-todo li", "items => items.map(i => i.textContent)")
+        assert todo[0] == "Don't click links, reply, or call numbers in the message.", todo
+        assert len(todo) == 3
+        hrefs = page.eval_on_selector_all("#scam-actions a", "links => links.map(a => a.getAttribute('href'))")
+        assert "tel:18333728311" in hrefs, hrefs
+        page.click("#scam-paid summary")
+        page.wait_for_timeout(500)
+        page.screenshot(path=str(OUT / f"scam-verdict-{width}-{theme}.png"), full_page=True)
+        check_layout(page, f"scam verdict at {width}px, {theme}")
+
+        # "Check another message": an empty box, ready to type.
+        page.click("#scam-another")
+        assert page.input_value("#scam-text") == ""
+        assert page.evaluate("document.activeElement.id") == "scam-text"
+
+        if width == 390:
+            # Read it out loud: her voice is written down, then checked.
+            page.click("#scam-read")
+            page.wait_for_selector("#scam-read-label:has-text('I’m done reading')")
+            page.wait_for_timeout(600)
+            page.click("#scam-read")
+            page.wait_for_selector("#scam-result:not([hidden])")
+            assert page.text_content("#scam-verdict") == "Likely scam"
+            assert page.input_value("#scam-text") == GRANDSON_SCAM
+            page.click("#scam-another")
+
+            # A photo: with the AI down, Buddy can't read it, so it says so.
+            picture = OUT / "scam-photo-sample.png"
+            page.screenshot(path=str(picture), clip={"x": 0, "y": 0, "width": 390, "height": 300})
+            page.set_input_files("#scam-photo-input", str(picture))
+            page.wait_for_selector("#scam-result:not([hidden])")
+            assert page.text_content("#scam-verdict") == "Suspicious"
+            assert (page.text_content("#scam-explanation") or "").startswith("I'm not sure about this one.")
+            assert page.is_visible("#scam-checked-photo")
+            page.wait_for_timeout(500)  # the card has finished rising in
+            page.screenshot(path=str(OUT / "scam-photo-390.png"), full_page=True)
+        page.close()
+
+
 def check_greeting_and_theme(browser) -> None:
     """Home in the morning, afternoon, evening, and night (a fake clock):
     the greeting follows the time. Auto theme follows the computer, and when
@@ -592,6 +656,7 @@ def main() -> int:
                 check_settings_form(page, problems)
                 check_diary_talk(page)
                 check_pills(page, problems)
+                check_scam(browser)
 
                 # The safety net, end to end: she says an emergency warning sign
                 # (faked speech-to-text), the real /api/chat answers with no AI,
@@ -705,7 +770,8 @@ def main() -> int:
             "progress, Earlier, the orb finishes and closes), the daily check-in (card, Not today, Start, check_in "
             "mode with its own talk), Settings saves choices at once and names a refused "
             "entry, theme, text size, and Calm motion work, \"Something hurts\" talks in diary mode, pill reminders "
-            "work (card, I took it, remind me, ring, round check, change, remove, undo), the emergency screen never "
+            "work (card, I took it, remind me, ring, round check, change, remove, undo), Check a message (paste, "
+            "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), the emergency screen never "
             "moves, Auto theme follows the computer and the evening, every screen at 390/768/1440px in light and "
             "dark, the orb's states and reduced motion look right, no layout problems. Screenshots in test-output/."
         )

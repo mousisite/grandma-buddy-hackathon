@@ -1696,6 +1696,100 @@ textarea::placeholder {
   margin-top: var(--s-4);
 }
 
+#scam-reading {
+  margin-top: var(--s-4);
+}
+
+/* The verdict: the screen's one raised card. */
+.verdict {
+  display: grid;
+  gap: var(--s-5);
+  padding: var(--s-6);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  animation: rise-in var(--slow) var(--spring) both;
+}
+
+.verdict-photo {
+  width: 140px;
+  max-height: 140px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+}
+
+/* Words and an icon, never color alone. Red stays for emergencies. */
+.verdict-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  justify-self: start;
+  min-height: 48px;
+  padding: 0 var(--s-5) 0 var(--s-4);
+  border: 2px solid var(--border-strong);
+  border-radius: var(--r-pill);
+  font-size: var(--t-24);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.verdict-pill .icon {
+  width: 28px;
+  height: 28px;
+  stroke-width: 2;
+}
+
+.verdict-pill--likely_scam {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.verdict-pill--looks_safe {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.verdict-explanation {
+  font-size: var(--t-20);
+  line-height: 1.4;
+}
+
+.verdict-heading {
+  margin-bottom: var(--s-2);
+  color: var(--text-2);
+  font-size: var(--t-15);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.verdict-list {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+.verdict-paid summary {
+  list-style: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.verdict-paid summary::-webkit-details-marker {
+  display: none;
+}
+
+.verdict-paid[open] .verdict-list {
+  margin-top: var(--s-2);
+  animation: rise-in var(--slow) var(--spring) both;
+}
+
+.verdict-actions {
+  justify-content: flex-start;
+}
+
 #scam-status:empty {
   display: none;
 }
@@ -2262,7 +2356,8 @@ label.group-row {
 [data-calm] .toast,
 [data-calm] .message.fresh .word,
 [data-calm] .pill-banner,
-[data-calm] .check-in-card {
+[data-calm] .check-in-card,
+[data-calm] .verdict {
   animation: fade-in var(--base) linear both !important;
 }
 

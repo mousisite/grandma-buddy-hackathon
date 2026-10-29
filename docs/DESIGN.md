@@ -140,7 +140,13 @@ All screens live on one page (`static/index.html`), each in a `<section data-scr
 
 **My diary.** "I'm an AI helper. I can't give medical advice." under the heading, one "Something hurts" button, then a timeline by day: the time, her words in quotes, where it hurts as a tag, and Pain and Since when she said them. A shimmer while it loads.
 
-**Check a message.** A paste area, "Check message", and "Use a photo". Verdicts (the next step) always have words and an icon: "Likely scam" in `--warning` with a stop icon, "Suspicious" with a neutral outline, "Looks safe" in `--success` with a check. Until then the button says message checking arrives in the next update.
+**Check a message.** A paste area with three ways in: "Check message", "Read it out loud" (tap, read, tap "I'm done reading"), and "Use a photo" (camera or photos, checked right away). While Buddy reads it: "Buddy is reading it…" and a shimmer. The verdict card is the screen's one raised element, read aloud, with focus on the verdict. It has:
+- a status pill with words and an icon: "Likely scam" in `--warning` with a stop icon (Lucide octagon-x), "Suspicious" with a neutral outline (circle-alert), "Looks safe" in `--success` (circle-check);
+- the explanation (20px), "Warning signs", and "What to do" (fixed text);
+- a folded "If you already paid or shared information";
+- Call {family} and Call the Elder Fraud Hotline on a likely scam;
+- "Say it again" and "Check another message";
+- a small thumbnail of the photo, for a photo.
 
 **Doctor notes and Family.** Documents: Newsreader headings, a readable column, and a print stylesheet (no navigation or buttons on paper). Family has large call buttons for her family member and doctor.
 

@@ -672,6 +672,180 @@ function addText(parent, tag, className, text) {
   parent.appendChild(element);
 }
 
+// ---------- Check a message ----------
+
+// Words and an icon for each verdict (Lucide octagon-x, circle-alert,
+// circle-check): never color alone.
+var VERDICT_ICONS = {
+  likely_scam: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 9-6 6"></path><path d="M2.586 16.726A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2h6.624a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586z"></path><path d="m9 9 6 6"></path></svg>',
+  suspicious: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>',
+  looks_safe: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m16 9-5.5 5.5L8 12"></path></svg>',
+};
+var SCAM_READ_LIMIT_MS = 2 * 60 * 1000; // reading out loud stops by itself after 2 minutes
+var scamSpoken = ""; // the verdict, for "Say it again"
+var scamRecording = false;
+var scamTimer = null;
+
+function scamStatus(text) {
+  setText(document.getElementById("scam-status"), text);
+}
+
+// Send the message (words, or a photo as a data URL) to /api/scam-check,
+// with a shimmer while Buddy reads it.
+function checkMessage(kind, photo) {
+  var text = document.getElementById("scam-text").value.trim();
+  if (!text && !photo) {
+    scamStatus("Please paste the message, read it out loud, or take a photo of it.");
+    document.getElementById("scam-text").focus();
+    return;
+  }
+  var buttons = document.querySelectorAll("#scam-compose button");
+  buttons.forEach(function (button) { button.disabled = true; });
+  document.getElementById("scam-reading").hidden = false;
+  scamStatus("Buddy is reading it…");
+  api("/api/scam-check", "POST", photo ? { image: photo, kind: "photo" } : { text: text, kind: kind })
+    .then(function (result) {
+      scamStatus("");
+      showVerdict(result, photo);
+    })
+    .catch(function (problem) {
+      scamStatus(typeof problem.detail === "string" ? problem.detail
+        : "I couldn’t check that just now. Please try again in a moment, or call your family about it.");
+    })
+    .then(function () {
+      document.getElementById("scam-reading").hidden = true;
+      buttons.forEach(function (button) { button.disabled = false; });
+    });
+}
+
+// The verdict card: read aloud, with focus on the verdict so a screen
+// reader starts there too.
+function showVerdict(result, photo) {
+  var verdict = document.getElementById("scam-verdict");
+  verdict.className = "verdict-pill verdict-pill--" + result.verdict;
+  verdict.innerHTML = VERDICT_ICONS[result.verdict] || "";
+  verdict.appendChild(document.createTextNode(result.title));
+  setText(document.getElementById("scam-explanation"), result.explanation);
+  fillList("scam-flags", result.red_flags);
+  document.getElementById("scam-flags-block").hidden = result.red_flags.length === 0;
+  fillList("scam-todo", result.what_to_do);
+  fillList("scam-paid-list", result.if_you_paid);
+  document.getElementById("scam-paid").hidden = result.if_you_paid.length === 0;
+  var actions = document.getElementById("scam-actions");
+  actions.textContent = "";
+  result.actions.forEach(function (action) {
+    if (isCallLink(action.href)) {
+      actions.appendChild(callLink(action, "call-pill"));
+    }
+  });
+  actions.hidden = actions.children.length === 0;
+  var slot = document.getElementById("scam-checked-photo");
+  slot.textContent = "";
+  if (photo) {
+    var picture = document.createElement("img");
+    picture.className = "verdict-photo";
+    picture.alt = "The photo you checked";
+    picture.src = photo;
+    slot.appendChild(picture);
+  }
+  slot.hidden = !photo;
+  document.getElementById("scam-compose").hidden = true;
+  document.getElementById("scam-result").hidden = false;
+  verdict.focus();
+  scamSpoken = result.title + ". " + result.explanation;
+  speak(scamSpoken);
+}
+
+// Her words and Buddy's are always set as text, never as HTML.
+function fillList(id, lines) {
+  var list = document.getElementById(id);
+  list.textContent = "";
+  lines.forEach(function (line) {
+    addText(list, "li", "", line);
+  });
+}
+
+// "Check another message": back to an empty box.
+function checkAnother() {
+  stopSpeaking();
+  document.getElementById("scam-result").hidden = true;
+  document.getElementById("scam-compose").hidden = false;
+  var box = document.getElementById("scam-text");
+  box.value = "";
+  scamStatus("");
+  box.focus();
+}
+
+// "Read it out loud": tap, read the message, tap "I’m done reading". Her
+// voice is written down (/api/transcribe, as in voice mode), then checked.
+function readMessageAloud() {
+  var label = document.getElementById("scam-read-label");
+  if (!scamRecording) {
+    stopSpeaking(); // the microphone must never hear Buddy
+    startRecording()
+      .then(function () {
+        scamRecording = true;
+        label.textContent = "I’m done reading";
+        scamStatus("I’m listening. Read the message out loud, then tap “I’m done reading”.");
+        scamTimer = setTimeout(readMessageAloud, SCAM_READ_LIMIT_MS);
+      })
+      .catch(function () {
+        scamStatus("I can’t hear you yet. At the top of the window, click the microphone or lock picture, choose Allow, then try again. Or paste the message.");
+      });
+    return;
+  }
+  clearTimeout(scamTimer);
+  scamRecording = false;
+  label.textContent = "Read it out loud";
+  scamStatus("Writing it down…");
+  stopRecording()
+    .then(sendForTranscript)
+    .then(function (result) {
+      if (!result.transcript) {
+        throw problem("NotHeard");
+      }
+      document.getElementById("scam-text").value = result.transcript;
+      checkMessage("voice");
+    })
+    .catch(function () {
+      scamStatus("I didn’t catch that. Please try again, or paste the message.");
+    });
+}
+
+// "Use a photo": the picture is shrunk on this device (about 1600 pixels
+// on its long side, JPEG) and checked right away.
+function choosePhoto(event) {
+  var file = event.target.files[0];
+  event.target.value = ""; // so the same photo can be chosen again
+  if (!file) {
+    return;
+  }
+  shrinkPhoto(file)
+    .then(function (photo) {
+      checkMessage("photo", photo);
+    })
+    .catch(function () {
+      scamStatus("That picture didn’t work. Please try another photo.");
+    });
+}
+
+function shrinkPhoto(file) {
+  return new Promise(function (resolve, reject) {
+    var image = new Image();
+    image.onload = function () {
+      var scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+      var canvas = document.createElement("canvas");
+      canvas.width = Math.round(image.width * scale);
+      canvas.height = Math.round(image.height * scale);
+      canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(image.src);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    image.onerror = reject;
+    image.src = URL.createObjectURL(file);
+  });
+}
+
 // ---------- Family and settings ----------
 
 // The text entries on the form, named like the profile fields.
@@ -845,12 +1019,15 @@ function startScreens() {
   document.getElementById("today-take").addEventListener("click", function () { answerReminder("taken"); });
   document.getElementById("check-in-skip").addEventListener("click", skipCheckIn);
 
-  // Check a message: designed now; checking arrives in the next update.
-  ["scam-check", "scam-photo"].forEach(function (id) {
-    document.getElementById(id).addEventListener("click", function () {
-      setText(document.getElementById("scam-status"), "Message checking arrives in the next update of Buddy.");
-    });
+  // Check a message.
+  document.getElementById("scam-check").addEventListener("click", function () { checkMessage("text"); });
+  document.getElementById("scam-read").addEventListener("click", readMessageAloud);
+  document.getElementById("scam-photo").addEventListener("click", function () {
+    document.getElementById("scam-photo-input").click();
   });
+  document.getElementById("scam-photo-input").addEventListener("change", choosePhoto);
+  document.getElementById("scam-again").addEventListener("click", function () { speak(scamSpoken); });
+  document.getElementById("scam-another").addEventListener("click", checkAnother);
   // Closing the tab with unsaved entries: the browser asks first.
   window.addEventListener("beforeunload", function (event) {
     if (form.hasAttribute("data-unsaved")) {

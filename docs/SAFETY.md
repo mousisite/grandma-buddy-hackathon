@@ -106,6 +106,7 @@ Every AI reply is checked by plain rules after it is written and before she sees
 - If crisis words come together with an emergency or a pill mix-up, the more urgent screen shows, and Call 988 and Text 988 are added to its buttons.
 - When crisis words are involved, her words are never stored: only the kind of event and the time. That includes Buddy's conversation memory, where her words are replaced with a short note. An emergency diary entry then lists only the warning signs.
 - After a crisis screen, every reply that day keeps Call 988 and Call {family_name} visible, and the AI is told to stay gentle. A repeated crisis phrase always shows the crisis screen again.
+- The safety net does not run on a message she asks the scam checker about: those are someone else's words, and a scammer's "Grandma, I'm bleeding, send money" must get a scam verdict, not the 911 screen. Her own words always go through the safety net when she talks to Buddy.
 - If her words can't reach the safety net (no internet, microphone problem, words not understood), Call 911 and Call {family_name} are shown with the kind message. The note at the bottom of the home screen has a "call 911" phone link at all times.
 - Safety messages are read aloud even if voice is turned off.
 
@@ -125,7 +126,13 @@ If she already paid or shared information:
 - Report it to the FTC at ReportFraud.ftc.gov.
 - Call the National Elder Fraud Hotline at 1-833-372-8311 (833-FRAUD-11), open 6 AM to 11 PM Eastern, every day.
 
-The scam checker never asks for or stores passwords, account numbers, or Social Security numbers. If a pasted message contains them, store only a short excerpt with long numbers removed.
+The scam checker never asks for or stores passwords, account numbers, or Social Security numbers. If a pasted message contains them, store only a short excerpt with long numbers removed. A photo is never stored.
+
+How the checker keeps to these rules (`app/scam.py`):
+- Plain rules look for the red flags above. They set a floor: the AI can make the verdict stronger, never weaker ("Grandma, send gift cards" is always at least a likely scam), and they still answer when the AI or the internet is down.
+- The "Always tell her" and "If she already paid" lines are shown word for word, never written by the AI. A message that looks safe gets "If you're not sure, call them at a number you already know, not one in the message." and the "Never share passwords…" line instead of the first two.
+- Links and phone numbers from the message are never repeated in Buddy's words. A likely scam shows Call {family_name} and Call the Elder Fraud Hotline.
+- Red is never used: "Likely scam" is shown in the warning color with a stop icon.
 
 ## 9. Privacy
 
