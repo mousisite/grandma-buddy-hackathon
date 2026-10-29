@@ -13,6 +13,7 @@ var SCREEN_LOADERS = {
   },
   diary: showDiary,
   pills: showPillsScreen,
+  notes: showNotes,
   family: showFamilyCalls,
   settings: fillSettingsForm,
 };
@@ -672,6 +673,204 @@ function addText(parent, tag, className, text) {
   parent.appendChild(element);
 }
 
+// ---------- Doctor notes ----------
+
+var notesRequests = 0; // so an older page never replaces a newer one
+
+function notesDays() {
+  return document.querySelector('input[name="notes-days"]:checked').value;
+}
+
+// Ask for the page (the server puts it together from her logs) and draw it.
+function showNotes() {
+  var doc = document.getElementById("notes-doc");
+  var status = document.getElementById("notes-status");
+  var mine = ++notesRequests;
+  doc.setAttribute("aria-busy", "true");
+  api("/api/doctor-notes?days=" + notesDays())
+    .then(function (page) {
+      if (mine === notesRequests) {
+        status.hidden = true;
+        drawNotes(page);
+      }
+    })
+    .catch(function () {
+      status.hidden = false;
+      status.textContent = "I couldn’t put your notes together just now. Please try again in a moment.";
+    })
+    .then(function () {
+      doc.removeAttribute("aria-busy");
+    });
+}
+
+// A small helper: an element with a class and words (always as text,
+// never as HTML, because her words are never code).
+function element(tag, className, text) {
+  var made = document.createElement(tag);
+  made.className = className;
+  if (text !== undefined) {
+    made.textContent = text;
+  }
+  return made;
+}
+
+function docSection(title) {
+  var section = element("section", "doc-section");
+  section.appendChild(element("h3", "doc-heading", title));
+  return section;
+}
+
+// The page, in the order a doctor reads it: her questions, how she has been
+// feeling (her words, grouped by topic), her pills, her mood.
+function drawNotes(page) {
+  var doc = document.getElementById("notes-doc");
+  var doctor = page.doctor_name || "your doctor";
+  doc.textContent = "";
+  document.getElementById("question-label").textContent = "Add a question for " + doctor;
+
+  var head = element("header", "doc-head");
+  var title = element("h2", "doc-title", "Notes for " + doctor);
+  title.id = "notes-doc-title";
+  head.appendChild(title);
+  head.appendChild(element("p", "doc-meta", (page.her_name ? page.her_name + ", " : "") + page.period));
+  doc.appendChild(head);
+
+  var questions = docSection("Questions to ask");
+  if (page.questions.length) {
+    var list = element("ol", "doc-questions");
+    page.questions.forEach(function (question) {
+      var item = element("li", "");
+      item.appendChild(element("span", "doc-question", question.question));
+      item.appendChild(smallButton("Asked", "Asked: " + question.question, function () {
+        markAsked(question);
+      }));
+      list.appendChild(item);
+    });
+    questions.appendChild(list);
+  } else {
+    questions.appendChild(element("p", "empty", "No questions yet. Add one below, or tell Buddy “I want to ask my doctor about…”."));
+  }
+  doc.appendChild(questions);
+
+  var feeling = docSection("How I’ve been feeling");
+  if (!page.topics.length) {
+    feeling.appendChild(element("p", "empty", "Nothing written down in these days. When something hurts, tell Buddy."));
+  }
+  page.topics.forEach(function (topic) {
+    feeling.appendChild(element("h4", "doc-topic", topic.label));
+    var entries = element("ul", "doc-entries");
+    entries.setAttribute("role", "list");
+    topic.entries.forEach(function (entry) {
+      var item = element("li", "");
+      item.appendChild(element("span", "doc-date", entry.date + ", " + entry.time));
+      item.appendChild(element("span", "doc-words", entry.quoted ? "“" + entry.words + "”" : entry.words));
+      var facts = [];
+      if (entry.pain !== null) {
+        facts.push("Pain " + entry.pain + " of 10");
+      }
+      if (entry.since) {
+        // Her words: "since lunch" stays as she said it; "yesterday" gets "Since".
+        facts.push(/^since\s/i.test(entry.since)
+          ? entry.since.charAt(0).toUpperCase() + entry.since.slice(1)
+          : "Since " + entry.since);
+      }
+      if (entry.note) {
+        facts.push(entry.note);
+      }
+      if (facts.length) {
+        item.appendChild(element("span", "doc-facts", facts.join(". ")));
+      }
+      entries.appendChild(item);
+    });
+    feeling.appendChild(entries);
+  });
+  doc.appendChild(feeling);
+
+  var pills = docSection("My pills");
+  if (!page.pills.length) {
+    pills.appendChild(element("p", "empty", "No pills set up."));
+  }
+  page.pills.forEach(function (pill) {
+    var item = element("div", "doc-pill");
+    item.appendChild(element("p", "doc-pill-name", pill.name));
+    if (pill.label) {
+      item.appendChild(element("p", "doc-pill-label", pill.label));
+    }
+    item.appendChild(element("p", "doc-count", pill.total ? "Taken " + pill.taken + " of " + pill.total : "No reminders in these days"));
+    if (pill.missed.length) {
+      var missed = element("p", "doc-missed");
+      missed.innerHTML = VERDICT_ICONS.suspicious; // circle-alert: words and an icon, never color alone
+      missed.appendChild(document.createTextNode("Missed: " + pill.missed.join("; ")));
+      item.appendChild(missed);
+    }
+    pills.appendChild(item);
+  });
+  doc.appendChild(pills);
+
+  var mood = docSection("My mood");
+  if (page.moods.length) {
+    var moods = element("ul", "doc-moods");
+    moods.setAttribute("role", "list");
+    page.moods.forEach(function (day) {
+      moods.appendChild(element("li", "", day.day + ": " + day.mood));
+    });
+    mood.appendChild(moods);
+  } else {
+    mood.appendChild(element("p", "empty", "No check-ins in these days."));
+  }
+  doc.appendChild(mood);
+
+  doc.appendChild(element("p", "doc-footer",
+    "Written down by Grandma Buddy, an AI helper, from what " + (page.her_name || "she") +
+    " told it. It is not medical advice. Made on " + page.made_on + "."));
+}
+
+// "Asked": the question leaves the page (it is kept, never deleted), with Undo.
+function markAsked(question) {
+  var line = document.getElementById("notes-undo");
+  api("/api/doctor-questions/" + question.id + "/asked", "POST")
+    .then(function () {
+      line.textContent = "Marked “" + question.question + "” as asked. ";
+      var undo = smallButton("Undo", "Undo: put back “" + question.question + "”", function () {
+        api("/api/doctor-questions/" + question.id + "/reopen", "POST")
+          .then(function () {
+            line.textContent = "";
+            focusScreenHeading(); // the Undo button she tapped is gone
+            showNotes();
+          })
+          .catch(function () {
+            line.textContent = "I couldn’t put it back just now. Please try again.";
+          });
+      });
+      line.appendChild(undo);
+      undo.focus();
+      showNotes();
+    })
+    .catch(function () {
+      toast("I couldn’t save that just now. Please try again.", true);
+    });
+}
+
+// "Add a question": straight onto the page.
+function addQuestion(event) {
+  event.preventDefault();
+  var box = document.getElementById("question-text");
+  clearProblem(event.target);
+  if (!box.value.trim()) {
+    showProblem(box, "Please type the question first.");
+    return;
+  }
+  api("/api/doctor-questions", "POST", { question: box.value })
+    .then(function () {
+      box.value = "";
+      toast("Added to doctor notes");
+      showNotes();
+    })
+    .catch(function () {
+      showProblem(box, "I couldn’t add that just now. Please try again.");
+    });
+}
+
 // ---------- Check a message ----------
 
 // Words and an icon for each verdict (Lucide octagon-x, circle-alert,
@@ -1018,6 +1217,15 @@ function startScreens() {
   });
   document.getElementById("today-take").addEventListener("click", function () { answerReminder("taken"); });
   document.getElementById("check-in-skip").addEventListener("click", skipCheckIn);
+
+  // Doctor notes.
+  document.querySelectorAll('input[name="notes-days"]').forEach(function (choice) {
+    choice.addEventListener("change", showNotes);
+  });
+  document.getElementById("notes-print").addEventListener("click", function () {
+    window.print();
+  });
+  document.getElementById("question-form").addEventListener("submit", addQuestion);
 
   // Check a message.
   document.getElementById("scam-check").addEventListener("click", function () { checkMessage("text"); });

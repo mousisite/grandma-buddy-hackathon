@@ -355,11 +355,30 @@
       <header class="screen-head">
         <h1 id="notes-title" class="display" tabindex="-1">Doctor notes</h1>
         <p class="lead">One page to bring to your next visit: how you’ve been, your pills, and your questions.</p>
+        <!-- Required on doctor-note screens: docs/SAFETY.md section 1. -->
+        <p class="note">I’m an AI helper. I can’t give medical advice.</p>
       </header>
-      <article class="doc">
-        <h2 class="doc-heading">For your next visit</h2>
-        <p class="empty">Your notes page is almost ready. Until then, “Add to doctor notes” in a talk with Buddy saves your questions for it.</p>
-      </article>
+      <div class="notes-controls">
+        <div class="segmented" role="radiogroup" aria-label="How many days">
+          <label><input type="radio" name="notes-days" value="7" checked><span>Last 7 days</span></label>
+          <label><input type="radio" name="notes-days" value="14"><span>14 days</span></label>
+          <label><input type="radio" name="notes-days" value="30"><span>30 days</span></label>
+        </div>
+        <button id="notes-print" class="pill-button pill-button--ink" type="button">Print</button>
+      </div>
+      <p id="notes-status" class="empty" role="status" hidden></p>
+      <!-- The page itself (screens.js): every fact straight from her logs.
+           A shimmer shows while it is put together. -->
+      <article id="notes-doc" class="doc" aria-labelledby="notes-doc-title" aria-busy="true"></article>
+      <p id="notes-undo" class="form-status" role="status"></p>
+      <form id="question-form" class="add-question" novalidate>
+        <label for="question-text" id="question-label">Add a question for your doctor</label>
+        <div class="add-question-row">
+          <input id="question-text" name="question" type="text" autocomplete="off" maxlength="300"
+                 placeholder="Like “Can I keep walking every day?”">
+          <button class="pill-button pill-button--quiet" type="submit">Add</button>
+        </div>
+      </form>
     </section>
 
     <!-- ========== Family ========== -->

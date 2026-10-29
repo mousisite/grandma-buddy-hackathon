@@ -52,6 +52,7 @@ grandma-buddy-hackathon/
     meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), transcribe()
     safety.py                emergency, crisis, and medication mix-up rules with fixed messages
     prompts.py               system prompts for companion, diary, scam, notes, family
+    notes.py                 Doctor notes: facts straight from the logs (plain code); the AI only groups, checked
     scam.py                  Check a message: red-flag rules (a floor the AI can't lower), the AI's verdict, fixed what-to-do
     tools.py                 companion tool definitions and what each one does
     reminders.py             pill reminder rules (upcoming, due, snoozed, taken, missed) with a clock tests can set
@@ -60,7 +61,7 @@ grandma-buddy-hackathon/
       diary.py               /api/diary
       meds.py                /api/meds, /api/reminders
       scam.py                /api/scam-check
-      notes.py               /api/doctor-notes, /api/doctor-questions
+      notes.py               /api/doctor-notes, /api/doctor-questions (add, asked, reopen)
       family.py              /api/family/summary
       profile.py             /api/profile
       checkin.py             /api/check-in (the daily check-in: due today? start, skip)
@@ -82,8 +83,9 @@ grandma-buddy-hackathon/
     check_pills.py           hand-run: pill questions through the real AI (no doses said, "I took my pills" recorded?)
     check_checkin.py         hand-run: a whole daily check-in through the real AI (mood, diary entry, pill taken, no advice?)
     check_scam.py            hand-run: the SAFETY.md scam messages and one photo through the real AI (right verdicts?)
+    check_notes.py           hand-run: the demo week's doctor notes grouped by the real AI (labels in her words?)
     check_contrast.py        measures the contrast of every color pair the screens use
-    seed_demo.py             fills the database with made-up demo data ("Rose", 7 days)
+    seed_demo.py             a made-up week for "Rose" (pills, diary, moods, questions); refuses to overwrite data unless --replace, which backs up first
     browser_checks/          Playwright scripts that check screens in a real browser (/webapp-testing)
   tests/
     conftest.py              temporary database + fake Meta client for every test
@@ -137,8 +139,9 @@ grandma-buddy-hackathon/
 | `POST /api/reminders/taken` and `/snooze` | `{"ids": [...]}` | the same as `GET /api/reminders`, updated |
 | `POST /api/meds/read-label` (P2) | photo | suggested fields for a family member to confirm |
 | `POST /api/scam-check` | `{"text", "kind"}` or `{"image": "data:image/jpeg;base64,…", "kind": "photo"}`; `kind` is `text` (pasted), `voice` (read out loud, written down by `/api/transcribe` first), or `photo` | scam result (below) |
-| `POST /api/doctor-notes` | `{"days": 7}` | doctor notes (below) |
+| `GET /api/doctor-notes?days=7` | `days` is 7, 14, or 30 | doctor notes (below) |
 | `POST /api/doctor-questions` | `{"question"}` | saved question |
+| `POST /api/doctor-questions/{id}/asked` and `/reopen` | | she asked it (off the page; never deleted), or Undo |
 | `GET /api/family/summary?date=YYYY-MM-DD` | | `{"text", "mailto"}` |
 | `GET/PUT /api/profile` | profile fields | profile |
 | `GET /api/check-in` | | `{"due", "mood"}`: whether today's check-in is still to do, and today's latest mood (`{"mood", "at"}` or `null`) |
@@ -204,15 +207,26 @@ The route returns `{"verdict", "title", "red_flags", "explanation", "what_to_do"
 - If the AI is down, the rules answer alone ("I'm not sure about this one…" when nothing matched).
 - Each check saves a `scam_checks` row: a 120-character excerpt with long numbers hidden, or "(photo)".
 
-Doctor notes (only facts from the logs, no interpretation):
+Doctor notes (`app/notes.py`). Every fact comes from the logs with plain code; the AI fills in only a grouping:
+
+```json
+{"topics": [{"label": "Left knee", "entry_ids": [3, 7]}]}
+```
+
+The grouping is used only if:
+- every id is a real entry;
+- each entry appears exactly once;
+- every label is 1 to 3 words she said herself (a plural or singular counts).
+
+Otherwise, or when the AI is down, entries are grouped by where she said it hurts. The route returns:
 
 ```json
 {
-  "period": "Oct 27 to Nov 2",
-  "symptom_log": [{"date": "...", "her_words": "...", "body_area": "...", "pain_level": 6, "since": "..."}],
-  "medications": [{"name": "...", "taken": 12, "missed": 2}],
-  "mood_by_day": [{"date": "...", "mood": "okay"}],
-  "questions_to_ask": ["..."]
+  "period": "October 22 to 28", "her_name": "Rose", "doctor_name": "Dr. Lee", "made_on": "Wednesday, October 28",
+  "topics": [{"label": "Left knee", "entries": [{"date": "Thu, Oct 22", "time": "9:20 AM", "words": "...", "quoted": true, "where": "left knee", "pain": 4, "since": "", "note": ""}]}],
+  "pills": [{"name": "...", "label": "exactly as typed", "taken": 6, "total": 7, "missed": ["Tue, Oct 27, 8:00 AM"]}],
+  "moods": [{"day": "Thu, Oct 22", "mood": "Good"}],
+  "questions": [{"id": 1, "question": "..."}]
 }
 ```
 

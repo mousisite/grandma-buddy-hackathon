@@ -43,9 +43,9 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 - [x] `/api/scam-check` for spoken, pasted, and photographed messages. Scam test messages pass. (Done early, Oct 28.)
 
 ### Day 8: Mon, Nov 2 (doctor notes and family)
-- [ ] `/api/doctor-notes`, printable one-page notes, add-a-question by voice.
+- [x] `/api/doctor-notes`, printable one-page notes, add-a-question by voice. (Done early, Oct 28.)
 - [ ] `/api/family/summary`, "Send to {family}" email link, Copy button.
-- [ ] `scripts/seed_demo.py` with a week of made-up data for "Rose".
+- [x] `scripts/seed_demo.py` with a week of made-up data for "Rose". (Done early, Oct 28.)
 
 ### Day 9: Tue, Nov 3 (polish and demo)
 - [ ] `/taste`, `/web-design-guidelines`, and `/senior-friendly-ui` on every screen.
@@ -71,6 +71,8 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 ## Status log
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
+
+- Oct 28 (Day 8 work, done early): Doctor notes (Feature 8) and the demo week. `app/notes.py` builds every fact with plain code straight from the logs (her words quoted exactly, where, pain, since, pills taken of total with missed dates, one mood a day, open questions); Muse Spark only groups her entries into topics, and its grouping is used only if every id is real, each entry appears once, and each label is 1 to 3 of her own words (otherwise by where she said it hurts). `GET /api/doctor-notes?days=7|14|30`, "Asked" and Undo for questions. Screen: a document with Questions, How I've been feeling, My pills, My mood, Add a question, 7/14/30 days, Print; a print stylesheet so a week fits on one page (measured with a PDF in the browser check). `scripts/seed_demo.py` grew from the profile-only version into a made-up week (2 pills, 2 missed doses, 5 diary entries, 7 moods, 3 questions); it refuses to overwrite data unless `--replace`, which backs up first. 361/361 pytest (28 new); browser check passes on the seeded week (every screen now screenshotted with data); real AI (`scripts/check_notes.py`): Left knee, Headache, Dizzy, every check passed. `/safety-check` passes.
 
 - Oct 28 (Day 7 work, done early): Check a message (Feature 7). Paste it, read it out loud (written down with Voice Transcribe), or take a photo (shrunk on the device, sent to Muse Spark as an image). `app/scam.py`: plain red-flag rules from SAFETY.md 8 set a floor the AI can't lower and answer alone when the AI is down; Muse Spark fills in a strict form (new `meta_client.structured()`, structured output with medium thinking); "what to do" and "if you already paid" are fixed SAFETY.md lines; links and phone numbers never repeated; Call {family} and the Elder Fraud Hotline on likely scams; a 120-character excerpt with long numbers hidden (photos never stored). The emergency safety net deliberately doesn't run on someone else's message (documented in SAFETY.md 7b). Verdict card with words and an icon (warning color and a stop sign, never red), read aloud. 333/333 pytest (29 new); browser check covers paste, read aloud, photo, and the AI being down; real AI (`scripts/check_scam.py`): the 3 SAFETY.md scams are likely scams, Dr. Lee's reminder looks safe, and a photo of the gift-card text is read correctly. The prompt now also asks for no pet names ("dear"). `/safety-check` passes.
 

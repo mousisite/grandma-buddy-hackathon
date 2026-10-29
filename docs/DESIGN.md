@@ -148,7 +148,21 @@ All screens live on one page (`static/index.html`), each in a `<section data-scr
 - "Say it again" and "Check another message";
 - a small thumbnail of the photo, for a photo.
 
-**Doctor notes and Family.** Documents: Newsreader headings, a readable column, and a print stylesheet (no navigation or buttons on paper). Family has large call buttons for her family member and doctor.
+**Doctor notes.** A document with Newsreader headings. On screen:
+- "I'm an AI helper. I can't give medical advice." under the heading;
+- a Last 7 days / 14 days / 30 days choice and **Print** (56px);
+- the page itself: "Notes for Dr. Lee", "Rose, October 22 to 28".
+
+The page's sections, in the order a doctor reads them:
+- **Questions to ask**, each with "Asked" (with Undo);
+- **How I've been feeling**, by topic: date and time, her words in quotes, pain, since, and the emergency note;
+- **My pills**, exactly as labeled: "Taken 6 of 7" and missed doses in `--warning` with an icon;
+- **My mood**, one line per day;
+- a footer saying it was written down by an AI helper from what she said and is not medical advice.
+
+"Add a question" sits below the page. On paper: only the page, 10.5pt, the date beside her words, pill counts beside their names, and moods in 4 columns. A week of the demo data fits on one page (checked in the browser check).
+
+**Family.** A document with large call buttons for her family member and doctor.
 
 **Settings.** Grouped rows: Appearance (Theme, Text size), Voice (Read replies aloud, Voice speed, Chime), Motion (Calm motion), and "Names and phone numbers", folded away for a family member. Switches and choices save at once with a "Settings saved" toast; the profile has its own "Save profile". A refused entry gets a `--warning` border and a note right under it saying how to fix it.
 

@@ -7,6 +7,7 @@
 # It starts its own test server on port 8001.
 
 import os
+import re
 import struct
 from datetime import datetime
 import subprocess
@@ -534,6 +535,63 @@ def check_scam(browser) -> None:
         page.close()
 
 
+def seed_demo_week(database: str) -> None:
+    """Fill the test server's database with the made-up demo week
+    (scripts/seed_demo.py --replace, which keeps a backup first)."""
+    env = dict(os.environ, DATABASE_PATH=database)
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "seed_demo.py"), "--replace"], cwd=ROOT, env=env,
+                   check=True, stdout=subprocess.DEVNULL)
+
+
+def check_notes(browser) -> None:
+    """Doctor notes on the demo week, with the AI down (the test server has no
+    key), so entries are grouped by where she said it hurts. Every section,
+    Asked and Undo, Add a question, the 7/14/30 days choice, and the printed
+    page: a week fits on ONE page (docs/SPEC.md feature 8)."""
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    visit(page, "notes")
+    page.wait_for_selector("#notes-doc .doc-title")
+    assert page.text_content("#notes-doc .doc-title") == "Notes for Dr. Lee"
+    assert (page.text_content("#notes-doc .doc-meta") or "").startswith("Rose, ")
+    assert page.is_visible("[data-screen='notes'] >> text=I’m an AI helper. I can’t give medical advice.")
+    topics = page.eval_on_selector_all("#notes-doc .doc-topic", "items => items.map(i => i.textContent)")
+    assert topics[0] == "Left knee" and topics[-1] == "Other things", topics
+    words = page.eval_on_selector_all("#notes-doc .doc-words", "items => items.map(i => i.textContent)")
+    assert "“My left knee is sore when I walk, about a 4”" in words, words
+    counts = page.eval_on_selector_all("#notes-doc .doc-count", "items => items.map(i => i.textContent)")
+    assert all(count.startswith("Taken ") for count in counts), counts
+    assert page.locator("#notes-doc .doc-missed").count() == 2, "the two missed doses should show"
+    assert page.locator("#notes-doc .doc-moods li").count() == 7
+
+    # A week of notes prints on one page.
+    pdf = page.pdf(format="Letter", print_background=True)
+    pages = len(re.findall(rb"/Type\s*/Page[^s]", pdf))
+    (OUT / "doctor-notes-7-days.pdf").write_bytes(pdf)
+    assert pages == 1, f"a week of doctor notes should print on one page, not {pages}"
+
+    # "Asked" takes a question off, Undo brings it back.
+    questions = "#notes-doc .doc-questions li"
+    assert page.locator(questions).count() == 3
+    page.click(f"{questions} >> nth=0 >> button")
+    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 2")
+    page.click("#notes-undo button")
+    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 3")
+
+    # Add a question.
+    page.fill("#question-text", "Can I go swimming with my knee?")
+    page.click("#question-form button[type=submit]")
+    page.wait_for_selector(".toast:has-text('Added to doctor notes')")
+    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 4")
+
+    # 14 days: a longer period.
+    page.click(".notes-controls label:has-text('14 days')")
+    page.wait_for_function("document.querySelector('#notes-doc .doc-meta').textContent.includes(' to ')")
+    page.wait_for_timeout(600)
+    page.screenshot(path=str(OUT / "doctor-notes-1440.png"), full_page=True)
+    check_layout(page, "Doctor notes at 1440px")
+    page.close()
+
+
 def check_greeting_and_theme(browser) -> None:
     """Home in the morning, afternoon, evening, and night (a fake clock):
     the greeting follows the time. Auto theme follows the computer, and when
@@ -754,6 +812,9 @@ def main() -> int:
                 zoomed.screenshot(path=str(OUT / "home-zoom200.png"))
 
                 check_greeting_and_theme(browser)
+                # The made-up demo week: the doctor notes, then every screen with real-looking data.
+                seed_demo_week(test_env["DATABASE_PATH"])
+                check_notes(browser)
                 check_every_screen(browser)
                 check_buddy_states(browser)
             finally:
@@ -771,7 +832,8 @@ def main() -> int:
             "mode with its own talk), Settings saves choices at once and names a refused "
             "entry, theme, text size, and Calm motion work, \"Something hurts\" talks in diary mode, pill reminders "
             "work (card, I took it, remind me, ring, round check, change, remove, undo), Check a message (paste, "
-            "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), the emergency screen never "
+            "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), Doctor notes on the demo week "
+            "(sections, Asked and Undo, Add a question, 14 days, prints on one page), the emergency screen never "
             "moves, Auto theme follows the computer and the evening, every screen at 390/768/1440px in light and "
             "dark, the orb's states and reduced motion look right, no layout problems. Screenshots in test-output/."
         )

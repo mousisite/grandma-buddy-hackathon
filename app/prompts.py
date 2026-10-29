@@ -79,6 +79,13 @@ AFTER_A_CRISIS = (
     "abruptly, and keep kindly encouraging her to reach out to {family_name} or to call or text 988.\n"
 )
 
+# Doctor notes (app/notes.py): the AI only sorts her diary entries into
+# topics. Its labels must use her own words; app/notes.py checks that.
+NOTE_TOPICS = """You sort an older adult's diary entries into a few topics for her doctor notes. You get a list of entries, each with an id, her own words, and where it hurts (if she said).
+
+Put entries about the same thing together, usually the same part of the body, like "Left knee" or "Headache". Give each topic a short label of one to three words, using only words she used herself. Never name a condition or a cause, never judge how serious it is, and never add anything else. Every entry goes in exactly one topic. Use as few topics as make sense.
+"""
+
 # "Check a message" (app/scam.py). The answer fills in a form (structured
 # output); "what to do" is added by the app as fixed text from SAFETY.md.
 SCAM = """You help an older adult who lives alone decide whether a text, email, letter, or call she got is a scam. She shows you the message, or a photo of it.
