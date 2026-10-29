@@ -1,118 +1,156 @@
-# Grandma Buddy: design rules
+# Grandma Buddy: the design system
 
-Grandma has weak eyesight, finds phones confusing, and is often in pain. Every screen must be usable by someone who has never used an app like this, possibly with shaky hands.
+Grandma Buddy should look and feel like a flagship app (the quality of the Claude app, Google Gemini, or Apple's own apps) and still be easy for an older adult with weak eyesight and shaky hands.
 
-## The golden rules
+## The idea: "the living orb"
 
-1. **Voice first.** The biggest thing on the Today screen is the "Tap to talk" voice box. Everything she can tap, she can also say.
-2. **One main thing per screen.** At most 3 or 4 choices visible at once.
-3. **Big everything.** Body text at least 22px, headings 32px or more, buttons at least 64px tall with at least 16px between them. No text under 18px.
-4. **Words, not just icons.** Every button has a clear label ("I took it"), with an icon only as a helper.
-5. **Plain language.** Short sentences, no jargon. Never show words like "error", "API", "server", "transcription", or "401".
-6. **Nothing is lost by mistake.** Confirm before deleting, offer undo, no time limits, no auto-dismissing messages. Unsaved form entries stay when she moves to another screen and back.
-7. **Red means emergency.** Use red only for the emergency and Poison Control screens, so red always means "act now".
+One memorable thing: **Buddy, a living orb of warm light.** Everything around it stays quiet and disciplined: restraint, whitespace, hairline borders, one ink accent, a real dark mode. Boldness is spent only on the orb and the moment it morphs into voice mode.
 
-## Look and feel
+Avoid: gradients anywhere but the orb, cards inside cards, the same shadow under everything, ALL CAPS, labels above every heading, arrows on buttons, spinners, color as the only signal.
 
-Buddy looks like the AI assistants people already know (ChatGPT, Perplexity, Gemini), made big and calm. The user chose this style on October 26, 2026, after trying several others. All colors and sizes live at the top of `static/styles.css`.
+Every color, size, and timing is a custom property at the top of `static/styles.css`.
 
-- **A quiet page.** White by day (6 AM to 6 PM), near-black at night. `app.js` sets `data-time="day"` or `"night"` on the page and colors the phone's top bar to match.
-- **One big centered question** on Today: the date, the greeting with her name, and Buddy's words underneath, appearing word by word like an AI answer.
-- **The voice box.** A wide white box with "Tap to talk" and a round black voice button, with a soft blue glow behind it. The whole box is the button.
-- **Suggestion cards** under the voice box, like the cards under an AI app's input: light gray, line icon, title, and a second line.
-- **A sidebar** on big screens (1000px and up): Buddy's mark, then Today, My diary, My pills, Doctor notes, Scam check, Family. On phones and upright tablets the same menu slides in from the left when she taps "Menu".
-- **Other screens** look like a settings page: "Back to Today" at the top left, a big left-aligned heading, a short line under it, then light gray cards.
-- **An honest note** at the bottom of every screen: Buddy is an AI helper, it can't give medical advice, and "call 911" is a real phone link.
-- Almost no color. No red in the normal app. No tiny gray text, no thin fonts, no text over photos, no flashing.
+## The rules (checked by `/senior-friendly-ui`)
 
-### Colors
+1. **Voice first.** "Talk to Buddy" is the main action on Home and in the sidebar. Everything she can tap, she can also say.
+2. **Legible.** Body text 17px or more; short labels (tabs, captions) 13px or more. "Text size" in Settings (Standard, Large, Largest: 100, 118, 135%) grows everything. It starts at Large on a first visit, and her choice is remembered on this device.
+3. **Easy to tap.** Every target at least 44 by 44px; the main actions (Talk to Buddy, I took it, call buttons) 56px or more.
+4. **Contrast.** Text 4.5:1 or more in light AND dark; large text, icons, and the edges of fields 3:1. Measured by `scripts/check_contrast.py`.
+5. **Words, not color alone.** Every button has a text label; every state has words and an icon.
+6. **Plain language.** Short, warm, specific, sentence case. Never "error", "API", "server", "transcribe", or codes.
+7. **Simple first.** Her screens show only what she uses. Things only a family member sets up ("Set up pills", "Names and phone numbers") are folded away behind one row marked "For a family member".
+8. **Every press shows.** A soft ring when the mouse is over something, and the moment a finger lands it squeezes, darkens, and a circle of light spreads from her finger.
+9. **Nothing is lost by mistake.** Removing asks first (a bottom sheet) and offers Undo. Unsaved profile entries stay when she moves to another screen. Form problems stay inline under the entry until fixed.
+10. **Red means emergency.** `--danger` and `--alarm` only on the emergency and Poison Control screens (and the Poison Control call on the pill reminder). A "Likely scam" verdict uses `--warning` with a stop icon.
+11. **Keyboard and screen readers.** Visible focus ring in both themes; focus moves to each screen's heading; new text is announced (`aria-live="polite"`); a "Skip to the page" button is the first stop.
+12. **Calm motion.** Reduced motion (the computer's setting) or "Calm motion" in Settings turns movement into simple fades. The orb stands still but keeps its glow.
 
-Measured October 26, 2026. If a color changes, keep the contrast at least as high: body text at least 7:1, buttons at least 4.5:1.
+## Color
 
-| Use | Name in styles.css | Day | Night |
+Light is the default; Auto follows the computer's light or dark setting (and, if the computer says neither, goes dark from 7 PM to 7 AM). Settings has Auto, Light, Dark; the choice is saved in her profile and applied before the first paint from this device's last choice, so dark mode never flashes white.
+
+| Token | Light | Dark | Use |
 |---|---|---|---|
-| Page | `--page` | `#FFFFFF` | `#111216` |
-| Cards, sidebar, voice box surround | `--soft` | `#F4F4F6` | `#1C1D22` |
-| Thin lines | `--border` | `#E4E4E9` | `#2B2D34` |
-| Main text | `--text` | `#0D0E12` (19.3:1) | `#ECEDEF` (16.0:1) |
-| Second lines, hints, form entry borders | `--text-2` | `#4B5060` (8.0:1, 7.3:1 on cards) | `#B4B8C2` (9.4:1, 8.5:1 on cards) |
-| Voice button, call buttons, Save | `--voice` | `#0D0E12`, white icon/words 19.3:1 | `#ECEDEF`, dark words 16.5:1 |
-| Focus ring, small accents | `--accent` | `#2E46D9` (7.0:1) | `#9DB0FF` |
-| Glow behind the voice box | `--glow-1`, `--glow-2` | soft blue and violet | a little dimmer |
+| `--bg` | `#F7F7F5` | `#131211` | the page |
+| `--surface` | `#FFFFFF` | `#1D1C1A` | grouped lists, fields, documents |
+| `--tint` | `#EFEEEA` | `#262522` | chips' pressed state, the segmented track, tags |
+| `--border` | `rgba(28,27,25,0.08)` | `rgba(255,255,255,0.08)` | hairlines |
+| `--text` | `#1C1B19` | `#F3F1EC` | words |
+| `--text-2` | `#5C5953` | `#ADA89F` | second lines, captions |
+| `--primary` | `#1C1B19` | `#F3F1EC` | the one ink accent: main buttons, switches |
+| `--success` | `#1E7350` | `#5BC79A` | taken, looks safe |
+| `--warning` | `#9A5B00` | `#F0B45A` | missed, likely scam, form problems |
+| `--danger` | `#C21F3A` | `#FF6B7F` | emergency only |
+| `--alarm` | `#A8162E` | `#A8162E` | emergency and Poison Control screens (white words on it) |
 
-**Red is only for emergency screens.** The emergency and Poison Control screens use `#B00020` with white words (7.3:1). The crisis screen is calm pale blue (`#EEF1FF`, dark words 17:1), deep blue at night.
+Buddy's colors live only inside the orb, never on words: amber `#F6B042`, peach `#F78C5B`, rose `#E1607E`, violet `#8B6CF2`.
 
-### Font and text sizes
+### Contrast (from `scripts/check_contrast.py`)
 
-- **Font:** Lexend, designed to make reading easier. Self-hosted in `static/fonts/` (SIL Open Font License 1.1). Falls back to Segoe UI.
-- Line height 1.5 for reading. Today's question is centered; everything else is left-aligned. Headings wrap evenly (`text-wrap: balance`).
-- All sizes use `rem`, so "Bigger words" grows everything at once: normal (100%), big (115%), biggest (130%). The choice is remembered on this device only.
-
-| What | Size |
-|---|---|
-| Greeting, screen headings, Buddy's short answers | 40px |
-| Section headings ("Set up Buddy") | 32px |
-| Buddy's long answers (over 12 words), safety screen words | 28px |
-| "Tap to talk", what she said | 26px |
-| Body text, form labels and entries, card titles | 22px |
-| Menu items, call buttons, Save | 20px |
-| Second lines, "Back to Today", "Bigger words", hints, the honest note | 18px (the smallest allowed) |
-
-### Shapes and spacing
-
-- **Round pills** for single buttons: "Bigger words", "Menu", call buttons, Save. At least 64px tall.
-- **Cards** have 24px rounded corners and 20 to 22px inside padding. Form entries and choices have 16px corners.
-- **Form entries** have a 2px border in `--text-2`, so they're easy to find. An entry the server sent back gets a 4px dark border and a note right under it saying how to fix it (never red).
-- **Spacing:** 16px between tap targets, 20px page padding on phones.
-- **Icons:** simple line drawings, same color as the words, sized with the text so they grow with "Bigger words". Always next to a word.
-- **Focus ring:** a 4px outline in `--accent`, 4px away from the button.
-
-### Motion
-
-Every movement tells her something: the app is ready, it's listening, it's working, or her words arrived. One easing everywhere (`--ease`: a quick start that slows down gently).
-
-| When | What moves | How long |
+| Pair | Light | Dark |
 |---|---|---|
-| The app opens | The question, voice box, and cards rise in one after another | under 1 second |
-| Waiting for her | The glow behind the voice box breathes; a soft ring pulses out of the voice button | 6 s breath, 2.8 s pulse |
-| Listening | Live bars in the voice button and the glow follow her voice; a colored ring runs around the box; everything else fades to 30% | live |
-| Working | Buddy's words shimmer; a small spinner turns | 1.6 s |
-| Her words arrived | The voice button nods; "You said" rises in; Buddy's answer appears word by word | under 1.2 s |
-| Another screen opens | It rises in gently; the phone menu slides in from the left | 0.3 to 0.4 s |
-| Bigger words | Text grows smoothly | 0.3 s |
+| Body text on the page | 16.0:1 | 16.6:1 |
+| Secondary text on the page | 6.5:1 | 7.9:1 |
+| Secondary text on cards | 7.0:1 | 7.2:1 |
+| Secondary text on tags and tracks | 6.0:1 | 6.5:1 |
+| Main button words | 17.2:1 | 16.6:1 |
+| Toasts | 16.0:1 | 16.6:1 |
+| Taken / looks safe | 5.4:1 (5.8 on cards) | 9.0:1 (8.2 on cards) |
+| Missed / likely scam | 5.1:1 (5.4 on cards) | 10.1:1 (9.2 on cards) |
+| Edges of fields and switches | 3.5:1 | 3.6:1 |
+| White on the emergency red | 7.4:1 | 7.4:1 |
 
-- Animate only `transform` and `opacity`, so it stays smooth on tablets.
-- Mouse users see a soft outline or lift when pointing at something. Touch screens don't, so nothing stays highlighted after a tap.
-- **Reduced motion:** if her device asks for less motion, nothing slides, spins, grows, or breathes. Fades and color changes still happen.
+## Type
 
-## Voice behavior
+- **Figtree** (SIL Open Font License) for everything: a clear, friendly sans with open shapes.
+- **Newsreader** (SIL Open Font License) only for the greeting, the wordmark, and the headings of documents (Doctor notes, Family).
+- Both self-hosted in `static/fonts/`; no font CDN.
+- Scale: 13 / 15 / 17 / 20 / 24 / 32 / 44 / 56px. Body 17px, line height 1.5. Headings letter-spacing −0.02em, line height 1.1. Sentence case.
+- The greeting is 44px on phones and 56px on tablets and computers. Buddy's replies are 32px (24px when long) on phones, 44px (32px) on bigger screens.
 
-- After she taps "Tap to talk", the label changes to "Tap when you're done", Buddy's words say "Listening…", and the bars move with her voice.
-- Show what she said in big text, then the reply in big text, and read the reply aloud at a slightly slow speed (about 0.9). Pick a clear, natural English voice.
-- "Say it again" replays the last reply. On the Family screen, a family member can turn reading aloud off and pick Slower, Normal, or Faster. Emergency messages are always read aloud.
-- If the microphone is blocked, say where to click "Allow". Whatever goes wrong, Call 911 and Call family appear.
+## Space, shape, depth
 
-## Screens and moving between them
+- A 4px grid: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64.
+- Radii: 10px inputs, 16px cards and grouped lists, 28px sheets and the tab bar, 999px buttons, chips, and tags.
+- Hairline borders separate things. At most one raised element per screen (the pill reminder card has the layered shadow).
+- Glass (a 20px backdrop blur) only on the tab bar, the sidebar, and sheets.
+- Icons: Lucide (ISC license), inline SVG, 24px, 1.75 stroke, always next to words.
 
-All screens live on one page (`static/index.html`), each in a `<section data-screen>`. The address shows which one is open (`#/diary`, `#/family`…), so the browser's Back button works. When she opens a screen, it starts at the top, and keyboard and screen-reader focus moves to its heading. A "Skip to the page" button is the first keyboard stop.
+## Layout
 
-**Today, on a phone, from top to bottom:** Menu and Bigger words; the date, greeting, and Buddy's question; "Say it again"; what she said (after she talks); the voice box; the cards (Something hurts, Is this a scam?, My pills, Family), one per row; the honest note.
+- **Phones (under 768px):** content full width with 20px sides; a floating glass tab bar at the bottom: Home, Diary, Pills, Family, Settings.
+- **768px and up:** a slim glass sidebar (the Buddy wordmark, the same five places, and "Talk to Buddy" at the bottom); content at most 760px wide.
+- Voice mode hides both, and fills the screen.
+- "Check a message" and "Doctor notes" open from Home's chips and Today list.
 
-**Tablets lying sideways and computers (1000px and up):** the sidebar sits on the left; the cards form a two-by-two grid (from 640px up); the page column is at most 820px wide.
+## Buddy, the living orb
 
-**My diary:** under the heading, "I'm an AI helper. I can't give medical advice." Then one "Something hurts" button, then her entries grouped by day ("Today", "Yesterday", "Monday, October 26"), newest first. Each entry is a flat gray card (for reading only): the time, her own words in quotes (24px), and Where, Pain ("5 out of 10"), and Since, only when she said them. Entries from the emergency screen or the daily check-in say so in a second line.
+A 220px circle (272px in voice mode on phones, 300px on bigger screens). `static/buddy.js` fills each `.orb` with a glow and a core holding four blurred color blobs, a swirl, and a soft shine. The blobs drift and the whole flow turns slowly (about 12s); the core breathes 0.98 to 1.02 over 6s. One state machine drives every orb: `setBuddyState('idle' | 'listening' | 'thinking' | 'speaking')`.
 
-**Pill reminder banner:** on every screen, at the very top, while a pill is due. A dark card (light at night) so it stands out without red: "Pill time" (32px), the words "It's time for your morning pill: …" with each label exactly as typed (26px), then "I took it" (light, filled), "Remind me in 10 minutes" (outline), and "Say it again". Read aloud once when it appears, brought into view once, and it stays until she answers.
+| State | What she sees | Words under it (voice mode) |
+|---|---|---|
+| Idle | Breathes slowly; the colors flow | none |
+| Listening | Brighter; swells gently with her voice (the eased microphone level) | "I'm listening" |
+| Thinking | The colors flow 3× faster and a soft light sweeps around inside; the glow pulses | "Let me think…" |
+| Speaking | Lifts softly with each spoken word (at most one lift every 400ms) | none |
 
-**My pills:** "Today": each reminder as a flat card with the time, the pill's name, its label, and what it is now ("Time to take it now" with a dark outline, "Taken at 8:05 AM ✓", "Reminding you again at 8:40 AM", "Later today", or "Missed. Please check the label or call your pharmacist about what to do."). Then "Set up pills" for a family member: each pill with Change and Remove, a calm "Remove this pill?" dialog where the cursor starts on "Keep it", an Undo line that stays, and the "Add a pill" form (name, label word for word, times of day).
+The flow speeds up without a jump (`updatePlaybackRate`). Buddy wakes once as the app opens. Nothing ever flashes. With Calm motion the orb stands still, still glowing, and still brightens when listening.
 
-**Family:** big call buttons for her family member and doctor at the top, then "Set up Buddy" for a family member: her names, family name, phone and email, doctor name and phone, and Buddy's voice. One Save button.
+## Voice mode (`#/talk`)
+
+"Talk to Buddy", the orb on Home, and "Something hurts" open voice mode with a View Transition: the orb morphs larger and centered (560ms spring), the room dims a little (`--voice-bg`), and listening starts.
+
+- The big ink button toggles between "Tap to talk" and "I'm done". Tapping the orb while she talks also finishes; tapping it otherwise, or "Done", morphs back to Home.
+- Her words appear under the orb, in italics, once they are written down.
+- Buddy's reply streams in word by word (each fades and un-blurs in 180ms, 25ms apart). As it is read aloud, reading progress shows like song lyrics: words not yet spoken are `--text-2`, spoken ones `--text`.
+- Call buttons and "Add to doctor notes" sit under the reply; "Say it again" is always there. Earlier exchanges are listed below, newest first.
+- Browsers without View Transitions, and Calm motion, just switch.
+
+## Motion
+
+Easing: a spring (`linear()` with a slight settle; `cubic-bezier(0.2, 0, 0, 1)` where `linear()` isn't supported). Speeds: 120ms (presses, fades out), 220ms (most changes), 360ms (things arriving); 500ms and more only for the orb's morph.
+
+| When | What moves |
+|---|---|
+| The mouse is over something | A soft 4px ring appears around it (`--ring`), and quiet buttons get a tint |
+| Any press (finger or mouse down) | It squeezes to 0.96 and darkens within 120ms, and a circle of light spreads from the spot she touched (650ms); it lets go with the spring. Calm motion keeps only the color; safety screens have none of it |
+| The app opens | Only Buddy wakes up |
+| Another screen opens | The old one fades (120ms), the new one rises 8px and fades in (220ms); the tab bar and sidebar stay put |
+| Voice mode opens or closes | The orb morphs between Home and the center (560ms) |
+| A reply arrives | Its words stream in |
+| Something is saved | A toast slides in from the top with the spring and leaves after 4s |
+| "Are you sure?" | A bottom sheet slides up (centered on bigger screens) |
+| A pill is marked taken | Its check pops and draws itself; the ring fills |
+| Loading | A soft shimmer, never a spinner |
+| Emergency, Poison Control, crisis screens | Nothing: they appear instantly |
+
+**Chime.** An optional soft, low two-note tone (Web Audio, no sound files) when listening starts and stops. Off by default.
+
+## Screens
+
+All screens live on one page (`static/index.html`), each in a `<section data-screen>`. The address shows which one is open (`#/talk`, `#/pills`…), so the browser's Back button works.
+
+**Home.** The greeting in Newsreader ("Good afternoon, Rose"), the date, the orb, "Talk to Buddy", two chips (Something hurts, Check a message), and "Today" as a grouped list: the daily check-in (her mood once she said it, and "Start" to do it any time), the next pill (with "Take" when one is due), the latest diary note today, and Doctor notes.
+
+**Daily check-in.** On her first visit each day, a flat card sits at the top of Home: "Your daily check-in", "Three quick questions: how you feel, anything that hurts, and your morning pills.", **Start check-in** (ink, 56px) and **Not today** (quiet). Start opens voice mode like "Something hurts": Buddy says its fixed opening ("Good morning, Rose. How are you feeling today?"), the button hint says "Your daily check-in", and the AI asks the other two questions one at a time. Leaving voice mode ends it. A browser can't speak before her first tap, which is why the check-in starts with a tap instead of talking on its own.
+
+**Pill reminder card.** On every screen, at the top, while a pill is due: "Pill time", the words "It's time for your morning pill: …" with each label exactly as typed, "I took it", "Remind me in 10 minutes", and "Say it again". Read aloud once, brought into view once, and it stays until she answers. After a Poison Control screen today, its fixed message and call button come first.
+
+**My pills.** "Today, Wednesday" with a ring ("2 of 3"), then Morning, Afternoon, Evening, Night as grouped lists of large rows: a round check, the name, the label word for word, what it is now ("Taken at 8:05 AM", "Reminding you again at 8:40 AM", "Later today", or the fixed missed text), and the time. A pill due now has a round check button ("I took this one"). Then "Set up pills", folded away behind one "For a family member" row: Change, Remove (a sheet where the cursor starts on "Keep it"), Undo, and the Add a pill form.
+
+**My diary.** "I'm an AI helper. I can't give medical advice." under the heading, one "Something hurts" button, then a timeline by day: the time, her words in quotes, where it hurts as a tag, and Pain and Since when she said them. A shimmer while it loads.
+
+**Check a message.** A paste area, "Check message", and "Use a photo". Verdicts (the next step) always have words and an icon: "Likely scam" in `--warning` with a stop icon, "Suspicious" with a neutral outline, "Looks safe" in `--success` with a check. Until then the button says message checking arrives in the next update.
+
+**Doctor notes and Family.** Documents: Newsreader headings, a readable column, and a print stylesheet (no navigation or buttons on paper). Family has large call buttons for her family member and doctor.
+
+**Settings.** Grouped rows: Appearance (Theme, Text size), Voice (Read replies aloud, Voice speed, Chime), Motion (Calm motion), and "Names and phone numbers", folded away for a family member. Switches and choices save at once with a "Settings saved" toast; the profile has its own "Save profile". A refused entry gets a `--warning` border and a note right under it saying how to fix it.
+
+**Safety screens.** Full-bleed, no motion, texts word for word from `docs/SAFETY.md`. Emergency and Poison Control: `--alarm` red with white words (44px title, 32px message) and one huge white call button (104px); any other call buttons are outlined. Crisis: the page color with ink words and one huge ink call button.
 
 ## Screen checklist
 
-- Works at 200% browser zoom with nothing cut off.
-- Works at 360px and 375px (phones), 768px (upright tablet), and 1280px.
+- `scripts/browser_checks/home.py` passes. It checks every flow, and every screen at 390, 768, and 1440px in light and dark, 360px, 200% zoom, and the largest text: no sideways scrolling, no words spilling out, every target 44px or more. Screenshots land in `test-output/`.
+- `scripts/check_contrast.py` passes.
 - Every action works with a keyboard, and focus is easy to see.
-- Spoken and new text is announced to screen readers (`aria-live="polite"`).
-- "Bigger words" works on every screen.
-- No horizontal scrolling. Words never spill out of a button (`scripts/browser_checks/home.py` checks this).
+- Reduced motion and Calm motion stop all movement.

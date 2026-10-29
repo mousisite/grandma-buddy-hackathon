@@ -18,4 +18,11 @@ The skills `meta-model-api`, `safety-check`, `senior-friendly-ui`, and `demo-pre
 
 | Font | Source | License | Changes |
 | --- | --- | --- | --- |
-| Lexend (Latin subset, variable weight 300 to 800) | [googlefonts/lexend](https://github.com/googlefonts/lexend), a typeface designed to make reading easier; file from Google Fonts | SIL Open Font License 1.1, Copyright 2018 The Lexend Project Authors, Reserved Font Name "RevReading Lexend". Full text in `static/fonts/OFL-Lexend.txt` | None |
+| Newsreader (variable weight and optical size, upright only) | [productiontype/Newsreader](https://github.com/productiontype/Newsreader); file from the Google Fonts repository ([google/fonts](https://github.com/google/fonts/tree/main/ofl/newsreader)). Used only for the greeting and a few headlines | SIL Open Font License 1.1, Copyright 2020 The Newsreader Project Authors. Full text in `static/fonts/OFL-Newsreader.txt` | Renamed only (`[opsz,wght]` removed from the file name) |
+| Figtree (variable weight, regular and italic) | [erikdkennedy/figtree](https://github.com/erikdkennedy/figtree); files from the Google Fonts repository ([google/fonts](https://github.com/google/fonts/tree/main/ofl/figtree)). Used for all other text | SIL Open Font License 1.1, Copyright 2022 The Figtree Project Authors. Full text in `static/fonts/OFL-Figtree.txt` | Renamed only (`[wght]` removed from the file names) |
+
+## Icons used by the app
+
+| Icons | Source | License | Changes |
+| --- | --- | --- | --- |
+| bandage, camera, check, clipboard-list, house, message-square-warning, mic, moon, notebook-pen, phone, pill, plus, settings, sun, users, volume-2, x | [Lucide](https://github.com/lucide-icons/lucide) (`icons/*.svg`), copied into the pages as inline SVG | ISC License, Copyright (c) 2026 Lucide Icons and Contributors. check, moon, and x are derived from Feather: MIT License, Copyright (c) 2013-present Cole Bemis. Full text of both in `static/LICENSE-lucide.txt` | Inlined; stroke width set to 1.75 in `static/styles.css` |

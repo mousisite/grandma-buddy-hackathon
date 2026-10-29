@@ -1,17 +1,21 @@
 // Grandma Buddy: talking.
-// Tap the voice box once to start, again when done (no holding down).
-// Her voice becomes text (/api/transcribe), then goes to /api/chat, where
-// the safety net checks it first. If the safety net answers, a full-screen
-// safety screen appears with big call buttons. Recording lives in
-// recorder.js and reading aloud in speech.js.
+// "Talk to Buddy" (or tapping the orb) on Home opens voice mode and starts
+// listening; tap "I'm done" when finished (no holding down). Her voice
+// becomes text (/api/transcribe), then goes to /api/chat, where the safety
+// net checks it first. If the safety net answers, a full-screen safety
+// screen appears with big call buttons. The orb (buddy.js) shows listening
+// and thinking; recording lives in recorder.js and reading aloud in speech.js.
 
 "use strict";
 
 var TALK_LIMIT_MS = 2 * 60 * 1000; // recording stops by itself after 2 minutes
-var TALK_LABELS = { idle: "Tap to talk", listening: "Tap when you’re done", working: "One moment…" };
+var TALK_LABELS = { idle: "Tap to talk", listening: "I’m done", working: "One moment…" };
+var BUDDY_FOR_TALK = { listening: "listening", working: "thinking" };
 var talkState = "idle"; // "idle", "listening", or "working"
 var talkTimer = null;
-var talkMode = "chat"; // "chat", "check_in", or "diary"
+var talkMode = "chat"; // "chat", "check_in" (the daily check-in), or "diary" ("Something hurts")
+var lastExchange = null; // { her, buddy }: moves to "Earlier" when a new one starts
+var EARLIER_MAX = 10;
 
 // "Something hurts": a short talk that ends in a diary entry. It gets its
 // own conversation id, so the entry holds exactly what she said in it. The
@@ -29,20 +33,27 @@ function conversationId() {
 }
 
 function setTalkState(state) {
+  var wasListening = talkState === "listening";
   talkState = state;
   document.getElementById("talk-button").setAttribute("data-state", state);
   document.getElementById("talk-label").textContent = TALK_LABELS[state];
-  // While listening, the rest of the screen steps back (see styles.css).
   document.documentElement.setAttribute("data-talk", state);
+  // The orb in voice mode says what tapping it does now.
+  document.querySelector("[data-talk-orb]").setAttribute("aria-label", state === "listening" ? "I’m done" : "Buddy. Tap to go back");
+  // Buddy listens and thinks with her; otherwise it is idle (or speaking,
+  // which speech.js tells it).
+  setBuddyState(BUDDY_FOR_TALK[state] || (isSpeaking() ? "speaking" : "idle"));
   if (state === "listening") {
+    chime("start");
     requestAnimationFrame(showVoiceLevel);
+  } else if (wasListening) {
+    chime("stop");
   }
 }
 
 // The voice level: about 60 times a second while she talks, set --level
-// from how loud she is (voiceLevel() in recorder.js). The bars in the voice
-// button and the glow behind the voice box follow it. Smoothed so they
-// move gently instead of jittering.
+// from how loud she is (voiceLevel() in recorder.js). The orb swells with
+// it. Smoothed so they move gently instead of jittering.
 var shownLevel = 0;
 
 function showVoiceLevel() {
@@ -52,9 +63,39 @@ function showVoiceLevel() {
     page.style.setProperty("--level", "0");
     return;
   }
-  shownLevel = shownLevel * 0.7 + voiceLevel() * 0.3;
+  shownLevel = shownLevel * 0.85 + voiceLevel() * 0.15;
   page.style.setProperty("--level", shownLevel.toFixed(3));
   requestAnimationFrame(showVoiceLevel);
+}
+
+// A soft, low two-note chime when listening starts (rising) and stops
+// (falling), only if it is switched on in Settings. Made with Web Audio,
+// no sound files.
+var chimeSound = null;
+
+function chime(direction) {
+  if (!profile.chime) {
+    return;
+  }
+  try {
+    chimeSound = chimeSound || new (window.AudioContext || window.webkitAudioContext)();
+    var notes = direction === "start" ? [294, 392] : [392, 294]; // D4 and G4
+    notes.forEach(function (frequency, index) {
+      var tone = chimeSound.createOscillator();
+      var volume = chimeSound.createGain();
+      var at = chimeSound.currentTime + index * 0.16;
+      tone.type = "sine";
+      tone.frequency.value = frequency;
+      volume.gain.setValueAtTime(0.0001, at);
+      volume.gain.exponentialRampToValueAtTime(0.15, at + 0.02);
+      volume.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+      tone.connect(volume).connect(chimeSound.destination);
+      tone.start(at);
+      tone.stop(at + 0.32);
+    });
+  } catch (e) {
+    // No sound on this device: the words and the orb still show it.
+  }
 }
 
 // A named problem, so talkProblem() can pick the right kind words.
@@ -62,6 +103,16 @@ function problem(name) {
   var error = new Error(name);
   error.name = name;
   return error;
+}
+
+// From Home or the sidebar: open voice mode and start listening at once.
+function startTalkFromToday() {
+  if (currentScreen() !== "talk") {
+    location.hash = "#/talk";
+  }
+  if (talkState === "idle") {
+    onTalkTap();
+  }
 }
 
 function onTalkTap() {
@@ -72,7 +123,6 @@ function onTalkTap() {
     startRecording()
       .then(function () {
         setTalkState("listening");
-        say("Listening…");
         talkTimer = setTimeout(finishTalking, TALK_LIMIT_MS);
       })
       .catch(function (reason) {
@@ -87,16 +137,14 @@ function onTalkTap() {
 
 function finishTalking() {
   clearTimeout(talkTimer);
-  setTalkState("working");
-  say("Writing down what you said…");
+  setTalkState("working"); // the orb: "Let me think…"
   stopRecording()
     .then(sendForTranscript)
     .then(function (result) {
       if (!result.transcript) {
         throw problem("NotHeard");
       }
-      showYouSaid(result.transcript);
-      say("Let me think…"); // shimmers while Buddy works (see styles.css)
+      newExchange(result.transcript);
       return askBuddy(result.transcript);
     })
     .catch(talkProblem)
@@ -121,8 +169,66 @@ function sendForTranscript(wav) {
     });
 }
 
-// Start a "Something hurts" talk: Buddy asks what she feels, on Today,
-// and the voice box says it is writing in her diary.
+// ---------- The latest exchange, and earlier ones ----------
+
+// Her words arrived: the last exchange moves to "Earlier", and hers shows big.
+function newExchange(herWords) {
+  moveToEarlier();
+  var card = document.getElementById("you-said");
+  document.getElementById("you-said-text").textContent = herWords;
+  card.hidden = false;
+  say("");
+  lastExchange = { her: herWords, buddy: "" };
+}
+
+// The finished exchange goes to the top of "Earlier" (newest first).
+function moveToEarlier() {
+  if (!lastExchange || !lastExchange.buddy) {
+    return;
+  }
+  var list = document.getElementById("earlier");
+  var item = document.createElement("li");
+  if (lastExchange.her) {
+    addText(item, "p", "earlier-her", "You said: “" + lastExchange.her + "”");
+  }
+  addText(item, "p", "earlier-buddy", "Buddy: " + lastExchange.buddy);
+  list.insertBefore(item, list.firstChild);
+  while (list.children.length > EARLIER_MAX) {
+    list.removeChild(list.lastChild);
+  }
+  document.getElementById("earlier-section").hidden = false;
+  lastExchange = null;
+}
+
+// Buddy's reply: streams in big, and is read aloud with reading progress.
+function showReply(text) {
+  say(text);
+  speak(text, { onWord: highlightWord, onEnd: clearHighlight });
+  lastExchange = { her: lastExchange ? lastExchange.her : "", buddy: text };
+}
+
+// Reading progress, like song lyrics: the words already read aloud are full
+// ink, the rest a little quieter. Only while the reply on screen is what is
+// being read. Voices that send no word events simply leave every word ink.
+function highlightWord(index) {
+  var message = document.getElementById("message");
+  if (message.getAttribute("data-text") !== lastSpoken) {
+    return;
+  }
+  message.classList.add("reading");
+  message.querySelectorAll(".word").forEach(function (word, number) {
+    word.classList.toggle("said", number <= index);
+  });
+}
+
+function clearHighlight() {
+  document.getElementById("message").classList.remove("reading");
+}
+
+// ---------- "Something hurts" ----------
+
+// Start a "Something hurts" talk: Buddy asks what she feels, in voice
+// mode, and the talk button says it is writing in her diary.
 function startDiaryTalk() {
   // Not while the microphone is open (it would record Buddy's question) or
   // while Buddy is still answering (that answer belongs to the last talk).
@@ -133,28 +239,69 @@ function startDiaryTalk() {
   diaryConversation = conversationId() + "-diary-" + Date.now();
   diaryLastAnswer = Date.now();
   document.getElementById("talk-hint").textContent = "Buddy is writing in your diary";
-  // Call buttons already under Buddy's words (like Call 988) stay.
-  if (currentScreen() === "today") {
-    document.querySelector(".intro").scrollIntoView({ block: "start" });
+  if (currentScreen() === "talk") {
+    window.scrollTo(0, 0);
   } else {
-    location.hash = "#/";
+    location.hash = "#/talk";
   }
-  say(DIARY_OPENING);
-  speak(DIARY_OPENING);
+  // A new talk: the last exchange moves to "Earlier". Call buttons already
+  // under Buddy's words (like Call 988) stay.
+  moveToEarlier();
+  document.getElementById("you-said").hidden = true;
+  showReply(DIARY_OPENING);
 }
 
-function endDiaryTalk() {
+// The end of a "Something hurts" talk or a check-in: ordinary talk again.
+function backToChat() {
   talkMode = "chat";
   document.getElementById("talk-hint").textContent = TALK_HINT;
+}
+
+// ---------- The daily check-in ----------
+
+// The check-in has its own conversation each day, so her diary entry holds
+// only what she said in it.
+function checkInConversation() {
+  return conversationId() + "-check-in";
+}
+
+// Start the daily check-in in voice mode. The server gives Buddy's opening
+// question ("Good morning, Rose. How are you feeling today?", fixed words)
+// and remembers that today's check-in has started. Then the AI asks the
+// other two questions in "check_in" mode.
+function startCheckIn() {
+  // Not while the microphone is open or Buddy is still answering.
+  if (talkState !== "idle") {
+    return;
+  }
+  talkMode = "check_in";
+  document.getElementById("talk-hint").textContent = "Your daily check-in";
+  if (currentScreen() === "talk") {
+    window.scrollTo(0, 0);
+  } else {
+    location.hash = "#/talk";
+  }
+  moveToEarlier();
+  document.getElementById("you-said").hidden = true;
+  say("");
+  api("/api/check-in/start", "POST", { conversation_id: checkInConversation() })
+    .then(function (answer) {
+      showReply(answer.opening);
+    })
+    .catch(function () {
+      backToChat();
+      talkProblem(problem("Offline"));
+    });
 }
 
 // Send her words to Buddy. The safety net answers first if it needs to.
 function askBuddy(text) {
   if (talkMode === "diary" && Date.now() - diaryLastAnswer > DIARY_IDLE_MS) {
-    endDiaryTalk(); // left alone too long: this is ordinary talk again
+    backToChat(); // left alone too long: this is ordinary talk again
   }
   diaryLastAnswer = Date.now();
-  var conversation = talkMode === "diary" ? diaryConversation : conversationId();
+  var conversation = talkMode === "diary" ? diaryConversation
+    : talkMode === "check_in" ? checkInConversation() : conversationId();
   return fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -173,31 +320,20 @@ function askBuddy(text) {
       // A diary talk ends when the server says so (entry saved and Buddy
       // isn't asking anything more, or her last answer), or after a safety
       // screen, so she is never stuck in it.
-      if (talkMode === "diary" && (answer.show || answer.diary_done)) {
-        endDiaryTalk();
+      if (talkMode !== "chat" && (answer.show || answer.diary_done)) {
+        backToChat();
       }
       if (answer.show) {
         openSafetyScreen(answer.show, answer.reply, answer.actions);
       } else {
-        say(answer.reply);
-        speak(answer.reply);
+        showReply(answer.reply);
+        if (answer.diary_saved) {
+          toast("Saved to diary");
+        }
         showActions(answer.actions || []);
         loadReminders(); // she may have told Buddy she took her pills
       }
     });
-}
-
-// Her words arrived: show them in her bubble, and the voice button nods.
-function showYouSaid(text) {
-  var card = document.getElementById("you-said");
-  document.getElementById("you-said-text").textContent = text;
-  card.hidden = false;
-  replay(card, "fresh");
-  var talkButton = document.getElementById("talk-button");
-  replay(talkButton, "heard");
-  setTimeout(function () {
-    talkButton.classList.remove("heard");
-  }, 1600);
 }
 
 // ---------- Call buttons ----------
@@ -207,11 +343,14 @@ function isCallLink(href) {
   return /^(tel|sms):[0-9+()\-. ]+$/.test(href);
 }
 
+var PHONE_ICON = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"></path></svg>';
+
 function callLink(action, className) {
   var link = document.createElement("a");
   link.className = className;
   link.href = action.href;
-  link.textContent = action.label;
+  link.innerHTML = PHONE_ICON;
+  link.appendChild(document.createTextNode(action.label));
   return link;
 }
 
@@ -256,9 +395,9 @@ function addQuestionButton(action) {
         if (!response.ok) {
           throw problem("NotSaved");
         }
-        button.textContent = "Added to doctor notes ✓";
-        say("I added that to your doctor notes.");
-        speak("I added that to your doctor notes.");
+        button.textContent = "Added to doctor notes";
+        toast("Added to doctor notes");
+        showReply("I added that to your doctor notes.");
       })
       .catch(function () {
         button.disabled = false;
@@ -292,8 +431,8 @@ var SAFETY_TITLES = {
   crisis: "You are not alone",
 };
 
-// A full-screen message with big call buttons, read aloud. It stays until
-// she taps "Go back" (it never closes by itself).
+// A full-screen message with big call buttons, read aloud. It appears at
+// once, with no movement, and stays until she taps "Go back".
 function openSafetyScreen(kind, message, actions) {
   var screen = document.getElementById("safety-screen");
   screen.setAttribute("data-kind", kind);
@@ -309,9 +448,8 @@ function openSafetyScreen(kind, message, actions) {
   }
   safetySpeaking = true;
   speak(message, { safety: true });
-  // Behind the screen, Buddy's words and the call buttons stay too,
-  // shown all at once (urgent words never stream in slowly).
-  say(message, { instant: true });
+  // Behind the screen, Buddy's words and the call buttons stay too.
+  say(message);
   showActions(actions);
 }
 
@@ -334,24 +472,44 @@ function closeSafetyScreen() {
 function talkProblem(reason) {
   var name = reason && reason.name;
   if (name === "NotAllowedError" || name === "SecurityError") {
-    say("I can’t hear you yet. At the top of the window, click the microphone or lock picture, choose Allow, then tap the voice box again. If you need help now, call below.");
+    say("I can’t hear you yet. At the top of the window, click the microphone or lock picture, choose Allow, then tap “Tap to talk” again. If you need help now, call below.");
   } else if (name === "NotFoundError" || name === "NotReadableError") {
     say("I can’t find a microphone. Please check that it’s plugged in and turned on. If you need help now, call below.");
   } else if (name === "Offline") {
     say("I can’t reach the internet right now. If you need help, call below.");
   } else {
-    say("I didn’t catch that. Tap the voice box and try again. If you need help now, call below.");
+    say("I didn’t catch that. Tap “Tap to talk” and try again. If you need help now, call below.");
   }
   showActions(emergencyCallActions());
 }
 
+// The orb in voice mode: while she talks, tapping it means "I'm done";
+// otherwise it closes voice mode, like Done. While Buddy is thinking,
+// taps do nothing.
+function onOrbTap() {
+  if (talkState === "listening") {
+    finishTalking();
+  } else if (talkState === "idle") {
+    location.hash = "#/";
+  }
+}
+
 function startTalking() {
   document.getElementById("talk-button").addEventListener("click", onTalkTap);
+  document.querySelectorAll("[data-talk-start]").forEach(function (button) {
+    button.addEventListener("click", startTalkFromToday);
+  });
+  document.querySelectorAll("[data-talk-orb]").forEach(function (orb) {
+    orb.addEventListener("click", onOrbTap);
+  });
   document.getElementById("safety-close").addEventListener("click", closeSafetyScreen);
   document.getElementById("safety-again").addEventListener("click", sayAgain);
   document.getElementById("say-again").addEventListener("click", sayAgain);
   document.querySelectorAll("[data-start-diary]").forEach(function (button) {
     button.addEventListener("click", startDiaryTalk);
+  });
+  document.querySelectorAll("[data-start-check-in]").forEach(function (button) {
+    button.addEventListener("click", startCheckIn);
   });
   // The Escape key closes a dialog by itself; keep speech in step with it.
   document.getElementById("safety-screen").addEventListener("close", function () {

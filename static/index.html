@@ -1,372 +1,480 @@
 <!DOCTYPE html>
-<!-- Grandma Buddy, in the style of AI assistant apps (ChatGPT, Perplexity,
-     Gemini): a sidebar on big screens (a "Menu" drawer on phones), one big
-     centered question, a voice box with a round voice button, suggestion
-     cards, and an honest note at the bottom.
-     Every screen lives on this one page as a <section data-screen>. app.js
-     shows the one named in the address (#/diary, #/family…), so the
-     browser's Back button works. -->
-<html lang="en" data-time="day" data-talk="idle">
+<!-- Grandma Buddy. One memorable thing: Buddy, a living orb of warm light.
+     Everything around it stays quiet: Figtree text, a Newsreader greeting,
+     hairline borders, one ink accent, light and dark themes. Tokens live at
+     the top of styles.css; the system is in docs/DESIGN.md.
+     Every screen is a <section data-screen> on this one page. app.js shows
+     the one named in the address (#/talk, #/pills…), so Back works. -->
+<html lang="en" data-theme="light" data-talk="idle">
 <head>
   <meta charset="utf-8">
   <!-- Makes the page fit phones and tablets. -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Grandma Buddy</title>
-  <meta name="theme-color" content="#FFFFFF">
-  <link rel="preload" href="/static/fonts/Lexend-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <meta name="theme-color" content="#F7F7F5">
+  <!-- The theme before the first paint (so dark mode never flashes white):
+       the last choice on this device, or the computer's own setting.
+       app.js confirms it from her profile. -->
+  <script>
+    (function () {
+      var choice = "auto";
+      try { choice = localStorage.getItem("theme") || "auto"; } catch (e) {}
+      var hour = new Date().getHours();
+      var dark = choice === "dark" || (choice === "auto" && (matchMedia("(prefers-color-scheme: dark)").matches ||
+        (!matchMedia("(prefers-color-scheme: light)").matches && (hour >= 19 || hour < 7))));
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+      var step = 1; // first visit: Large
+      try { var saved = localStorage.getItem("words"); if (saved !== null) { step = Number(saved) || 0; } } catch (e) {}
+      document.documentElement.style.fontSize = [100, 118, 135][step] ? [100, 118, 135][step] + "%" : "100%";
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/Figtree.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/static/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <!--
-  THESIS: Buddy looks and moves like the AI assistants people know (ChatGPT, Perplexity, Gemini), made big and calm for her: one question, one voice box, a few clear suggestions.
-  OWN-WORLD: Quiet white page (dark at night), a soft blue glow behind the voice box, a round black voice button, light gray suggestion cards with line icons, a sidebar on big screens, Lexend type, almost no color.
-  STORY: Buddy asks how she is; she taps the voice box and talks; it listens, thinks, and her words appear; suggestions sit right under it.
-  FIRST VIEWPORT: Top bar with Menu and Bigger words; the date, greeting, and Buddy's question centered; the voice box; the first suggestion cards.
-  FORM: User-directed: match AI SaaS apps (ChatGPT, Perplexity, Gemini patterns), seed key 2daf57d9.
-  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
-  -->
-
-  <!-- For keyboard users: the first Tab stop jumps past the menu to the
-       screen's heading. Hidden until it has keyboard focus. -->
+  <!-- For keyboard users: the first Tab stop jumps to the screen's heading. -->
   <button id="skip-link" class="skip-link" type="button">Skip to the page</button>
 
-  <div class="shell">
-    <!-- The menu: always on the left on big screens; on phones and upright
-         tablets it slides in when she taps "Menu". -->
-    <aside id="sidebar" class="sidebar" aria-label="Menu">
-      <div class="sidebar-top">
-        <div class="brand">
-          <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3c1.2 6.6 6.4 11.8 13 13-6.6 1.2-11.8 6.4-13 13-1.2-6.6-6.4-11.8-13-13 6.6-1.2 11.8-6.4 13-13Z"></path></svg>
-          <span>Buddy</span>
-        </div>
-        <button id="menu-close" class="ghost-button menu-close" type="button">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
-          Close
+  <!-- Desktop (768px and up): a slim glass sidebar. -->
+  <aside class="sidebar" aria-label="Buddy">
+    <a class="wordmark" href="#/" translate="no">
+      <span class="orb-mark" aria-hidden="true"></span>
+      Buddy
+    </a>
+    <nav class="nav" aria-label="Places">
+      <a class="nav-link" href="#/" data-nav="today">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+        Home
+      </a>
+      <a class="nav-link" href="#/diary" data-nav="diary">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path></svg>
+        Diary
+      </a>
+      <a class="nav-link" href="#/pills" data-nav="pills">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
+        Pills
+      </a>
+      <a class="nav-link" href="#/family" data-nav="family">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>
+        Family
+      </a>
+      <a class="nav-link" href="#/settings" data-nav="settings">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        Settings
+      </a>
+    </nav>
+    <button class="pill-button pill-button--ink sidebar-talk" type="button" data-talk-start>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+      Talk to Buddy
+    </button>
+  </aside>
+
+  <main class="main">
+    <!-- Pill reminder: the one raised card, on every screen while a pill is
+         due (screens.js). The words repeat each label exactly as typed. -->
+    <section id="pill-banner" class="pill-banner" aria-labelledby="pill-banner-title" hidden>
+      <h2 id="pill-banner-title" class="pill-banner-title">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
+        Pill time
+      </h2>
+      <!-- After a Poison Control screen today: its fixed message first. -->
+      <div id="pill-banner-poison" class="pill-banner-poison" hidden>
+        <p id="pill-banner-poison-words" class="pill-banner-words"></p>
+        <a class="pill-button pill-button--danger" href="tel:18002221222">Call Poison Control</a>
+      </div>
+      <p id="pill-banner-words" class="pill-banner-words" aria-live="polite"></p>
+      <div class="pill-banner-actions">
+        <button id="pill-taken" class="pill-button pill-button--ink" type="button">I took it</button>
+        <button id="pill-snooze" class="pill-button pill-button--quiet" type="button">Remind me in 10 minutes</button>
+        <button id="pill-again" class="text-button" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path></svg>
+          Say it again
         </button>
       </div>
-      <nav class="side-nav" aria-label="Sections">
-        <a class="side-item" href="#/" data-nav="today" aria-current="page">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18.5V7a2.5 2.5 0 0 1 2.5-2.5h9A2.5 2.5 0 0 1 19 7v6.5a2.5 2.5 0 0 1-2.5 2.5H9Z"></path></svg>
-          Today
-        </a>
-        <a class="side-item" href="#/diary" data-nav="diary">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C9.5 4.8 6.5 4.6 4 5.5v13c2.5-.9 5.5-.7 8 1 2.5-1.7 5.5-1.9 8-1v-13c-2.5-.9-5.5-.7-8 1Z"></path><line x1="12" y1="6.5" x2="12" y2="19.5"></line></svg>
-          My diary
-        </a>
-        <a class="side-item" href="#/pills" data-nav="pills">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8" width="17" height="8" rx="4"></rect><line x1="12" y1="8" x2="12" y2="16"></line></g></svg>
-          My pills
-        </a>
-        <a class="side-item" href="#/notes" data-nav="notes">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 2.5h6v3H9zM9 11h6M9 15h4"></path></svg>
-          Doctor notes
-        </a>
-        <a class="side-item" href="#/scam" data-nav="scam">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6Z"></path><path d="M9 12l2 2 4-4"></path></svg>
-          Scam check
-        </a>
-        <a class="side-item" href="#/family" data-nav="family">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 19c.5-3.5 3-5.5 5.5-5.5s5 2 5.5 5.5M14.5 14.2c.8-.5 1.6-.7 2.5-.7 2 0 3.8 1.5 4 4.5"></path></svg>
-          Family
-        </a>
-      </nav>
-      <p class="side-note">Made for you and your family. Your notes stay on this device.</p>
-    </aside>
-    <!-- Dims the page behind the menu on phones. Tapping it closes the menu. -->
-    <div id="scrim" class="scrim" hidden></div>
+      <p id="pill-banner-note" class="pill-banner-note" role="status"></p>
+    </section>
 
-    <div class="main">
-      <!-- Top bar: Menu (phones and upright tablets) and Bigger words. -->
-      <header class="topbar">
-        <button id="menu-button" class="ghost-button menu-button" type="button" aria-controls="sidebar" aria-expanded="false">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
-          Menu
-        </button>
-        <!-- The label always says what tapping it will do (app.js changes it). -->
-        <button id="text-size-button" class="ghost-button text-size-button" type="button">
-          <span id="text-size-glyph" class="glyph" aria-hidden="true">A+</span>
-          <span id="text-size-label">Bigger words</span>
-        </button>
+    <!-- ========== Home ========== -->
+    <section class="screen home" data-screen="today" aria-labelledby="greeting">
+      <!-- The daily check-in, offered on her first visit each day
+           (screens.js). Flat: the pill reminder stays the one raised card. -->
+      <section id="check-in-card" class="check-in-card" aria-labelledby="check-in-title" hidden>
+        <span class="orb-mark" aria-hidden="true"></span>
+        <div>
+          <h2 id="check-in-title" class="check-in-title">Your daily check-in</h2>
+          <p class="check-in-lead">Three quick questions: how you feel, anything that hurts, and your morning pills.</p>
+        </div>
+        <div class="check-in-actions">
+          <button class="pill-button pill-button--ink" type="button" data-start-check-in>Start check-in</button>
+          <button id="check-in-skip" class="pill-button pill-button--quiet" type="button">Not today</button>
+        </div>
+      </section>
+
+      <header class="hero">
+        <h1 id="greeting" class="greeting" tabindex="-1">Good afternoon</h1>
+        <p id="today-date" class="hero-date"></p>
       </header>
 
-      <main class="page">
-        <!-- Pill reminder, on every screen when a pill is due (screens.js).
-             The words repeat each label exactly as the family typed it. -->
-        <section id="pill-banner" class="pill-banner" aria-labelledby="pill-banner-title" hidden>
-          <h2 id="pill-banner-title" class="pill-banner-title">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8" width="17" height="8" rx="4"></rect><line x1="12" y1="8" x2="12" y2="16"></line></g></svg>
-            Pill time
-          </h2>
-          <!-- After a Poison Control screen today: its fixed message first. -->
-          <div id="pill-banner-poison" class="pill-banner-poison" hidden>
-            <p id="pill-banner-poison-words" class="pill-banner-words"></p>
-            <a class="pill-button" href="tel:18002221222">Call Poison Control</a>
+      <!-- Buddy, the living orb (buddy.js). Tapping it starts a talk. -->
+      <div class="hero-orb">
+        <button class="orb" type="button" data-talk-start aria-label="Talk to Buddy"></button>
+      </div>
+
+      <button id="start-talk" class="pill-button pill-button--ink pill-button--hero" type="button" data-talk-start>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+        Talk to Buddy
+      </button>
+
+      <nav class="chips" aria-label="Quick help">
+        <button class="chip" type="button" data-start-diary>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 10.01h.01"></path><path d="M10 14.01h.01"></path><path d="M14 10.01h.01"></path><path d="M14 14.01h.01"></path><path d="M18 6v12"></path><path d="M6 6v12"></path><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
+          Something hurts
+        </button>
+        <a class="chip" href="#/scam">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 15h.01"></path><path d="M12 7v4"></path></svg>
+          Check a message
+        </a>
+      </nav>
+
+      <!-- Today, as a clean list (screens.js fills in the details). -->
+      <section class="today" aria-labelledby="today-title">
+        <h2 id="today-title" class="list-title">Today</h2>
+        <ul class="rows" role="list">
+          <li class="row">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+            <span class="row-text">
+              <span class="row-title">Daily check-in</span>
+              <span id="today-check-in" class="row-meta">Not done yet</span>
+            </span>
+            <button class="row-link" type="button" data-start-check-in>Start</button>
+          </li>
+          <li class="row">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
+            <span class="row-text"><span id="pills-summary" class="row-title">No pills set up yet</span></span>
+            <button id="today-take" class="pill-button pill-button--ink pill-button--small" type="button" hidden>Take</button>
+            <a id="today-pills-link" class="row-link" href="#/pills">Pills</a>
+          </li>
+          <li class="row">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path></svg>
+            <span class="row-text">
+              <span id="today-diary" class="row-title">Nothing noted today</span>
+              <span id="today-diary-when" class="row-meta"></span>
+            </span>
+            <a class="row-link" href="#/diary">Diary</a>
+          </li>
+          <li class="row">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>
+            <span class="row-text"><span class="row-title">Questions for your next doctor visit</span></span>
+            <a class="row-link" href="#/notes">Notes</a>
+          </li>
+        </ul>
+      </section>
+    </section>
+
+    <!-- ========== Voice mode ========== -->
+    <section class="screen voice" data-screen="talk" aria-labelledby="talk-title" hidden>
+      <div class="voice-top">
+        <h1 id="talk-title" class="visually-hidden" tabindex="-1">Talk with Buddy</h1>
+        <a class="pill-button pill-button--quiet pill-button--small voice-done" href="#/">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+          Done
+        </a>
+      </div>
+      <div class="voice-stage">
+        <!-- While she talks, tapping the orb means "I'm done"; otherwise it
+             closes voice mode, like Done. -->
+        <button class="orb orb--voice" type="button" data-talk-orb aria-label="Buddy"></button>
+        <p id="buddy-label" class="voice-status" aria-live="polite"></p>
+      </div>
+      <section id="you-said" class="voice-her" aria-label="What you said" hidden>
+        <p id="you-said-text" class="said-text"></p>
+      </section>
+      <div class="voice-reply">
+        <!-- Buddy's words, one <span> per word: they stream in, then light
+             up as each is read aloud (talk.js). -->
+        <p id="message" class="message" role="status" aria-live="polite">How are you feeling today?</p>
+        <div id="actions" class="actions" aria-label="Call buttons" hidden></div>
+        <button id="say-again" class="text-button" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path></svg>
+          Say it again
+        </button>
+      </div>
+      <div class="voice-controls">
+        <button id="talk-button" class="pill-button pill-button--ink pill-button--hero" type="button" data-state="idle">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+          <span class="talk-text">
+            <span id="talk-label">Tap to talk</span>
+            <span id="talk-hint" class="talk-hint">Buddy writes down what you say</span>
+          </span>
+        </button>
+      </div>
+      <!-- Earlier in this visit, newest first (talk.js). -->
+      <section id="earlier-section" class="earlier" aria-labelledby="earlier-title" hidden>
+        <h2 id="earlier-title" class="list-title">Earlier</h2>
+        <ol id="earlier" class="earlier-list" role="list"></ol>
+      </section>
+    </section>
+
+    <!-- ========== Diary ========== -->
+    <section class="screen" data-screen="diary" aria-labelledby="diary-title" hidden>
+      <header class="screen-head">
+        <h1 id="diary-title" class="display" tabindex="-1">My diary</h1>
+        <p class="lead">What you told Buddy about how you feel, in your own words, for your doctor.</p>
+        <!-- Required on diary screens: docs/SAFETY.md section 1. -->
+        <p class="note">I’m an AI helper. I can’t give medical advice.</p>
+      </header>
+      <button class="pill-button pill-button--ink" type="button" data-start-diary>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 10.01h.01"></path><path d="M10 14.01h.01"></path><path d="M14 10.01h.01"></path><path d="M14 14.01h.01"></path><path d="M18 6v12"></path><path d="M6 6v12"></path><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
+        Something hurts
+      </button>
+      <!-- "Nothing yet" or "couldn't open it", and the timeline (screens.js). -->
+      <p id="diary-status" class="empty" role="status" hidden></p>
+      <div id="diary-list" class="timeline"></div>
+    </section>
+
+    <!-- ========== Pills ========== -->
+    <section class="screen" data-screen="pills" aria-labelledby="pills-title" hidden>
+      <header class="screen-head pills-head">
+        <div>
+          <h1 id="pills-title" class="display" tabindex="-1">My pills</h1>
+          <p id="pills-day" class="lead">Today</p>
+        </div>
+        <!-- "2 of 3 taken" (screens.js). -->
+        <div id="pills-ring" class="ring" role="img" aria-label="No pills today">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><circle class="ring-track" cx="32" cy="32" r="28"></circle><circle id="pills-ring-arc" class="ring-arc" cx="32" cy="32" r="28" pathLength="100"></circle></svg>
+          <span class="ring-text"><span id="pills-ring-count">0</span><span class="ring-of">of <span id="pills-ring-total">0</span></span></span>
+        </div>
+      </header>
+      <p id="pills-today-status" class="empty" role="status" hidden></p>
+      <!-- Today's schedule: morning, afternoon, evening, night (screens.js). -->
+      <div id="pills-today" class="schedule"></div>
+
+      <!-- For a family member: the pills, exactly as on their labels.
+           Folded away, so her screen stays simple; one tap opens it. -->
+      <details id="pills-setup" class="for-family">
+        <summary class="for-family-summary">
+          <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>
+          <span class="row-text">
+            <h2 id="setup-title" class="row-title">Set up pills</h2>
+            <span class="row-meta">For a family member</span>
+          </span>
+          <svg class="icon for-family-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+        </summary>
+        <section class="setup" aria-labelledby="setup-title">
+        <p class="lead">Type each label exactly as it is on the bottle. Buddy reads it word for word and never changes it.</p>
+        <ul id="pills-list" class="rows rows--boxed" role="list"></ul>
+        <!-- "Removed Lisinopril. Undo" appears here. -->
+        <p id="pills-undo" class="form-status" role="status"></p>
+        <form id="pill-form" class="card form" novalidate>
+          <h3 id="pill-form-title" class="card-title">Add a pill</h3>
+          <div class="field">
+            <label for="pill-name">Name, as on the bottle</label>
+            <input id="pill-name" name="name" type="text" autocomplete="off" spellcheck="false" maxlength="80">
           </div>
-          <p id="pill-banner-words" class="pill-banner-words" aria-live="polite"></p>
-          <div class="pill-banner-actions">
-            <button id="pill-taken" class="pill-button" type="button">I took it</button>
-            <button id="pill-snooze" class="pill-button pill-button--quiet" type="button">Remind me in 10 minutes</button>
-            <button id="pill-again" class="say-again" type="button">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
-              Say it again
-            </button>
+          <div class="field">
+            <label for="pill-label">Label, word for word</label>
+            <input id="pill-label" name="label_dose" type="text" autocomplete="off" spellcheck="false" maxlength="200">
           </div>
-          <p id="pill-banner-note" class="pill-banner-note" role="status"></p>
-        </section>
-
-        <!-- ========== Today ========== -->
-        <section class="screen" data-screen="today" aria-labelledby="greeting">
-          <!-- 1. The big centered question. -->
-          <div class="intro">
-            <p id="today-date" class="date"></p>
-            <h1 id="greeting" tabindex="-1">Good morning</h1>
-            <!-- Buddy's words. Kind notes and "Listening…" appear here. -->
-            <p id="message" class="message" role="status" aria-live="polite">How are you feeling today?</p>
-            <!-- Call buttons Buddy offers (filled in by talk.js), and "Say it again". -->
-            <div id="actions" class="actions" aria-label="Call buttons" hidden></div>
-            <button id="say-again" class="say-again" type="button">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
-              Say it again
-            </button>
+          <fieldset id="pill-times" class="times">
+            <legend>Times of day</legend>
+            <!-- One time to start; "Add another time" adds more (screens.js). -->
+            <input class="time-input" name="time" type="time" aria-label="Time 1">
+          </fieldset>
+          <button id="pill-add-time" class="text-button" type="button">Add another time</button>
+          <p id="pill-status" class="form-status" role="status" aria-live="polite"></p>
+          <div class="form-actions">
+            <button id="pill-save" class="pill-button pill-button--ink" type="submit">Save pill</button>
+            <button id="pill-cancel" class="pill-button pill-button--quiet" type="button" hidden>Cancel</button>
           </div>
+        </form>
+        </section>
+      </details>
+    </section>
 
-          <!-- What she said. Hidden until she has talked. -->
-          <section id="you-said" class="you-said said" aria-label="What you said" hidden>
-            <p id="you-said-text" class="said-text"></p>
-          </section>
+    <!-- ========== Check a message ========== -->
+    <section class="screen" data-screen="scam" aria-labelledby="scam-title" hidden>
+      <header class="screen-head">
+        <h1 id="scam-title" class="display" tabindex="-1">Check a message</h1>
+        <p class="lead">Paste a text or email you’re not sure about. Buddy looks for the warning signs of a scam.</p>
+      </header>
+      <div class="compose">
+        <label for="scam-text" class="visually-hidden">The message to check</label>
+        <textarea id="scam-text" rows="7" autocomplete="off" placeholder="Paste the message here…"></textarea>
+        <div class="form-actions">
+          <button id="scam-check" class="pill-button pill-button--ink" type="button">Check message</button>
+          <button id="scam-photo" class="pill-button pill-button--quiet" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+            Use a photo
+          </button>
+        </div>
+      </div>
+      <p id="scam-status" class="note" role="status"></p>
+    </section>
 
-          <!-- 2. The voice box. The whole box is the button. -->
-          <div class="composer-wrap">
-            <span class="glow" aria-hidden="true"></span>
-            <button id="talk-button" class="composer" type="button" data-state="idle">
-              <span class="composer-text">
-                <span id="talk-label" class="composer-title">Tap to talk</span>
-                <span id="talk-hint" class="composer-hint">Buddy writes down what you say</span>
-              </span>
-              <!-- The round voice button: a waveform icon, live bars while
-                   listening, or a spinner while working. -->
-              <span class="voice" aria-hidden="true">
-                <svg class="icon voice-icon" viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"></path></svg>
-                <span class="wave"><i></i><i></i><i></i><i></i><i></i></span>
-                <span class="spinner"></span>
-              </span>
-            </button>
+    <!-- ========== Doctor notes ========== -->
+    <section class="screen document" data-screen="notes" aria-labelledby="notes-title" hidden>
+      <header class="screen-head">
+        <h1 id="notes-title" class="display" tabindex="-1">Doctor notes</h1>
+        <p class="lead">One page to bring to your next visit: how you’ve been, your pills, and your questions.</p>
+      </header>
+      <article class="doc">
+        <h2 class="doc-heading">For your next visit</h2>
+        <p class="empty">Your notes page is almost ready. Until then, “Add to doctor notes” in a talk with Buddy saves your questions for it.</p>
+      </article>
+    </section>
+
+    <!-- ========== Family ========== -->
+    <section class="screen document" data-screen="family" aria-labelledby="family-title" hidden>
+      <header class="screen-head">
+        <h1 id="family-title" class="display" tabindex="-1">Family</h1>
+        <p class="lead">Call the people who help you.</p>
+      </header>
+      <!-- Call buttons for family and doctor (screens.js). -->
+      <div id="family-calls" class="call-list" aria-label="Call buttons"></div>
+      <p id="family-calls-empty" class="empty">No phone numbers yet. A family member can add them in <a href="#/settings">Settings</a>, under “Names and phone numbers”.</p>
+    </section>
+
+    <!-- ========== Settings ========== -->
+    <section class="screen" data-screen="settings" aria-labelledby="settings-title" hidden>
+      <header class="screen-head">
+        <h1 id="settings-title" class="display" tabindex="-1">Settings</h1>
+      </header>
+      <!-- Switches and choices save at once; the profile has its own Save.
+           novalidate: the server checks every entry and says which one
+           needs another look. -->
+      <form id="settings-form" class="settings" novalidate>
+        <h2 class="group-title">Appearance</h2>
+        <div class="group">
+          <div class="group-row">
+            <span class="group-label" id="theme-label">Theme</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="theme-label">
+              <label><input type="radio" name="theme" value="auto"><span>Auto</span></label>
+              <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+              <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+            </div>
           </div>
-
-          <!-- 3. Suggestions, like the cards under an AI app's box. -->
-          <nav class="suggestions" aria-label="Main choices">
-            <button class="suggestion" type="button" data-start-diary>
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(45 12 12)"><rect x="2" y="8.5" width="20" height="7" rx="3.5"></rect><rect x="9" y="8.5" width="6" height="7"></rect></g></svg>
-              <span class="suggestion-title">Something hurts</span>
-              <span class="suggestion-text">Write it down for your doctor</span>
-            </button>
-            <a class="suggestion" href="#/scam">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6Z"></path><path d="M9 12l2 2 4-4"></path></svg>
-              <span class="suggestion-title">Is this a scam?</span>
-              <span class="suggestion-text">Check a strange message</span>
-            </a>
-            <a class="suggestion" href="#/pills">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><rect x="3.5" y="8" width="17" height="8" rx="4"></rect><line x1="12" y1="8" x2="12" y2="16"></line></g></svg>
-              <span class="suggestion-title">My pills</span>
-              <span id="pills-summary" class="suggestion-text">None set up yet</span>
-            </a>
-            <a class="suggestion" href="#/family">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3.5 19c.5-3.5 3-5.5 5.5-5.5s5 2 5.5 5.5M14.5 14.2c.8-.5 1.6-.7 2.5-.7 2 0 3.8 1.5 4 4.5"></path></svg>
-              <span class="suggestion-title">Family</span>
-              <span class="suggestion-text">Call or send an update</span>
-            </a>
-          </nav>
-        </section>
-
-        <!-- ========== My diary ========== -->
-        <section class="screen" data-screen="diary" aria-labelledby="diary-title" hidden>
-          <header class="screen-head">
-            <a class="back-link" href="#/">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
-              Back to Today
-            </a>
-            <h1 id="diary-title" tabindex="-1">My diary</h1>
-            <p class="lead">What you told Buddy about how you feel, in your own words, for your doctor.</p>
-            <!-- Required on diary screens: docs/SAFETY.md section 1. -->
-            <p class="hint">I’m an AI helper. I can’t give medical advice.</p>
-          </header>
-          <div class="screen-actions">
-            <button class="primary-button" type="button" data-start-diary>
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(45 12 12)"><rect x="2" y="8.5" width="20" height="7" rx="3.5"></rect><rect x="9" y="8.5" width="6" height="7"></rect></g></svg>
-              Something hurts
-            </button>
+          <div class="group-row">
+            <span class="group-label" id="size-label">Text size</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="size-label">
+              <label><input type="radio" name="text_size" value="0"><span>Standard</span></label>
+              <label><input type="radio" name="text_size" value="1"><span>Large</span></label>
+              <label><input type="radio" name="text_size" value="2"><span>Largest</span></label>
+            </div>
           </div>
-          <!-- "Nothing yet" or "couldn't open it", and the entries by day (screens.js). -->
-          <p id="diary-status" class="empty" role="status" hidden></p>
-          <div id="diary-list"></div>
-        </section>
+        </div>
 
-        <!-- ========== My pills ========== -->
-        <section class="screen" data-screen="pills" aria-labelledby="pills-title" hidden>
-          <header class="screen-head">
-            <a class="back-link" href="#/">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
-              Back to Today
-            </a>
-            <h1 id="pills-title" tabindex="-1">My pills</h1>
-            <p class="lead">Your pills for today. When it’s time, Buddy reminds you.</p>
-          </header>
-          <h2 class="day-heading">Today</h2>
-          <!-- Today's reminders (screens.js), or a note when there are none. -->
-          <p id="pills-today-status" class="empty" role="status" hidden></p>
-          <ol id="pills-today" class="entries" role="list"></ol>
-
-          <!-- For a family member: the pills, exactly as on their labels. -->
-          <div class="settings">
-            <h2>Set up pills</h2>
-            <p class="lead">For a family member. Type each label exactly as it is on the bottle. Buddy reads it to her word for word and never changes it.</p>
-            <ul id="pills-list" class="entries" role="list"></ul>
-            <!-- "Removed Lisinopril. Undo" appears here. -->
-            <p id="pills-undo" class="form-status" role="status"></p>
-
-            <form id="pill-form" class="card" novalidate>
-              <h3 id="pill-form-title" class="card-title">Add a pill</h3>
-              <div class="field">
-                <label for="pill-name">Name, as on the bottle</label>
-                <input id="pill-name" name="name" type="text" autocomplete="off" spellcheck="false" maxlength="80">
-              </div>
-              <div class="field">
-                <label for="pill-label">Label, word for word</label>
-                <input id="pill-label" name="label_dose" type="text" autocomplete="off" spellcheck="false" maxlength="200">
-              </div>
-              <fieldset id="pill-times" class="choices">
-                <legend>Times of day</legend>
-                <!-- One time to start; "Add another time" adds more (screens.js). -->
-                <input class="time-input" name="time" type="time" aria-label="Time 1">
-              </fieldset>
-              <button id="pill-add-time" class="ghost-button" type="button">
-                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
-                Add another time
-              </button>
-              <p id="pill-status" class="form-status" role="status" aria-live="polite"></p>
-              <div class="form-actions">
-                <button id="pill-save" class="primary-button" type="submit">Save pill</button>
-                <button id="pill-cancel" class="ghost-button" type="button" hidden>Cancel</button>
-              </div>
-            </form>
+        <h2 class="group-title">Voice</h2>
+        <div class="group">
+          <label class="group-row">
+            <span class="group-label">Read replies aloud</span>
+            <input class="switch" name="voice_on" type="checkbox" role="switch">
+          </label>
+          <div class="group-row">
+            <span class="group-label" id="speed-label">Voice speed</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="speed-label">
+              <label><input type="radio" name="voice_rate" value="0.75"><span>Slower</span></label>
+              <label><input type="radio" name="voice_rate" value="0.9"><span>Normal</span></label>
+              <label><input type="radio" name="voice_rate" value="1.1"><span>Faster</span></label>
+            </div>
           </div>
-        </section>
+          <label class="group-row">
+            <span class="group-label">Chime when Buddy starts and stops listening</span>
+            <input class="switch" name="chime" type="checkbox" role="switch">
+          </label>
+        </div>
+        <p class="group-note">Emergency messages are always read aloud.</p>
 
-        <!-- ========== Doctor notes (built later) ========== -->
-        <section class="screen" data-screen="notes" aria-labelledby="notes-title" hidden>
-          <header class="screen-head">
-            <a class="back-link" href="#/">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
-              Back to Today
-            </a>
-            <h1 id="notes-title" tabindex="-1">Doctor notes</h1>
-            <p class="lead">One page to bring to your next doctor visit.</p>
-          </header>
-          <p class="empty">This part of Buddy is still being built. It’s coming soon.</p>
-        </section>
+        <h2 class="group-title">Motion</h2>
+        <div class="group">
+          <label class="group-row">
+            <span class="group-label">Calm motion<span class="group-hint">No movement, and the orb stays still</span></span>
+            <input class="switch" name="calm_mode" type="checkbox" role="switch">
+          </label>
+        </div>
 
-        <!-- ========== Scam check (built later) ========== -->
-        <section class="screen" data-screen="scam" aria-labelledby="scam-title" hidden>
-          <header class="screen-head">
-            <a class="back-link" href="#/">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
-              Back to Today
-            </a>
-            <h1 id="scam-title" tabindex="-1">Is this a scam?</h1>
-            <p class="lead">Read or paste a strange message, and Buddy looks for warning signs.</p>
-          </header>
-          <p class="empty">This part of Buddy is still being built. It’s coming soon.</p>
-        </section>
+        <details id="profile-setup" class="for-family">
+          <summary class="for-family-summary">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>
+            <span class="row-text">
+              <h2 class="row-title">Names and phone numbers</h2>
+              <span class="row-meta">For a family member</span>
+            </span>
+            <svg class="icon for-family-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+          </summary>
+          <div class="for-family-body">
+        <p class="group-note">Buddy uses these names and numbers.</p>
+        <div class="group group--fields">
+          <div class="field">
+            <label for="set-name">Her full name</label>
+            <input id="set-name" name="name" type="text" autocomplete="off" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="set-preferred-name">What Buddy calls her</label>
+            <input id="set-preferred-name" name="preferred_name" type="text" autocomplete="off" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="set-family-name">Family member to call</label>
+            <input id="set-family-name" name="family_name" type="text" autocomplete="off" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="set-family-phone">Their phone number</label>
+            <input id="set-family-phone" name="family_phone" type="tel" autocomplete="off" maxlength="30">
+          </div>
+          <div class="field">
+            <label for="set-family-email">Their email, for daily updates</label>
+            <input id="set-family-email" name="family_email" type="email" autocomplete="off" spellcheck="false" maxlength="120">
+          </div>
+          <div class="field">
+            <label for="set-doctor-name">Her doctor</label>
+            <input id="set-doctor-name" name="doctor_name" type="text" autocomplete="off" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="set-doctor-phone">The doctor’s phone number</label>
+            <input id="set-doctor-phone" name="doctor_phone" type="tel" autocomplete="off" maxlength="30">
+          </div>
+        </div>
+        <button class="pill-button pill-button--ink" type="submit">Save profile</button>
+          </div>
+        </details>
+        <p id="settings-status" class="form-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
 
-        <!-- ========== Family and settings ========== -->
-        <section class="screen" data-screen="family" aria-labelledby="family-title" hidden>
-          <header class="screen-head">
-            <a class="back-link" href="#/">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
-              Back to Today
-            </a>
-            <h1 id="family-title" tabindex="-1">Family</h1>
-            <p class="lead">Call the people who help you.</p>
-          </header>
-          <!-- Call buttons for family and doctor (screens.js fills these in). -->
-          <div id="family-calls" class="call-row" aria-label="Call buttons"></div>
-          <p id="family-calls-empty" class="empty">No phone numbers yet. A family member can add them below.</p>
+    <!-- The honest note, on every screen. "call 911" is always one tap away. -->
+    <p class="footnote">Buddy is an AI helper. It can’t give medical advice. In an emergency, <a class="footnote-call" href="tel:911">call 911</a>.</p>
+  </main>
 
-          <!-- Filled in once by a family member. novalidate: the server checks
-               every entry and says which one needs another look. -->
-          <form id="settings-form" class="settings" novalidate>
-            <h2>Set up Buddy</h2>
-            <p class="lead">For a family member. Fill this in once and change it any time.</p>
+  <!-- Phones (under 768px): a floating glass tab bar. -->
+  <nav class="tabbar" aria-label="Places">
+    <a class="tab" href="#/" data-nav="today">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+      Home
+    </a>
+    <a class="tab" href="#/diary" data-nav="diary">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path></svg>
+      Diary
+    </a>
+    <a class="tab" href="#/pills" data-nav="pills">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
+      Pills
+    </a>
+    <a class="tab" href="#/family" data-nav="family">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>
+      Family
+    </a>
+    <a class="tab" href="#/settings" data-nav="settings">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      Settings
+    </a>
+  </nav>
 
-            <fieldset class="card">
-              <legend>About her</legend>
-              <div class="field">
-                <label for="set-name">Her full name</label>
-                <input id="set-name" name="name" type="text" autocomplete="off" maxlength="80">
-              </div>
-              <div class="field">
-                <label for="set-preferred-name">What Buddy calls her</label>
-                <input id="set-preferred-name" name="preferred_name" type="text" autocomplete="off" maxlength="80">
-              </div>
-            </fieldset>
+  <!-- Confirmations ("Saved to diary"), sliding in from the top (screens.js). -->
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
-            <fieldset class="card">
-              <legend>Family member to call</legend>
-              <div class="field">
-                <label for="set-family-name">Name</label>
-                <input id="set-family-name" name="family_name" type="text" autocomplete="off" maxlength="80">
-              </div>
-              <div class="field">
-                <label for="set-family-phone">Phone number</label>
-                <input id="set-family-phone" name="family_phone" type="tel" autocomplete="off" maxlength="30">
-              </div>
-              <div class="field">
-                <label for="set-family-email">Email, for daily updates</label>
-                <input id="set-family-email" name="family_email" type="email" autocomplete="off" spellcheck="false" maxlength="120">
-              </div>
-            </fieldset>
-
-            <fieldset class="card">
-              <legend>Her doctor</legend>
-              <div class="field">
-                <label for="set-doctor-name">Name</label>
-                <input id="set-doctor-name" name="doctor_name" type="text" autocomplete="off" maxlength="80">
-              </div>
-              <div class="field">
-                <label for="set-doctor-phone">Phone number</label>
-                <input id="set-doctor-phone" name="doctor_phone" type="tel" autocomplete="off" maxlength="30">
-              </div>
-            </fieldset>
-
-            <fieldset class="card">
-              <legend>Buddy’s voice</legend>
-              <label class="check">
-                <input name="voice_on" type="checkbox">
-                Read Buddy’s words aloud
-              </label>
-              <fieldset class="choices">
-                <legend>How fast Buddy talks</legend>
-                <label class="choice"><input type="radio" name="voice_rate" value="0.75"> Slower</label>
-                <label class="choice"><input type="radio" name="voice_rate" value="0.9"> Normal</label>
-                <label class="choice"><input type="radio" name="voice_rate" value="1.1"> Faster</label>
-              </fieldset>
-              <p class="hint">Emergency messages are always read aloud.</p>
-            </fieldset>
-
-            <p id="settings-status" class="form-status" role="status" aria-live="polite"></p>
-            <button class="primary-button" type="submit">Save</button>
-          </form>
-        </section>
-
-        <!-- The honest note, on every screen. "call 911" is always one tap away. -->
-        <p class="footnote">Buddy is an AI helper. It can’t give medical advice. In an emergency, <a class="footnote-call" href="tel:911">call 911</a>.</p>
-      </main>
-    </div>
-  </div>
-
-  <!-- Safety screen: emergency, Poison Control (red), or crisis (calm).
-       Shown by talk.js with fixed text from docs/SAFETY.md. A <dialog>
-       keeps keyboard focus inside it until she taps "Go back". -->
+  <!-- Safety screen: emergency, Poison Control, or crisis. Shown by talk.js
+       with fixed text from docs/SAFETY.md, instantly, with no movement. A
+       <dialog> keeps keyboard focus inside it until she taps "Go back". -->
   <dialog id="safety-screen" class="safety" role="alertdialog" aria-labelledby="safety-title" aria-describedby="safety-message">
     <div class="safety-inner">
       <h2 id="safety-title">Emergency</h2>
@@ -379,17 +487,18 @@
     </div>
   </dialog>
 
-  <!-- "Are you sure?" before removing something (screens.js). Calm, not red. -->
-  <dialog id="confirm-dialog" class="confirm" aria-labelledby="confirm-title" aria-describedby="confirm-text">
-    <h2 id="confirm-title">Remove this pill?</h2>
+  <!-- "Are you sure?" before removing something: a bottom sheet (screens.js). -->
+  <dialog id="confirm-dialog" class="sheet" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <h2 id="confirm-title" class="sheet-title">Remove this pill?</h2>
     <p id="confirm-text"></p>
     <div class="form-actions">
-      <button id="confirm-yes" class="primary-button" type="button">Yes, remove it</button>
-      <button id="confirm-no" class="ghost-button" type="button" autofocus>Keep it</button>
+      <button id="confirm-yes" class="pill-button pill-button--ink" type="button">Yes, remove it</button>
+      <button id="confirm-no" class="pill-button pill-button--quiet" type="button" autofocus>Keep it</button>
     </div>
   </dialog>
 
   <script src="/static/recorder.js"></script>
+  <script src="/static/buddy.js"></script>
   <script src="/static/speech.js"></script>
   <script src="/static/talk.js"></script>
   <script src="/static/screens.js"></script>

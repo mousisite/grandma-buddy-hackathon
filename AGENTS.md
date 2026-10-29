@@ -33,7 +33,7 @@ It's being built for the Meta Global AI Developer Hackathon (Indie developer tra
 1. `docs/SPEC.md`: every feature and what "done" means
 2. `docs/ARCHITECTURE.md`: stack, file map, data model, API routes, AI design
 3. `docs/SAFETY.md`: the no-advice rules, safety net, medication, companionship, and scam rules. Non-negotiable.
-4. `docs/DESIGN.md`: senior-friendly screen rules
+4. `docs/DESIGN.md`: the design system (tokens, type, the orb, motion, every screen) and its accessibility rules
 5. `docs/PLAN.md`: build order and current status. Update it whenever you finish something.
 
 ## Skills to use

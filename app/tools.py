@@ -11,7 +11,7 @@ import json
 import re
 from datetime import datetime
 
-from app import db, reminders
+from app import db, reminders, safety
 
 MOODS = ["great", "good", "okay", "low", "very_low"]
 SCREENS = ["today", "diary", "pills", "notes", "family", "scam"]
@@ -36,6 +36,37 @@ def words_in(text: str) -> list[str]:
 def joined(parts: list[str]) -> str:
     """Her messages as one text: a period after each, unless she ended it with one."""
     return " ".join(part if part[-1:] in ".!?" else part + "." for part in parts)
+
+
+# Buddy asking about her pills, in a check-in.
+PILL_TOPIC = re.compile(r"\b(pills?|medicines?|medications?)\b", re.IGNORECASE)
+
+
+def asks_about_pills(buddy_words: str, pill_names: list[str]) -> bool:
+    """True when Buddy talks about her pills, in general ("your pills") or by
+    name ("Did you take your Lisinopril?")."""
+    said = set(re.findall(r"[a-z]+", buddy_words.lower()))
+    return PILL_TOPIC.search(buddy_words) is not None or any(
+        reminders.name_words(name) & said for name in pill_names
+    )
+
+
+def check_in_words(connection, conversation_id: str) -> str:
+    """Her words about what hurts, in a daily check-in: what she said after
+    Buddy asked whether anything hurts, until Buddy asked about her pills.
+    So "I'm feeling pretty good" and "Yes, I took them" stay out of her diary.
+    (If Buddy never asked about pain, her last few words, as in a chat.)"""
+    pill_names = db.active_pill_names(connection)
+    words, listening = [], False
+    for row in db.talk_messages(connection, conversation_id):
+        if row["role"] == "assistant":
+            if not listening:
+                listening = safety.pain_is_the_topic("chat", row["content"])
+            elif asks_about_pills(row["content"], pill_names):
+                break
+        elif row["role"] == "user" and listening:
+            words.append(row["content"])
+    return joined(words[-6:] or db.her_recent_words(connection, conversation_id, limit=4))
 
 
 def from_her_words(fact, her_words: str) -> str:
@@ -180,10 +211,7 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
     if name == "log_mood":
         if args.get("mood") not in MOODS:
             return {"ok": False, "error": "mood must be one of " + ", ".join(MOODS)}, []
-        connection.execute(
-            "INSERT INTO moods (created_at, mood, note) VALUES (?, ?, ?)",
-            (db.now(), args["mood"], str(args.get("note", ""))[:200]),
-        )
+        db.save_mood(connection, context["conversation_id"], args["mood"], str(args.get("note", ""))[:200])
         return {"ok": True}, []
 
     if name == "log_symptom":
@@ -191,15 +219,19 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
         # message plus up to three follow-ups (4). A "Something hurts" talk
         # has its own conversation, so all of it is kept (6, with room to spare).
         diary = context["mode"] == "diary"
-        her_words = joined(db.her_recent_words(connection, context["conversation_id"], limit=6 if diary else 4))
+        if context["mode"] == "check_in":
+            her_words = check_in_words(connection, context["conversation_id"])
+        else:
+            her_words = joined(db.her_recent_words(connection, context["conversation_id"], limit=6 if diary else 4))
         facts = {
             "body_area": from_her_words(args.get("body_area"), her_words),
             "pain_level": pain_she_said(args.get("pain_level"), her_words),
             "since": from_her_words(args.get("since"), her_words),
         }
-        if diary:
-            # One entry per "Something hurts" talk, even if the AI saves again.
-            db.save_talk_entry(connection, context["conversation_id"], her_words, **facts)
+        if diary or context["mode"] == "check_in":
+            # One entry per "Something hurts" talk or check-in, even if the
+            # AI saves again on a later turn.
+            db.save_talk_entry(connection, context["conversation_id"], her_words, source=context["mode"], **facts)
         elif not context.get("diary_saved"):  # one entry per reply, even if the AI asks twice
             source = "check_in" if context["mode"] == "check_in" else "chat"
             db.add_symptom(connection, her_words, source, conversation_id=context["conversation_id"], **facts)

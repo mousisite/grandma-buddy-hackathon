@@ -36,6 +36,13 @@ def get_connection(db_path: str | None = None) -> sqlite3.Connection:
     return connection
 
 
+def add_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    """Add a column to an older database's table, if it isn't there yet.
+    (table, column, and definition come from our own code, never from a request.)"""
+    if column not in [row["name"] for row in connection.execute(f"PRAGMA table_info({table})")]:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def init_db(db_path: str | None = None) -> None:
     """Create all tables if they don't exist yet."""
     connection = get_connection(db_path)
@@ -55,7 +62,10 @@ def init_db(db_path: str | None = None) -> None:
                 doctor_phone TEXT NOT NULL DEFAULT '',
                 voice_on INTEGER NOT NULL DEFAULT 1,
                 voice_rate REAL NOT NULL DEFAULT 0.9,
-                text_size TEXT NOT NULL DEFAULT 'normal'
+                text_size TEXT NOT NULL DEFAULT 'normal',
+                calm_mode INTEGER NOT NULL DEFAULT 0,  -- Settings: no movement on screen
+                chime INTEGER NOT NULL DEFAULT 0,      -- Settings: soft tone when listening starts/stops
+                theme TEXT NOT NULL DEFAULT 'auto'     -- Settings: 'auto', 'light', or 'dark'
             );
 
             -- Medications, entered by a family member exactly as on the label.
@@ -100,6 +110,14 @@ def init_db(db_path: str | None = None) -> None:
                 note TEXT NOT NULL DEFAULT ''
             );
 
+            -- One row per day once the daily check-in was started, or
+            -- skipped with "Not today", so it is asked only once a day.
+            CREATE TABLE IF NOT EXISTS check_ins (
+                day TEXT PRIMARY KEY,
+                started_at TEXT NOT NULL DEFAULT '',
+                skipped INTEGER NOT NULL DEFAULT 0
+            );
+
             -- Questions she wants to ask her doctor.
             CREATE TABLE IF NOT EXISTS doctor_questions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -140,11 +158,13 @@ def init_db(db_path: str | None = None) -> None:
             CREATE UNIQUE INDEX IF NOT EXISTS med_events_once ON med_events (medication_id, due_at);
             """
         )
-        # A database made before October 27 has no conversation_id on its
-        # diary entries yet: add it, keeping every entry.
-        columns = [row["name"] for row in connection.execute("PRAGMA table_info(symptoms)")]
-        if "conversation_id" not in columns:
-            connection.execute("ALTER TABLE symptoms ADD COLUMN conversation_id TEXT NOT NULL DEFAULT ''")
+        # A database made before these columns existed gets them, keeping
+        # everything already saved.
+        add_column(connection, "symptoms", "conversation_id", "TEXT NOT NULL DEFAULT ''")  # October 27
+        add_column(connection, "profile", "calm_mode", "INTEGER NOT NULL DEFAULT 0")  # October 28
+        add_column(connection, "profile", "chime", "INTEGER NOT NULL DEFAULT 0")  # October 28
+        add_column(connection, "profile", "theme", "TEXT NOT NULL DEFAULT 'auto'")  # October 28
+        add_column(connection, "moods", "conversation_id", "TEXT NOT NULL DEFAULT ''")  # October 28
         # WAL mode lets one connection read while another writes. Writers
         # still take turns, so the companion saves after each round of tools
         # (app/companion.py) and never holds the lock while the AI thinks.
@@ -167,7 +187,8 @@ def get_profile(connection: sqlite3.Connection) -> dict:
     connection.execute("INSERT OR IGNORE INTO profile (id) VALUES (1)")
     row = connection.execute("SELECT * FROM profile WHERE id = 1").fetchone()
     profile = dict(row)
-    profile["voice_on"] = bool(profile["voice_on"])
+    for switch in ("voice_on", "calm_mode", "chime"):
+        profile[switch] = bool(profile[switch])
     return profile
 
 
@@ -214,6 +235,34 @@ def her_last_words(connection: sqlite3.Connection, minutes: int = 10, limit: int
         (last_safety, since, limit),
     ).fetchall()
     return list(reversed(rows))
+
+
+def talk_messages(connection: sqlite3.Connection, conversation_id: str) -> list[sqlite3.Row]:
+    """Everything said in this talk (role and content) since the safety net
+    last answered, oldest first."""
+    last_safety = connection.execute(
+        "SELECT MAX(id) FROM messages WHERE conversation_id = ? AND role = 'safety'",
+        (conversation_id,),
+    ).fetchone()[0] or 0
+    return connection.execute(
+        "SELECT role, content FROM messages WHERE conversation_id = ? AND id > ? ORDER BY id",
+        (conversation_id, last_safety),
+    ).fetchall()
+
+
+def save_mood(connection: sqlite3.Connection, conversation_id: str, mood: str, note: str) -> None:
+    """Save how she feels overall: one mood per talk. The AI may save it again
+    later in the same talk; then her latest words replace the first ones, so
+    her doctor notes never count one feeling twice."""
+    changed = connection.execute(
+        "UPDATE moods SET mood = ?, note = ?, created_at = ? WHERE conversation_id = ? AND conversation_id != ''",
+        (mood, note, now(), conversation_id),
+    ).rowcount
+    if not changed:
+        connection.execute(
+            "INSERT INTO moods (created_at, mood, note, conversation_id) VALUES (?, ?, ?, ?)",
+            (now(), mood, note, conversation_id),
+        )
 
 
 def buddy_last_words(connection: sqlite3.Connection, conversation_id: str) -> str:
@@ -301,17 +350,19 @@ def save_talk_entry(
     body_area: str = "",
     pain_level: int | None = None,
     since: str = "",
+    source: str = "diary",
 ) -> int:
-    """The one diary entry of a "Something hurts" talk. Saving again in the
-    same talk updates it: all her words so far, plus any new facts (a fact
-    she gave earlier stays if nothing new replaces it). Returns its id."""
+    """The one diary entry of a "Something hurts" talk or a daily check-in
+    (source "check_in"). Saving again in the same talk updates it: all her
+    words so far, plus any new facts (a fact she gave earlier stays if
+    nothing new replaces it). Returns its id."""
     row = connection.execute(
-        "SELECT id, body_area, pain_level, since FROM symptoms WHERE conversation_id = ? AND source = 'diary' "
+        "SELECT id, body_area, pain_level, since FROM symptoms WHERE conversation_id = ? AND source = ? "
         "ORDER BY id LIMIT 1",
-        (conversation_id,),
+        (conversation_id, source),
     ).fetchone()
     if row is None:
-        return add_symptom(connection, description, "diary", body_area, pain_level, since, conversation_id)
+        return add_symptom(connection, description, source, body_area, pain_level, since, conversation_id)
     connection.execute(
         "UPDATE symptoms SET description = ?, body_area = ?, pain_level = ?, since = ? WHERE id = ?",
         (

@@ -1,19 +1,21 @@
 // Grandma Buddy: the page shell.
-// Greets her (by name once the family has set it up), shows the date,
-// grows the words on request (and remembers her choice), moves between
-// screens (the router), and opens the Menu on phones. Talking lives in
+// Greets her (by name once the family has set it up), shows the date, sets
+// the theme (Auto, Light, or Dark) and the text size, turns on Calm motion,
+// and moves between screens (the router) with a soft cross-fade, or the
+// orb morphing into voice mode. Buddy's orb lives in buddy.js, talking in
 // talk.js, the other screens in screens.js, reading aloud in speech.js,
 // and recording in recorder.js.
 
 "use strict";
 
-// Her profile from /api/profile: names, phone numbers, voice settings.
-var profile = { preferred_name: "", name: "", family_name: "", family_phone: "" };
+// Her profile from /api/profile: names, phone numbers, voice settings,
+// Calm motion, the chime, and the theme.
+var profile = { preferred_name: "", name: "", family_name: "", family_phone: "", calm_mode: false, chime: false, theme: "" };
 
 // Ask our own server. Resolves with its answer. If the server says no,
 // rejects with an error whose .detail says why (for example which entry
-// on the Family form needs another look). If there is no connection,
-// rejects with no .detail.
+// on a form needs another look). If there is no connection, rejects with
+// no .detail.
 function api(path, method, body) {
   var options = { method: method || "GET" };
   if (body !== undefined) {
@@ -32,43 +34,124 @@ function api(path, method, body) {
   });
 }
 
-// Morning, afternoon, or evening, based on the real time, with her name
-// when it is known. From 6 AM to 6 PM the page is light; otherwise dark.
-function showGreeting() {
-  var hour = new Date().getHours();
-  var greeting = "Good evening";
-  if (hour < 12) {
-    greeting = "Good morning";
-  } else if (hour < 18) {
-    greeting = "Good afternoon";
+// Remember a choice on this device. Some browsers block this (private
+// windows); then the choice just isn't remembered.
+function remember(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {}
+}
+
+function remembered(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
   }
+}
+
+// ---------- The time of day ----------
+
+// Morning 5:00 to 11:59, afternoon 12:00 to 16:59, evening 17:00 to 20:59,
+// night 21:00 to 4:59 (at night the greeting is still "Good evening").
+function partOfDay(date) {
+  var hour = date.getHours();
+  if (hour >= 5 && hour < 12) {
+    return "morning";
+  }
+  if (hour >= 12 && hour < 17) {
+    return "afternoon";
+  }
+  return hour >= 17 && hour < 21 ? "evening" : "night";
+}
+
+// "Good afternoon, Rose" (or just "Good afternoon" when no name is set up).
+function showGreeting() {
+  var part = partOfDay(new Date());
+  var greeting = "Good " + (part === "night" ? "evening" : part);
   var name = profile.preferred_name || profile.name;
-  document.getElementById("greeting").textContent = name ? greeting + ", " + name : greeting;
-  var isDay = hour >= 6 && hour < 18;
-  document.documentElement.setAttribute("data-time", isDay ? "day" : "night");
-  // Phones color their top bar to match the page.
-  document.querySelector('meta[name="theme-color"]').content = isDay ? "#FFFFFF" : "#111216";
+  setText(document.getElementById("greeting"), name ? greeting + ", " + name : greeting);
 }
 
-// Fill in the date line, like "Monday, October 26".
+// "Wednesday, October 28"
 function showToday() {
-  document.getElementById("today-date").textContent = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  var date = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  setText(document.getElementById("today-date"), date);
 }
 
-// Use a freshly loaded or saved profile: greeting and voice settings.
+// ---------- Theme ----------
+
+// Auto follows the computer's light or dark setting. If the computer says
+// neither, it is dark from 7 PM to 7 AM. The page head already set the
+// theme before the first paint (index.html); this keeps it right after.
+var computerWantsDark = matchMedia("(prefers-color-scheme: dark)");
+var computerWantsLight = matchMedia("(prefers-color-scheme: light)");
+
+function themeChoice() {
+  return profile.theme || remembered("theme") || "auto";
+}
+
+function applyTheme() {
+  var choice = themeChoice();
+  var dark = choice === "dark";
+  if (choice === "auto") {
+    var hour = new Date().getHours();
+    dark = computerWantsDark.matches || (!computerWantsLight.matches && (hour >= 19 || hour < 7));
+  }
+  var theme = dark ? "dark" : "light";
+  var page = document.documentElement;
+  if (page.getAttribute("data-theme") !== theme) {
+    page.setAttribute("data-theme", theme);
+  }
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", dark ? "#131211" : "#F7F7F5");
+  remember("theme", choice);
+}
+
+// ---------- Text size ----------
+
+// Standard, Large, Largest (Settings). Everything is sized in rem, so the
+// whole app grows together. It starts at Large, so it is easy to read from
+// the first visit. Remembered on this device; the page head sets it before
+// the first paint.
+var WORD_SIZES = [100, 118, 135];
+
+function wordStep() {
+  var saved = remembered("words");
+  var step = saved === null ? 1 : Number(saved);
+  return WORD_SIZES[step] ? step : 0;
+}
+
+function setWords(step) {
+  document.documentElement.style.fontSize = WORD_SIZES[step] + "%";
+  remember("words", String(step));
+}
+
+// ---------- Calm motion ----------
+
+// No movement anywhere (styles.css, the end). On when she turns it on in
+// Settings, or when the computer asks for reduced motion.
+var computerWantsLessMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+function isCalm() {
+  return profile.calm_mode === true || computerWantsLessMotion.matches;
+}
+
+function applyCalm() {
+  document.documentElement.toggleAttribute("data-calm", isCalm());
+}
+
+// Use a freshly loaded or saved profile: greeting, voice, theme, Calm motion.
 function useProfile(saved) {
   profile = saved;
   voiceSettings.on = saved.voice_on !== false;
   voiceSettings.rate = saved.voice_rate || 0.9;
   showGreeting();
+  applyTheme();
+  applyCalm();
 }
 
-// Load her profile, then refresh the screen she is on (the Family screen
-// shows the names and numbers).
+// Load her profile, then refresh the screen she is on (Family and
+// Settings show the names and numbers).
 function loadProfile() {
   return api("/api/profile")
     .then(function (saved) {
@@ -82,14 +165,16 @@ function loadProfile() {
 
 // ---------- Screens (the router) ----------
 
-// Each screen has its own address: #/diary, #/family… Today is #/ (or nothing).
+// Each screen has its own address: #/talk, #/pills… Home is #/ (or nothing).
 var SCREEN_TITLES = {
-  today: "Today",
+  today: "Home",
+  talk: "Talk with Buddy",
   diary: "My diary",
   pills: "My pills",
   notes: "Doctor notes",
-  scam: "Is this a scam?",
+  scam: "Check a message",
   family: "Family",
+  settings: "Settings",
 };
 
 function currentScreen() {
@@ -104,24 +189,37 @@ function loadScreen(name) {
   }
 }
 
+// Change what is on screen with a View Transition: the old screen fades,
+// the new one rises 8px into place, and the orb morphs between Home and
+// voice mode (styles.css). Browsers without View Transitions, and Calm
+// motion, just switch.
+function changeScreen(update) {
+  if (!document.startViewTransition || isCalm()) {
+    update();
+    return;
+  }
+  document.startViewTransition(update);
+}
+
 // Show the screen named in the address and hide the others. When she moved
 // there herself, start at the top with keyboard and screen-reader focus on
 // the screen's heading, so she hears where she is.
 function showScreen(moveFocus) {
   var name = currentScreen();
-  // Leaving Today while Buddy is listening: finish up, so her words still
-  // reach the safety net.
-  if (name !== "today" && talkState === "listening") {
+  // Leaving voice mode while Buddy is listening: finish up, so her words
+  // still reach the safety net.
+  if (name !== "talk" && talkState === "listening") {
     finishTalking();
   }
-  // Leaving Today ends a "Something hurts" talk (unless her last words
-  // are still on their way, which belong to it).
-  if (name !== "today" && talkMode === "diary" && talkState === "idle") {
-    endDiaryTalk();
+  // Leaving voice mode ends a "Something hurts" talk or the check-in
+  // (unless her last words are still on their way, which belong to it).
+  if (name !== "talk" && talkMode !== "chat" && talkState === "idle") {
+    backToChat();
   }
-  document.querySelectorAll("[data-screen]").forEach(function (screen) {
+  document.querySelectorAll("section[data-screen]").forEach(function (screen) {
     screen.hidden = screen.getAttribute("data-screen") !== name;
   });
+  // The tab bar and sidebar show where she is.
   document.querySelectorAll("[data-nav]").forEach(function (link) {
     if (link.getAttribute("data-nav") === name) {
       link.setAttribute("aria-current", "page");
@@ -129,117 +227,94 @@ function showScreen(moveFocus) {
       link.removeAttribute("aria-current");
     }
   });
+  document.documentElement.setAttribute("data-view", name);
   document.title = name === "today" ? "Grandma Buddy" : SCREEN_TITLES[name] + " · Grandma Buddy";
-  closeMenu();
+  setBuddyState(buddyState); // a newly shown orb picks up Buddy's state
   loadScreen(name);
   if (moveFocus) {
+    document.documentElement.setAttribute("data-moved", "");
     window.scrollTo(0, 0);
     document.querySelector('[data-screen="' + name + '"] h1').focus();
   }
 }
 
-// ---------- The Menu on phones and upright tablets ----------
-
-// The sidebar slides in over the page. While it is open, the page behind it
-// can't be reached (inert), so keyboard focus stays in the menu.
-function openMenu() {
-  document.getElementById("sidebar").setAttribute("data-open", "");
-  document.getElementById("scrim").hidden = false;
-  document.querySelector(".main").inert = true;
-  document.getElementById("menu-button").setAttribute("aria-expanded", "true");
-  document.querySelector(".side-item[aria-current]").focus();
-}
-
-function closeMenu() {
-  document.getElementById("sidebar").removeAttribute("data-open");
-  document.getElementById("scrim").hidden = true;
-  document.querySelector(".main").inert = false;
-  document.getElementById("menu-button").setAttribute("aria-expanded", "false");
-}
-
-// Closed with "Close", a tap beside it, or Escape: focus goes back to "Menu".
-function closeMenuAndReturn() {
-  closeMenu();
-  document.getElementById("menu-button").focus();
-}
-
-// Restart a short CSS animation (see "Motion" in styles.css), so
-// something new on screen gently eases in every time, not just the first.
-function replay(element, className) {
-  element.classList.remove(className);
-  void element.offsetWidth; // makes the browser notice the class was removed
-  element.classList.add(className);
-}
-
-// Show Buddy's words (screen readers announce them too). Each word gets
-// its own span, so they appear one after another, like an AI answer.
-// Long messages speed up so every message is fully shown within about
-// 1.2 seconds, and urgent ones (options.instant) appear all at once.
-function say(text, options) {
+// Show Buddy's words in voice mode (screen readers announce them too).
+// Each word gets its own span: the words stream in one after another, and
+// light up as each is read aloud (talk.js).
+function say(text) {
   var message = document.getElementById("message");
   message.textContent = "";
-  // Short questions are shown very big; long messages a little smaller,
-  // so the buttons under them stay on the screen.
+  message.setAttribute("data-text", text);
+  message.classList.remove("fresh", "reading");
+  // Short answers are shown very big; long ones a little smaller.
   message.classList.toggle("long", text.split(" ").length > 12);
-  if (options && options.instant) {
-    message.textContent = text;
-    return;
-  }
-  var words = text.split(" ");
-  var step = Math.min(70, 1200 / words.length); // milliseconds between words
-  words.forEach(function (word, index) {
+  text.split(" ").forEach(function (word, index) {
+    if (index > 0) {
+      message.appendChild(document.createTextNode(" "));
+    }
     var span = document.createElement("span");
     span.className = "word";
-    span.style.animationDelay = Math.round(index * step) + "ms";
+    span.style.setProperty("--i", index);
     span.textContent = word;
     message.appendChild(span);
-    message.appendChild(document.createTextNode(" "));
+  });
+  if (text) {
+    void message.offsetWidth; // makes the browser start the stream again
+    message.classList.add("fresh");
+  }
+}
+
+// ---------- Pressing ----------
+
+// Every press shows the moment it lands: the button squeezes and darkens a
+// little (data-pressed, styles.css "Pressing"), and a circle of light
+// spreads from the spot she touched. Calm motion keeps only the color.
+var PRESSABLE = ".pill-button, .text-button, .chip, .tab, .nav-link, .row-link, .call-pill, .check, .for-family-summary, .segmented label, label.group-row";
+
+function showPress(event) {
+  var target = event.target.closest(PRESSABLE);
+  if (!target || target.disabled || event.button > 0) {
+    return;
+  }
+  target.setAttribute("data-pressed", "");
+  if (isCalm()) {
+    return;
+  }
+  var box = target.getBoundingClientRect();
+  var size = Math.max(box.width, box.height) * 2;
+  var ripple = document.createElement("span");
+  ripple.className = "ripple";
+  ripple.setAttribute("aria-hidden", "true");
+  ripple.style.width = ripple.style.height = size + "px";
+  ripple.style.left = event.clientX - box.left - size / 2 + "px";
+  ripple.style.top = event.clientY - box.top - size / 2 + "px";
+  target.appendChild(ripple);
+  setTimeout(function () { ripple.remove(); }, 700);
+}
+
+// The finger lifted (or slid away to scroll): let go, a moment later, so
+// even a very quick tap is seen.
+function endPress() {
+  document.querySelectorAll("[data-pressed]").forEach(function (pressed) {
+    setTimeout(function () { pressed.removeAttribute("data-pressed"); }, 140);
   });
 }
 
-// The words button cycles: normal -> big -> biggest -> normal.
-var WORD_SIZES = [100, 115, 130];
-var WORD_NAMES = ["normal", "big", "biggest"];
-// The button always says what tapping it will do next.
-// Labels are short so they fit on one line on a phone, even at biggest.
-var WORD_GLYPHS = ["A+", "A+", "A−"];
-var WORD_LABELS = ["Bigger words", "Even bigger", "Smaller words"];
-var wordStep = 0;
-
-function setWords(step) {
-  wordStep = step;
-  document.documentElement.style.fontSize = WORD_SIZES[step] + "%";
-  document.getElementById("text-size-glyph").textContent = WORD_GLYPHS[step];
-  document.getElementById("text-size-label").textContent = WORD_LABELS[step];
-  // Remember her choice on this device. Some browsers block this
-  // (private windows); then the words just start at normal next time.
-  try {
-    localStorage.setItem("words", String(step));
-  } catch (e) {}
-}
-
-function growWords() {
-  setWords((wordStep + 1) % WORD_SIZES.length);
-  say("The words are now " + WORD_NAMES[wordStep] + ".");
-}
-
-// Start with the size she chose last time, if there is one.
-function loadWords() {
-  var saved = 0;
-  try {
-    saved = Number(localStorage.getItem("words"));
-  } catch (e) {}
-  if (WORD_SIZES[saved]) {
-    setWords(saved);
-  }
-}
-
 function start() {
+  applyTheme();
+  applyCalm();
+  computerWantsLessMotion.addEventListener("change", applyCalm);
+  computerWantsDark.addEventListener("change", applyTheme);
+  startBuddy(); // buddy.js: Buddy wakes up
   showGreeting();
   showToday();
-  loadWords();
+  // The greeting, the date, and Auto's evening switch follow the clock.
+  setInterval(function () {
+    showGreeting();
+    showToday();
+    applyTheme();
+  }, 60 * 1000);
   loadProfile();
-  // Buddy's first question appears word by word when the app opens.
   say(document.getElementById("message").textContent);
 
   startTalking(); // talk.js
@@ -249,32 +324,24 @@ function start() {
   loadReminders();
   setInterval(loadReminders, 30 * 1000);
 
-  // Show the screen in the address (Today when there is none), and follow
+  // Show the screen in the address (Home when there is none), and follow
   // every change after that, including the browser's Back button.
   showScreen(false);
   window.addEventListener("hashchange", function () {
-    showScreen(true);
+    changeScreen(function () {
+      showScreen(true);
+    });
   });
+
+  document.addEventListener("pointerdown", showPress);
+  document.addEventListener("pointerup", endPress);
+  document.addEventListener("pointercancel", endPress);
 
   document.getElementById("skip-link").addEventListener("click", function () {
     document.querySelector('[data-screen="' + currentScreen() + '"] h1').focus();
   });
-  document.getElementById("menu-button").addEventListener("click", openMenu);
-  document.getElementById("menu-close").addEventListener("click", closeMenuAndReturn);
-  document.getElementById("scrim").addEventListener("click", closeMenuAndReturn);
-  document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape" && document.getElementById("sidebar").hasAttribute("data-open")) {
-      closeMenuAndReturn();
-    }
-  });
-  // A tablet turned sideways shows the sidebar for good: close the drawer
-  // so the page behind it can be used again.
-  matchMedia("(min-width: 1000px)").addEventListener("change", closeMenu);
-
-  document.getElementById("text-size-button").addEventListener("click", growWords);
 }
 
-// Start right away. This script sits at the end of <body>, so the page above
-// it is already there, and the page shows the right time of day from the
-// very first frame (no bright flash at night).
+// Start right away. This script sits at the end of <body>, so the page
+// above it is already there.
 start();

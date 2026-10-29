@@ -69,10 +69,14 @@ def update_profile(changes: dict = Body(...)):
             if field == "family_email" and not EMAIL.match(value):
                 refuse(field, "It looks like name@example.com.")
             clean[field] = value
-        elif field == "voice_on":
+        elif field in ("voice_on", "calm_mode", "chime"):  # on/off switches
             if not isinstance(value, bool):
                 refuse(field)
             clean[field] = int(value)
+        elif field == "theme":  # Settings: Auto (follows the computer), Light, or Dark
+            if value not in ("auto", "light", "dark"):
+                refuse(field)
+            clean[field] = value
         elif field == "voice_rate":
             if not isinstance(value, (int, float)) or not 0.6 <= value <= 1.4:
                 refuse(field)

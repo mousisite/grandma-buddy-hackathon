@@ -1,14 +1,20 @@
-// Grandma Buddy: the screens other than Today, and the pill reminders.
+// Grandma Buddy: the screens, the pill reminders, and toasts.
 // Each time the router (app.js) shows a screen, it runs that screen's
 // loader below, so the screen always shows fresh information.
-// Doctor notes and scam check arrive in the next steps.
+// Checking a message and Doctor notes are designed, and arrive in the next
+// steps.
 
 "use strict";
 
 var SCREEN_LOADERS = {
+  today: function () {
+    showCheckIn();
+    showTodayDiary();
+  },
   diary: showDiary,
   pills: showPillsScreen,
-  family: showFamily,
+  family: showFamilyCalls,
+  settings: fillSettingsForm,
 };
 
 // ---------- Pill reminders (on every screen) ----------
@@ -46,6 +52,24 @@ function setText(element, text) {
 // Put keyboard focus on the heading of the screen she is on.
 function focusScreenHeading() {
   document.querySelector('[data-screen="' + currentScreen() + '"] h1').focus({ preventScroll: true });
+}
+
+// A short note that slides in at the top and leaves by itself after 4
+// seconds: a confirmation ("Saved to diary") with a check, or a problem
+// without one. Screen readers announce it (#toasts is a polite live region).
+var CHECK_ICON = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>';
+
+function toast(text, problem) {
+  var shelf = document.getElementById("toasts");
+  var note = document.createElement("p");
+  note.className = "toast";
+  note.innerHTML = problem ? "" : CHECK_ICON;
+  note.appendChild(document.createTextNode(text));
+  shelf.appendChild(note);
+  setTimeout(function () {
+    note.classList.add("toast--leaving");
+    setTimeout(function () { note.remove(); }, 300);
+  }, 4000);
 }
 
 function showReminders(state) {
@@ -113,7 +137,7 @@ function showPillBanner() {
 // "I took it" or "Remind me in 10 minutes", for every pill in the banner.
 function answerReminder(answer) {
   var ids = duePills().map(function (r) { return r.id; });
-  var buttons = document.querySelectorAll(".pill-button");
+  var buttons = document.querySelectorAll("#pill-banner button, #today-take");
   var note = document.getElementById("pill-banner-note");
   if (!ids.length) {
     return;
@@ -127,7 +151,10 @@ function answerReminder(answer) {
         showReminders(state);
       }
       var words = answer === "taken" ? "Thank you. I wrote that down." : "Okay. I’ll remind you again in 10 minutes.";
-      if (currentScreen() === "today") {
+      if (answer === "taken") {
+        toast("Marked as taken");
+      }
+      if (currentScreen() === "talk") {
         say(words);
       }
       if (talkState === "idle") {
@@ -142,24 +169,26 @@ function answerReminder(answer) {
     });
 }
 
-// The second line of the "My pills" card on Today.
+// The pills row on Home: what's next, with "Take" when a pill is due.
 function showPillsSummary() {
   var reminders = pillState.reminders;
   var snoozed = reminders.filter(function (r) { return r.status === "snoozed"; })[0];
   var next = reminders.filter(function (r) { return r.status === "upcoming"; })[0];
   var text = "No more pills today";
   if (!pillState.has_pills) {
-    text = "None set up yet";
+    text = "No pills set up yet";
   } else if (duePills().length) {
     text = "Time for your pills now";
   } else if (snoozed) {
-    text = "Reminder at " + clockTime(snoozed.snooze_until);
+    text = "Pill reminder again at " + clockTime(snoozed.snooze_until);
   } else if (next) {
-    text = "Next at " + clockTime(next.due_at);
+    // "Next: evening pills at 8:00 PM"
+    text = "Next: " + partOfDay(new Date(next.due_at)) + " pills at " + clockTime(next.due_at);
   } else if (reminders.length && reminders.every(function (r) { return r.status === "taken"; })) {
-    text = "All taken today";
+    text = "All of today’s pills are taken";
   }
-  document.getElementById("pills-summary").textContent = text;
+  setText(document.getElementById("pills-summary"), text);
+  document.getElementById("today-take").hidden = duePills().length === 0;
 }
 
 // What each reminder is now, in plain words. Missed uses the fixed text
@@ -168,32 +197,124 @@ var PILL_STATUS = {
   upcoming: function () { return "Later today"; },
   due: function () { return "Time to take it now"; },
   snoozed: function (r) { return "Reminding you again at " + clockTime(r.snooze_until); },
-  taken: function (r) { return "Taken at " + clockTime(r.acted_at) + " ✓"; },
+  taken: function (r) { return "Taken at " + clockTime(r.acted_at); }, // shown with a check icon
   missed: function () { return "Missed. Please check the label or call your pharmacist about what to do."; },
 };
 
-// Today's list on the Pills screen: time, name, label, and what it is now.
+// Today's pills on the Pills screen: a "2 of 3 taken" ring, then one group
+// for each part of the day, each pill a large row with a round check, its
+// label word for word, and what it is now. Drawn again only when something
+// changed, so the 30-second check never moves anything (or her focus).
+var PILL_SLOTS = [["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"], ["night", "Night"]];
+var shownPills = "";
+var justTaken = null; // the pill she just checked: its check draws itself
+
 function showTodaysPills() {
-  var list = document.getElementById("pills-today");
+  var reminders = pillState.reminders;
+  setText(document.getElementById("pills-day"),
+    "Today, " + new Date().toLocaleDateString("en-US", { weekday: "long" }));
+  showRing(reminders);
   var status = document.getElementById("pills-today-status");
-  list.textContent = "";
-  pillState.reminders.forEach(function (reminder) {
-    var item = document.createElement("li");
-    item.className = "entry entry--" + reminder.status;
-    // Just after midnight, last night's late reminder can still be due.
-    var lastNight = new Date(reminder.due_at).toDateString() !== new Date().toDateString();
-    addText(item, "p", "entry-when", (lastNight ? "Last night, " : "") + clockTime(reminder.due_at));
-    addText(item, "p", "entry-words", reminder.name);
-    if (reminder.label_dose) {
-      addText(item, "p", "pill-label", reminder.label_dose);
-    }
-    addText(item, "p", "pill-status", PILL_STATUS[reminder.status](reminder));
-    list.appendChild(item);
-  });
-  status.hidden = pillState.reminders.length > 0;
+  status.hidden = reminders.length > 0;
   setText(status, pillState.has_pills
     ? "No more pill reminders today."
     : "No pills set up yet. A family member can add them below.");
+  var drawn = JSON.stringify(reminders);
+  if (drawn === shownPills) {
+    return;
+  }
+  shownPills = drawn;
+  var schedule = document.getElementById("pills-today");
+  schedule.textContent = "";
+  var slots = {};
+  reminders.forEach(function (reminder) {
+    // Just after midnight, last night's late reminder can still be due: night.
+    var part = lastNight(reminder) ? "night" : partOfDay(new Date(reminder.due_at));
+    (slots[part] = slots[part] || []).push(reminder);
+  });
+  PILL_SLOTS.forEach(function (slot) {
+    if (slots[slot[0]]) {
+      schedule.appendChild(pillSlot(slot[1], slots[slot[0]]));
+    }
+  });
+  justTaken = null;
+}
+
+function lastNight(reminder) {
+  return new Date(reminder.due_at).toDateString() !== new Date().toDateString();
+}
+
+// The ring fills as pills are taken: "2 of 3".
+function showRing(reminders) {
+  var taken = reminders.filter(function (r) { return r.status === "taken"; }).length;
+  var total = reminders.length;
+  var ring = document.getElementById("pills-ring");
+  ring.hidden = total === 0;
+  ring.style.setProperty("--done", total ? Math.round((taken / total) * 100) : 0);
+  setText(document.getElementById("pills-ring-count"), String(taken));
+  setText(document.getElementById("pills-ring-total"), String(total));
+  ring.setAttribute("aria-label", taken + " of " + total + " pills taken today");
+}
+
+function pillSlot(title, reminders) {
+  var slot = document.createElement("section");
+  slot.setAttribute("aria-label", title + " pills");
+  addText(slot, "h2", "slot-title", title);
+  var list = document.createElement("ol");
+  list.className = "rows";
+  list.setAttribute("role", "list");
+  reminders.forEach(function (reminder) {
+    list.appendChild(pillRow(reminder));
+  });
+  slot.appendChild(list);
+  return slot;
+}
+
+// One pill. A pill to take now has a round check button ("I took this
+// one"); a taken pill shows a filled check.
+function pillRow(reminder) {
+  var item = document.createElement("li");
+  item.className = "check-row check-row--" + reminder.status + (reminder.id === justTaken ? " check-row--new" : "");
+  var canTake = reminder.status === "due" || reminder.status === "snoozed";
+  var check = document.createElement(canTake ? "button" : "span");
+  check.className = "check";
+  check.innerHTML = '<span class="check-circle">' + CHECK_ICON + "</span>";
+  if (canTake) {
+    check.type = "button";
+    check.setAttribute("aria-label", "I took this one: " + reminder.name);
+    check.addEventListener("click", function () {
+      takeOnePill(reminder, check);
+    });
+  }
+  item.appendChild(check);
+  var text = document.createElement("div");
+  text.className = "check-text";
+  addText(text, "p", "check-time", (lastNight(reminder) ? "Last night, " : "") + clockTime(reminder.due_at));
+  addText(text, "p", "pill-name", reminder.name);
+  if (reminder.label_dose) {
+    addText(text, "p", "pill-label", reminder.label_dose);
+  }
+  addText(text, "p", "pill-status", PILL_STATUS[reminder.status](reminder));
+  item.appendChild(text);
+  return item;
+}
+
+function takeOnePill(reminder, button) {
+  button.disabled = true;
+  var mine = ++reminderRequests;
+  api("/api/reminders/taken", "POST", { ids: [reminder.id] })
+    .then(function (state) {
+      justTaken = reminder.id;
+      if (mine === reminderRequests) {
+        showReminders(state);
+      }
+      toast("Marked as taken");
+      focusScreenHeading(); // the button she tapped is gone
+    })
+    .catch(function () {
+      button.disabled = false;
+      toast("I couldn’t save that. Please tap again.", true);
+    });
 }
 
 // ---------- Setting up pills (for a family member) ----------
@@ -237,7 +358,7 @@ function showPillList(pills) {
 function smallButton(text, label, onClick) {
   var button = document.createElement("button");
   button.type = "button";
-  button.className = "ghost-button";
+  button.className = "pill-button pill-button--quiet pill-button--small";
   button.textContent = text;
   button.setAttribute("aria-label", label);
   button.addEventListener("click", onClick);
@@ -395,12 +516,17 @@ var DIARY_SOURCES = {
   check_in: "From the daily check-in.",
 };
 
-// Her entries from the last 30 days, newest first, under a heading per day.
+// Her entries from the last 30 days, newest first, on a timeline with a
+// heading per day. A soft shimmer shows while they load.
 function showDiary() {
   var list = document.getElementById("diary-list");
   var status = document.getElementById("diary-status");
+  if (!list.children.length) {
+    list.setAttribute("aria-busy", "true");
+  }
   api("/api/diary?days=30")
     .then(function (entries) {
+      list.removeAttribute("aria-busy");
       list.textContent = "";
       status.hidden = entries.length > 0;
       status.textContent =
@@ -427,8 +553,64 @@ function showDiary() {
       });
     })
     .catch(function () {
+      list.removeAttribute("aria-busy");
       status.hidden = false;
       status.textContent = "I couldn’t open your diary just now. Please try again in a moment.";
+    });
+}
+
+// ---------- The daily check-in on Home ----------
+
+var MOOD_WORDS = { great: "Feeling great", good: "Feeling good", okay: "Feeling okay", low: "Feeling low", very_low: "Feeling very low" };
+
+// The card on her first visit each day, and the check-in row in the Today
+// list: her mood once she told Buddy how she feels.
+function showCheckIn() {
+  api("/api/check-in")
+    .then(function (today) {
+      document.getElementById("check-in-card").hidden = !today.due;
+      var words = "Not done yet";
+      if (today.mood) {
+        words = (MOOD_WORDS[today.mood.mood] || "Checked in") + ", at " +
+          new Date(today.mood.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      } else if (!today.due) {
+        words = "Done for today";
+      }
+      setText(document.getElementById("today-check-in"), words);
+    })
+    .catch(function () {
+      // No connection to our own server: keep what is shown.
+    });
+}
+
+// "Not today": the card goes away until tomorrow.
+function skipCheckIn() {
+  api("/api/check-in/skip", "POST")
+    .then(function () {
+      document.getElementById("check-in-card").hidden = true;
+      setText(document.getElementById("today-check-in"), "Done for today");
+      focusScreenHeading(); // the button she tapped is gone
+      toast("Okay, maybe tomorrow");
+    })
+    .catch(function () {
+      toast("I couldn’t save that just now. Please try again.", true);
+    });
+}
+
+// Home's diary row: the latest thing she noted today, in her words.
+function showTodayDiary() {
+  api("/api/diary?days=1")
+    .then(function (entries) {
+      var today = entries.filter(function (entry) {
+        return new Date(entry.created_at).toDateString() === new Date().toDateString();
+      })[0];
+      setText(document.getElementById("today-diary"), today ? "“" + today.description + "”" : "Nothing noted today");
+      setText(document.getElementById("today-diary-when"), today
+        ? "Noted at " + new Date(today.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+        : "");
+    })
+    .catch(function () {
+      // No connection to our own server: keep what is shown.
     });
 }
 
@@ -455,8 +637,14 @@ function diaryEntry(entry, when) {
   // instead of her words when crisis words were involved, so it isn't quoted.
   var herWords = !/^Emergency warning signs \(/.test(entry.description);
   addText(item, "p", "entry-words", herWords ? "“" + entry.description + "”" : entry.description);
+  // Where it hurts, as a tag.
+  if (entry.body_area) {
+    var tags = document.createElement("p");
+    tags.className = "tags";
+    addText(tags, "span", "tag", entry.body_area);
+    item.appendChild(tags);
+  }
   var facts = [
-    ["Where:", entry.body_area],
     ["Pain:", entry.pain_level === null ? "" : entry.pain_level + " out of 10"],
     ["Since:", entry.since],
   ].filter(function (fact) { return fact[1]; });
@@ -490,11 +678,6 @@ function addText(parent, tag, className, text) {
 var PROFILE_TEXT_FIELDS = ["name", "preferred_name", "family_name", "family_phone", "family_email", "doctor_name", "doctor_phone"];
 var VOICE_RATES = ["0.75", "0.9", "1.1"]; // Slower, Normal, Faster
 
-function showFamily() {
-  showFamilyCalls();
-  fillSettingsForm();
-}
-
 // Big call buttons for the family member and the doctor, when their
 // numbers are set up.
 function showFamilyCalls() {
@@ -514,25 +697,28 @@ function showFamilyCalls() {
   document.getElementById("family-calls-empty").hidden = row.children.length > 0;
 }
 
-// Put the saved profile into the form, unless it has entries that aren't
-// saved yet (then they stay, so nothing typed is lost by going back).
+// Put the saved profile into the form. Profile entries that aren't saved
+// yet stay as typed, so nothing is lost by going to another screen.
 function fillSettingsForm() {
   var form = document.getElementById("settings-form");
-  if (form.hasAttribute("data-unsaved")) {
-    return;
+  if (!form.hasAttribute("data-unsaved")) {
+    PROFILE_TEXT_FIELDS.forEach(function (field) {
+      form.elements[field].value = profile[field] || "";
+    });
+    clearProblem(form);
+    document.getElementById("settings-status").textContent = "";
   }
-  PROFILE_TEXT_FIELDS.forEach(function (field) {
-    form.elements[field].value = profile[field] || "";
-  });
+  form.elements.theme.value = themeChoice();
+  form.elements.text_size.value = String(wordStep());
   form.elements.voice_on.checked = profile.voice_on !== false;
+  form.elements.calm_mode.checked = profile.calm_mode === true;
+  form.elements.chime.checked = profile.chime === true;
   // The closest of Slower, Normal, Faster to the saved speed.
   var rate = Number(profile.voice_rate) || 0.9;
   var closest = VOICE_RATES.reduce(function (best, option) {
     return Math.abs(option - rate) < Math.abs(best - rate) ? option : best;
   });
   form.elements.voice_rate.value = closest;
-  clearProblem(form);
-  document.getElementById("settings-status").textContent = "";
 }
 
 function clearProblem(form) {
@@ -558,16 +744,46 @@ function showProblem(input, message) {
   input.focus();
 }
 
-// Save everything at once. The server checks every entry; if one needs
-// another look, that entry is marked, focused, and named in the message.
+// Switches and choices save the moment she changes them. The theme and
+// text size change on screen at once; text size is kept on this device.
+function saveChoice(event) {
+  var input = event.target;
+  var field = input.name;
+  if (PROFILE_TEXT_FIELDS.indexOf(field) !== -1) {
+    return; // profile entries wait for "Save profile"
+  }
+  if (field === "text_size") {
+    setWords(Number(input.value));
+    toast("Text size changed");
+    return;
+  }
+  var change = {};
+  change[field] = input.type === "checkbox" ? input.checked
+    : field === "voice_rate" ? Number(input.value) : input.value;
+  if (field === "theme") {
+    changeScreen(function () {
+      profile.theme = input.value;
+      applyTheme();
+    });
+  }
+  api("/api/profile", "PUT", change)
+    .then(function (saved) {
+      useProfile(saved);
+      toast("Settings saved");
+    })
+    .catch(function () {
+      fillSettingsForm(); // back to what is really saved
+      document.getElementById("settings-status").textContent = "I couldn’t save that just now. Please try again.";
+    });
+}
+
+// "Save profile": the names and numbers. The server checks every entry; if
+// one needs another look, that entry is marked, focused, and named.
 function saveSettings(event) {
   event.preventDefault();
   var form = event.target;
   var status = document.getElementById("settings-status");
-  var changes = {
-    voice_on: form.elements.voice_on.checked,
-    voice_rate: Number(form.elements.voice_rate.value),
-  };
+  var changes = {};
   PROFILE_TEXT_FIELDS.forEach(function (field) {
     changes[field] = form.elements[field].value;
   });
@@ -579,8 +795,8 @@ function saveSettings(event) {
       form.removeAttribute("data-unsaved");
       useProfile(saved);
       showFamilyCalls();
-      status.textContent = "Saved. Buddy will use these from now on.";
-      speak("Saved.");
+      status.textContent = "";
+      toast("Profile saved");
     })
     .catch(function (problem) {
       var detail = problem.detail || {};
@@ -620,8 +836,20 @@ function startScreens() {
 
   var form = document.getElementById("settings-form");
   form.addEventListener("submit", saveSettings);
-  form.addEventListener("input", function () {
-    form.setAttribute("data-unsaved", "");
+  form.addEventListener("change", saveChoice);
+  form.addEventListener("input", function (event) {
+    if (PROFILE_TEXT_FIELDS.indexOf(event.target.name) !== -1) {
+      form.setAttribute("data-unsaved", "");
+    }
+  });
+  document.getElementById("today-take").addEventListener("click", function () { answerReminder("taken"); });
+  document.getElementById("check-in-skip").addEventListener("click", skipCheckIn);
+
+  // Check a message: designed now; checking arrives in the next update.
+  ["scam-check", "scam-photo"].forEach(function (id) {
+    document.getElementById(id).addEventListener("click", function () {
+      setText(document.getElementById("scam-status"), "Message checking arrives in the next update of Buddy.");
+    });
   });
   // Closing the tab with unsaved entries: the browser asks first.
   window.addEventListener("beforeunload", function (event) {

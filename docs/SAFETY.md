@@ -79,7 +79,7 @@ After a crisis response, keep the conversation open and gentle. Never end it abr
 - After saving, offer to tell {family_name} or call her doctor. Never comment on what the symptom means.
 - Doctor notes only organize what's in the logs. No summaries that interpret, like "this suggests" or "possibly".
 - The AI may fill in where it hurts, how bad (0 to 10), and since when, but each is kept only if she said those words. So "knee" stays when she said "my knee", while "patella", "possible sprain", or a pain number she never said is dropped. A number that is a time ("sore for 2 days") is not a pain level.
-- One entry per "Something hurts" talk, even if the AI saves twice or side effects come up in it. After an entry is saved, Call {doctor_name} and Call {family_name} always appear (when their numbers are set up).
+- One entry per "Something hurts" talk or daily check-in, even if the AI saves on every turn or side effects come up in it. A check-in's entry holds only what she said after Buddy asked whether anything hurts, until Buddy asked about her pills (by "pills" or by a pill's name), so her mood and pill answers stay out of it. Her mood is saved once per talk. After an entry is saved, Call {doctor_name} and Call {family_name} always appear (when their numbers are set up).
 - The Diary screen shows her words in quotes, and "I'm an AI helper. I can't give medical advice." under its heading.
 
 ## 7. Companionship

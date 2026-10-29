@@ -211,3 +211,44 @@ def test_crisis_words_are_never_kept_in_the_conversation_either(client, safe_tes
     said = [row["content"] for row in connection.execute("SELECT content FROM messages WHERE role = 'user'")]
     connection.close()
     assert said and all("die" not in text for text in said)
+
+
+# ---------- Calm mode and the chime (Settings) ----------
+
+def test_calm_mode_and_the_chime_start_off_and_are_saved(client):
+    profile = client.get("/api/profile").json()
+    assert (profile["calm_mode"], profile["chime"]) == (False, False)
+    saved = client.put("/api/profile", json={"calm_mode": True, "chime": True}).json()
+    assert (saved["calm_mode"], saved["chime"]) == (True, True)
+    assert client.put("/api/profile", json={"calm_mode": "yes"}).status_code == 400
+    assert client.put("/api/profile", json={"chime": 1}).status_code == 400
+
+
+def test_an_older_profile_gets_calm_mode_and_the_chime(tmp_path):
+    import sqlite3
+
+    path = str(tmp_path / "older.db")
+    older = sqlite3.connect(path)
+    older.execute(
+        "CREATE TABLE profile (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT NOT NULL DEFAULT '', "
+        "preferred_name TEXT NOT NULL DEFAULT '', language TEXT NOT NULL DEFAULT 'English', "
+        "family_name TEXT NOT NULL DEFAULT '', family_email TEXT NOT NULL DEFAULT '', "
+        "family_phone TEXT NOT NULL DEFAULT '', doctor_name TEXT NOT NULL DEFAULT '', "
+        "doctor_phone TEXT NOT NULL DEFAULT '', voice_on INTEGER NOT NULL DEFAULT 1, "
+        "voice_rate REAL NOT NULL DEFAULT 0.9, text_size TEXT NOT NULL DEFAULT 'normal')"
+    )
+    older.execute("INSERT INTO profile (id, preferred_name) VALUES (1, 'Rose')")
+    older.commit()
+    older.close()
+    db.init_db(path)
+    connection = db.get_connection(path)
+    profile = db.get_profile(connection)
+    connection.close()
+    assert (profile["preferred_name"], profile["calm_mode"], profile["chime"], profile["theme"]) == ("Rose", False, False, "auto")
+
+
+def test_the_theme_starts_on_auto_and_is_saved(client):
+    assert client.get("/api/profile").json()["theme"] == "auto"
+    assert client.put("/api/profile", json={"theme": "dark"}).json()["theme"] == "dark"
+    assert client.put("/api/profile", json={"theme": "purple"}).status_code == 400
+    assert client.put("/api/profile", json={"theme": True}).status_code == 400

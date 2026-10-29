@@ -36,8 +36,8 @@ It never gives medical, mental-health, or food advice. It listens, writes things
 ## Brand Commitments
 
 - Name: Grandma Buddy.
-- The sky matches the time of day: a smiling sun by day, a sleepy moon at night (user asked to keep this, Oct 26, 2026).
-- Buttons are raised keys that sink when pressed, like a big-button phone (user asked to keep this, Oct 26, 2026).
+- "The living orb" (user's flagship design brief, Oct 28, 2026): it should look and feel like a flagship app, on the level of the Claude app, Google Gemini, and Apple's own apps. Buddy is a living gradient orb (amber, peach, rose, violet) with no face; everything around it is restrained: Figtree and Newsreader, hairline borders, one ink accent, light and dark mode, a glass tab bar and sidebar. See docs/DESIGN.md.
+- The orb shows what Buddy is doing (idle, listening, thinking, speaking) and morphs into a full-screen voice mode; Calm motion stops all movement.
 - Must look and feel like a real, finished app, not a demo page (user, Oct 26, 2026).
 
 ## Evidence on Hand
@@ -55,4 +55,4 @@ It never gives medical, mental-health, or food advice. It listens, writes things
 
 ## Accessibility & Inclusion
 
-Rules in docs/DESIGN.md: body text 22px or more, headings 32px or more, buttons at least 64px tall with 16px between them, body contrast at least 7:1, words on every button, no time limits, keyboard focus easy to see, screen-reader announcements, reduced motion respected, works at 375px and 200% zoom.
+Rules in docs/DESIGN.md (pro-app standards): body text 17px or more and labels 13px or more, a Text size setting up to 135%, tap targets at least 44px (main actions 56px), text contrast at least 4.5:1 in light and dark (measured by scripts/check_contrast.py), never color alone, words on every button, red only for emergencies, no time limits on anything she must answer, keyboard focus easy to see, screen-reader announcements, Calm motion and reduced motion respected, works at 360, 390, 768, and 1440px and 200% zoom.

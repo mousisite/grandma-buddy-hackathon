@@ -63,20 +63,25 @@ grandma-buddy-hackathon/
       notes.py               /api/doctor-notes, /api/doctor-questions
       family.py              /api/family/summary
       profile.py             /api/profile
+      checkin.py             /api/check-in (the daily check-in: due today? start, skip)
   static/
-    index.html               one page, one <section data-screen> per screen: today, diary, pills, notes, scam, family (with settings)
-    styles.css               senior-friendly styles (see docs/DESIGN.md)
-    app.js                   page shell: greeting, Bigger words, api() helper, router (#/diary…), phone Menu drawer
-    talk.js                  voice box, /api/chat, call buttons, safety screens
-    screens.js               the screens other than Today (Family & settings so far)
+    index.html               one page, one <section data-screen> per screen: today, talk, diary, pills, notes, scam, family, settings
+    styles.css               the design system: tokens (light and dark), the orb, every screen, motion, Calm motion, print (see docs/DESIGN.md)
+    app.js                   page shell: greeting, theme (Auto/Light/Dark), text size, Calm motion, api() helper, router with View Transitions (#/talk…)
+    buddy.js                 Buddy, the living orb: drifting color blobs and its states (idle, listening, thinking, speaking)
+    talk.js                  voice mode: listening, /api/chat, latest and earlier exchanges, reading progress, chime, call buttons, safety screens
+    screens.js               the other screens: diary timeline, pills (ring, round checks) and reminder card, family, settings, toasts
     recorder.js              microphone -> 16 kHz mono 16-bit WAV
     speech.js                read-aloud wrapper around speechSynthesis (speed, voice, replay)
-    fonts/                   Lexend (the app's font) and its license, OFL-Lexend.txt
+    fonts/                   Figtree (all text) and Newsreader (greeting and documents), with their licenses
+    LICENSE-lucide.txt       license for the Lucide icons inlined in index.html and the scripts
   scripts/
     check_meta.py            one tiny real call to confirm the API key and billing work
     check_advice.py          hand-run: SAFETY.md advice phrases through the real AI (no advice given?)
     check_diary.py           hand-run: two "Something hurts" talks through the real AI (entry saved, no advice?)
     check_pills.py           hand-run: pill questions through the real AI (no doses said, "I took my pills" recorded?)
+    check_checkin.py         hand-run: a whole daily check-in through the real AI (mood, diary entry, pill taken, no advice?)
+    check_contrast.py        measures the contrast of every color pair the screens use
     seed_demo.py             fills the database with made-up demo data ("Rose", 7 days)
     browser_checks/          Playwright scripts that check screens in a real browser (/webapp-testing)
   tests/
@@ -106,11 +111,12 @@ grandma-buddy-hackathon/
 
 | Table | Columns |
 |---|---|
-| `profile` (one row) | id, name, preferred_name, language, family_name, family_email, family_phone, doctor_name, doctor_phone, voice_on, voice_rate, text_size |
+| `profile` (one row) | id, name, preferred_name, language, family_name, family_email, family_phone, doctor_name, doctor_phone, voice_on, voice_rate, text_size, calm_mode (no movement), chime (tone when listening starts and stops), theme ('auto', 'light', or 'dark'). Older databases get new columns on startup (`db.add_column`) |
 | `medications` | id, name, label_dose (exactly as on the label), times (JSON list like `["08:00","20:00"]`), notes, active, created_at |
 | `med_events` | id, medication_id, due_at, status (`due`, `snoozed`, or `taken`: only her answers are stored; `upcoming` and `missed` follow from the clock), snooze_until, acted_at. One row per pill per time (`med_events_once` unique index) |
 | `symptoms` (the diary) | id, created_at, description (her own words), body_area, pain_level (0 to 10, optional), since (her words, like "since Tuesday"), source (`check_in`, `diary`, `chat`, `safety_net`), conversation_id (the talk it came from; one entry per "Something hurts" talk) |
-| `moods` | id, created_at, mood (`great`, `good`, `okay`, `low`, `very_low`), note |
+| `moods` | id, created_at, mood (`great`, `good`, `okay`, `low`, `very_low`), note, conversation_id (one mood per talk: saving again in the same talk replaces it) |
+| `check_ins` | day (`YYYY-MM-DD`, one row per day), started_at, skipped (1 for "Not today"). The check-in is offered until today has a row |
 | `doctor_questions` | id, created_at, question, resolved |
 | `messages` | id, conversation_id, created_at, role, content |
 | `scam_checks` | id, created_at, input_kind (`voice`, `text`, `photo`), excerpt, verdict, red_flags (JSON) |
@@ -134,6 +140,9 @@ grandma-buddy-hackathon/
 | `POST /api/doctor-questions` | `{"question"}` | saved question |
 | `GET /api/family/summary?date=YYYY-MM-DD` | | `{"text", "mailto"}` |
 | `GET/PUT /api/profile` | profile fields | profile |
+| `GET /api/check-in` | | `{"due", "mood"}`: whether today's check-in is still to do, and today's latest mood (`{"mood", "at"}` or `null`) |
+| `POST /api/check-in/start` | `{"conversation_id"}` | `{"opening"}`: Buddy's fixed first question ("Good morning, Rose. How are you feeling today?"), also saved in that talk so the AI knows it was asked |
+| `POST /api/check-in/skip` | | "Not today": not offered again until tomorrow |
 
 ## Main flows
 
