@@ -72,6 +72,26 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
 
+- Oct 29 (Find my things, and welcome polish):
+  - **Find my things** (SPEC feature 12): she says or types what she's looking for and takes a photo of the room.
+    - **SAM 3.1** finds it (`meta_client.segment`, `/v1/responses`, `store=false`).
+    - The photo shows a soft halo in Buddy's orb colors around it, with the room dimmed like a spotlight.
+    - **Muse Spark** says where it is in one sentence, read aloud. The advice guard checks it, and plain words take over if it fails.
+    - If nothing is found, Buddy says so kindly and asks for another photo.
+    - Opens from a Home chip, or by voice: the `find_my_things` tool gives a "Find my glasses" button.
+    - The safety net runs first on her words, and the photo is never saved.
+  - **The real check** (`scripts/check_find.py`, 3 photos painted with Muse Image):
+    - glasses, keys, pill bottle, and remote all found, with sentences like "Your keys are on the counter on the left, in front of the white bowl by the kettle."; the umbrella is kindly not found ("Find check OK").
+    - "pill bottle" found nothing in SAM, so SAM is now asked for "medicine bottle" (`finder.SAM_WORDS`).
+    - The masks use an undocumented encoding, so the halo is drawn from the box.
+  - **Welcome:** "Step 2 of 3" in words, bigger dots, and a quiet Back at the top left on steps 2 and 3. "Say it" is now shared (`static/sayit.js`).
+  - **Home:** the four chips are a 2×2 grid of tiles on phones.
+  - **Tested:**
+    - 509 pytest (finder, route, tool, SAM request, all mocked);
+    - the full browser check passes (`check_find`, the welcome's step label and Back, Find in every screen size and theme);
+    - `/safety-check` passes.
+  - **The browser check's voice step** now gives the natural voice a minute. On a busy computer a sentence took 7 to 9 seconds, so the page rightly used the browser voice, and the check failed on timing, not on the app.
+
 - Oct 29 (welcome and demo week, for the video): screens are no longer empty.
   - **First-time welcome** (`static/welcome.js`, `#/welcome` while no name is saved): Buddy's orb, three step dots, and Newsreader questions.
     - The steps: "Let's begin" (the tap that lets Buddy speak), her name, one or two family members with phone numbers, then pills now or later. Home then says "Good evening, Rose".

@@ -19,6 +19,9 @@
  Memory book (shimmer, then the picture) <--JSON--  /api/memories
                                                       background: memories.make_page  ---->  Muse Spark 1.3 (writes the page)
                                                                                        ---->  Muse Image 1.0 (paints it)
+ Find my things: a photo + "glasses"  --POST-->  /api/find (safety net first)
+   the halo around it, the sentence    <--JSON--    finder.find  ----------------------->  SAM 3.1 (finds it: a box)
+                                                                  ----------------------->  Muse Spark 1.3 (says where)
                                                     SQLite file: data/grandma_buddy.db
                                                     Pictures: data/memories/<id>.webp
 ```
@@ -31,6 +34,7 @@ Key ideas:
 - The AI never gives medical advice (`docs/SAFETY.md`). It records, reminds, and connects her to people.
 - Reports (scam verdict, doctor notes, Memory book pages) use structured outputs (JSON schemas), so the screen can show clean cards instead of walls of text.
 - The Memory book uses two Meta models together: Muse Spark writes her story as a page in her own words, and Muse Image paints its picture in one fixed watercolor style. Plain code checks the page first.
+- Find my things also uses two together: SAM 3.1 finds her thing in the photo from a short text prompt, and Muse Spark looks at the same photo and says where it is ("next to the lamp"). The page draws the halo from SAM's box.
 
 ## Folder map
 
@@ -56,11 +60,12 @@ grandma-buddy-hackathon/
     main.py                  creates the FastAPI app, serves static/, includes the routes
     config.py                reads settings from .env (only place that does)
     db.py                    SQLite connection, creates tables, small query helpers
-    meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), paint() (Muse Image), transcribe()
+    meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), paint() (Muse Image), segment() (SAM 3.1), transcribe()
     safety.py                emergency, crisis, and medication mix-up rules with fixed messages
     prompts.py               system prompts for companion, diary, scam, notes, family
     family.py                the family update: one day in plain words (plain code, no AI) and its mailto: link
     memories.py              the Memory book: write the page (checked: only her names and numbers, no advice), paint it, the picture style
+    finder.py                Find my things: what she's looking for as a short noun phrase, SAM's answer line, the surest match, Spark's sentence (checked) or plain words
     voice.py                 Buddy's natural voice: Kokoro (kokoro-onnx) on this computer, the voices on offer, WAV making, a cache of recent words
     notes.py                 Doctor notes: facts straight from the logs (plain code); the AI only groups, checked
     scam.py                  Check a message: red-flag rules (a floor the AI can't lower), the AI's verdict, fixed what-to-do
@@ -74,17 +79,20 @@ grandma-buddy-hackathon/
       notes.py               /api/doctor-notes, /api/doctor-questions (add, asked, reopen)
       family.py              /api/family/summary
       memories.py            /api/memories (the pages, a picture, save, paint again)
+      find.py                /api/find (safety net first, then finder.find; the photo is never saved)
       voice.py               /api/voice (is the natural voice here, which voices), /api/speak (words in, WAV out)
       learned.py             /api/learned: what Buddy remembers and learned about her (Settings), forget, undo
       profile.py             /api/profile
       checkin.py             /api/check-in (the daily check-in: due today? start, skip)
   static/
-    index.html               one page, one <section data-screen> per screen: today, talk, diary, pills, notes, scam, family, memories, memory (one page, #/memory/3), settings
+    index.html               one page, one <section data-screen> per screen: today, talk, diary, pills, notes, scam, find (#/find/glasses), family, memories, memory (one page, #/memory/3), settings, welcome
     styles.css               the design system: tokens (light and dark), the orb, every screen, motion, Calm motion, print (see docs/DESIGN.md)
     app.js                   page shell: greeting, theme (Auto/Light/Dark), text size, Calm motion, api() helper, router with View Transitions (#/talk…)
     buddy.js                 Buddy, the living orb: drifting color blobs and its states (idle, listening, thinking, speaking)
     talk.js                  voice mode: listening, /api/chat, latest and earlier exchanges, reading progress, chime, call buttons, safety screens
-    welcome.js               the first-time welcome: name, family, pills now or later; typed or said ("Say it", through /api/check-words first)
+    welcome.js               the first-time welcome: "Step 1 of 3", name, family, pills now or later; typed or said ("Say it")
+    sayit.js                 "Say it" buttons for forms (the welcome, Find my things): record, write down, the safety net first (/api/check-words), then fill the form
+    find.js                  Find my things: what she's looking for (quick picks, "Say it"), the photo, the halo (an SVG in the photo's own pixels) and Buddy's sentence
     screens.js               the other screens: diary timeline, pills (ring, round checks) and reminder card, family, Memory book, settings, toasts
     recorder.js              microphone -> 16 kHz mono 16-bit WAV
     speech.js                read-aloud: Buddy's natural voice (/api/speak, one sentence at a time, the next made while one plays, the highlight estimated from how far it has played), else the browser's speechSynthesis (her choice in Settings, else the best English voice); any trouble falls back to the browser voice
@@ -99,6 +107,8 @@ grandma-buddy-hackathon/
     check_scam.py            hand-run: the SAFETY.md scam messages and one photo through the real AI (right verdicts?)
     check_notes.py           hand-run: the demo week's doctor notes grouped by the real AI (labels in her words?)
     check_memory.py          hand-run: two made-up memories written and painted by the real AI (about 3 cents), then screenshots
+    check_find.py            hand-run: Find my things end to end in a browser with the real SAM 3.1 and Muse Spark on 3 test photos (about 2 cents; 3 more the first time, to paint them), then screenshots
+    find_photos/             the 3 test photos for check_find.py, painted with Muse Image for this project (rooms only, no people)
     try_companion.py         hand-run: 8 made-up conversations with the real AI (about 25 cents), incl. a returning chat after real daily learning
     get_voice.py             hand-run once: downloads Buddy's natural voice model (Kokoro, about 354 MB) into models/
     check_contrast.py        measures the contrast of every color pair the screens use
@@ -123,6 +133,7 @@ grandma-buddy-hackathon/
 | `CHAT_MODEL` | `muse-spark-1.3` | conversation and reasoning model (standard, never `-contributor`) |
 | `TRANSCRIBE_MODEL` | `muse-voice-transcribe-1.0` | speech-to-text model |
 | `IMAGE_MODEL` | `muse-image-1.0` | paints the Memory book pictures (standard mode; Meta lists no `-contributor` version) |
+| `SAM_MODEL` | `sam-3.1` | finds her things in a photo (Find my things) |
 | `LANGUAGE` | `English` | the app's language, sent to speech-to-text as `languageBias` |
 | `DATABASE_PATH` | `data/grandma_buddy.db` | where the SQLite file lives |
 
@@ -173,6 +184,7 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `GET /api/memories/{id}/picture` | | the painting (WebP), only a file name saved by our own code; 404 before it is painted |
 | `POST /api/memories` | `{"conversation_id", "mode"}` (`chat` or `memory`, the talk the button was shown in) | "Save it in my memory book": the page made from what was said in that talk (400 if she said nothing), written and painted in the background. Already saved: the same page, not painted again |
 | `POST /api/memories/{id}/paint` | | "Paint it again", only for a page with `no_picture` (writes it first if it has no title) |
+| `POST /api/find` | `{"thing", "image", "width", "height"}`: what she said or typed, and the photo as a data URL (JPEG, PNG, or WebP, at most about 6 MB; the page shrinks it to about 1600px JPEG) and its size | the safety net first: a safety-screen answer like `/api/chat`'s if her words need one (no AI). Else `{"found": true, "thing", "sentence", "box": {"x1", "y1", "x2", "y2"}, "width", "height"}` (the box in the photo's own pixels, x2 and y2 included) or `{"found": false, "thing", "sentence"}`. 400 when she named nothing or the photo isn't one; 503 with a kind sentence when SAM can't look. The photo is never saved |
 | `POST /api/check-words` | `{"text"}` | words she said outside a talk (the welcome's "Say it"): the safety net only, never the AI. `{"show": null}`, or the same safety-screen answer as `/api/chat` (saved the same way) |
 | `POST /api/greeting` | `{"conversation_id"}` | `{"greeting"}`: at the start of a conversation (no talk in the last 2 hours), "Good afternoon, Rose!" plus a follow-up that's due (asked once) or a warm opener; plain words, no AI; saved in the conversation. Otherwise `""` |
 | `GET /api/learned` | | `{"facts": [{"id", "kind", "fact", "follow_up"}], "notes": [{"id", "note"}], "days_learned"}` for Settings |
@@ -253,6 +265,7 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `offer_memory_page` | none | tells the screen to show "Save it in my memory book" |
 | `save_memory` | none | saves what was said in the talk for a Memory book page (her own words; Buddy's questions too, for context) and shows "Open my memory book". The page is written and painted afterward. Saving again is the same page. Ordinary talk and memory talks only |
 | `open_screen` | screen (`today`, `diary`, `pills`, `notes`, `family`, `scam`, `memories`) | tells the screen to show "Open …" |
+| `find_my_things` | thing | when she can't find something: tells the screen to show "Find my glasses", which opens Find my things with the thing filled in. Plain code makes the thing a short noun phrase first |
 
 **Structured outputs (`meta_client.structured()`)**
 
@@ -310,6 +323,18 @@ Otherwise it is written once more with a note saying what to fix (like "These we
 **Painting (`meta_client.paint()`, Muse Image)**
 
 `POST /v1/images/generations` through the `openai` package's `images.generate` (Meta's endpoint follows the OpenAI Images format): `model` (`muse-image-1.0`), `prompt`, `n: 1`, `size: "1536x1024"`, and `extra_body: {"tool_enablement": {...all false}}`. That last part turns off Muse Image's own web and image search, so her story stays in the request and it never matches a real person's likeness. The answer is base64 (WebP by default). Our code saves it only if its first bytes are a real WebP, PNG, or JPEG. The prompt is always the fixed `memories.STYLE` (a soft watercolor storybook in Buddy's colors, no text, people only as small figures from behind or far away) followed by the writer's scene. That's what makes every page in the book look like the same book. It costs $0.01 per picture, so each page is painted once; "Paint it again" only appears when painting failed. Waits and retries on 429 and 503; a 180-second timeout.
+
+**Finding her things (`meta_client.segment()`, SAM 3.1)**
+
+`POST /v1/responses` through the `openai` package's `responses.create`: `model` (`sam-3.1`); `input` is one user message with an `input_text` part (one short noun phrase, like "glasses") and an `input_image` part (the data URL); `metadata: {"include_confidence": "true", "mask_encoding": "one_bit"}` (Meta's settings are strings); and `store: false`, so Meta doesn't keep her photo (big inline photos can also fail with HTTP 413 when stored). The answer (`output_text`) is one line, empty when nothing matched:
+
+```
+<0f>0<|box;x1=100;y1=200;x2=199;y2=259;w=1000;h=800;c=0.91|><|mask;x=0;y=0;data=60,100,!…|>,3<|box;…|><|mask;…|>
+```
+
+Each match is an id, a box, and a mask. `x1,y1` is the top-left corner and `x2,y2` the bottom-right (both included), in the photo's own pixels; `w,h` is the photo's size; `c` is how sure SAM is (0 to 1). `finder.parse_matches` reads the boxes and skips anything it can't read; `finder.best_match` keeps the surest, if `c` is at least 0.5. The mask (the exact outline) uses an encoding Meta doesn't document (only its own client library decodes it, with no published license), so the page draws a soft halo around the box instead. Costs $0.0025 per photo. Waits and retries on 429, like chat. A few things are asked of SAM by the name it knows (`finder.SAM_WORDS`): "pill bottle" found nothing in the real check, "medicine bottle" found it; Buddy still says "pill bottle" to her.
+
+Then Muse Spark (`structured()`, reasoning "low") gets the photo, the thing, and where the box is as parts of the photo ("from 10% to 20% across…"), and writes `{"sentence"}` with the `FIND` prompt: one short sentence, where it is next to what, never reading labels, never about medicines, health, or food, never describing people. The sentence is used only if it's 30 words or fewer and the advice guard finds nothing; otherwise, or when Spark is down, plain code says where in the photo it is ("Your keys are near the bottom left of your photo.").
 
 ## Errors and offline behavior
 

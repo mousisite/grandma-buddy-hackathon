@@ -167,6 +167,46 @@ def paint(prompt: str) -> bytes:
     return base64.b64decode(picture)
 
 
+def segment(image: str, phrase: str) -> str:
+    """Find a thing in a photo with SAM 3.1 (POST /v1/responses).
+
+    image is a data URL ("data:image/jpeg;base64,..."), and phrase is one
+    short noun phrase, like "glasses". Returns SAM's one-line answer: a box
+    (and a mask) for every match, or "" when nothing matches. app/finder.py
+    reads it. Costs $0.0025 per photo.
+
+    store=False: Meta doesn't keep her photo. (Big inline photos can also
+    fail with HTTP 413 when stored.)
+    """
+    settings = get_settings()
+    if not settings.model_api_key:
+        raise MetaError("no API key is set up in .env")
+    request = {
+        "model": settings.sam_model,  # sam-3.1
+        "input": [{"type": "message", "role": "user", "content": [
+            {"type": "input_text", "text": phrase},
+            {"type": "input_image", "image_url": image},
+        ]}],
+        # Meta's settings are words, even "true". one_bit masks are the small kind.
+        "metadata": {"include_confidence": "true", "mask_encoding": "one_bit"},
+        "store": False,
+    }
+    client = _client()
+    for attempt in range(RETRIES + 1):
+        try:
+            response = client.responses.create(**request)
+            break
+        except openai.RateLimitError:
+            if attempt == RETRIES:
+                raise MetaError("SAM stayed busy (HTTP 429)")
+            time.sleep(2**attempt)  # too busy: wait 1, then 2, then 4 seconds
+        except openai.APIStatusError as problem:
+            raise MetaError(f"SAM failed with HTTP {problem.status_code}")
+        except (openai.APITimeoutError, openai.APIConnectionError) as problem:
+            raise MetaError(f"SAM failed: {type(problem).__name__}")
+    return (response.output_text or "").strip()
+
+
 def transcribe(wav_bytes: bytes, keywords: list[str]) -> str:
     """Turn a recording (16 kHz mono 16-bit WAV) into text with Muse Voice Transcribe.
 

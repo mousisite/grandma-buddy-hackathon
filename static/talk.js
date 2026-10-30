@@ -426,6 +426,16 @@ function showActions(actions) {
         openScreen(action.screen);
       });
       row.appendChild(open);
+    } else if (action.type === "find") {
+      // "Buddy, where are my glasses?": Find my things, with "glasses" filled in.
+      var find = document.createElement("button");
+      find.type = "button";
+      find.className = "call-pill";
+      find.textContent = action.label;
+      find.addEventListener("click", function () {
+        location.hash = "#/find/" + encodeURIComponent(action.thing);
+      });
+      row.appendChild(find);
     } else if (isCallLink(action.href)) {
       row.appendChild(callLink(action, "call-pill"));
     }

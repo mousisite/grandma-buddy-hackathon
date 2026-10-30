@@ -76,7 +76,7 @@ Rules for the helper skills:
 - Frontend: plain HTML, CSS, and JavaScript in `static/`, served by FastAPI. No React, no npm, no build step.
 - Voice in: the browser records the microphone, converts it to 16 kHz mono 16-bit WAV in JavaScript, and posts it to our backend, which calls Muse Voice Transcribe.
 - Voice out: Meta has no text-to-speech model (checked against Meta's docs, Oct 29). Buddy speaks with Kokoro, an open voice model (Apache-2.0) that runs on this computer through `kokoro-onnx` (`app/voice.py`, `/api/speak`), so it sounds natural in every browser and nothing leaves the computer. The browser's built-in `speechSynthesis` is the backup: when the voice files aren't there, when she picks a browser voice, and whenever the natural voice has trouble (safety messages wait at most 2.5 seconds for it). Approved by the user on Oct 29.
-- Models in the app: `muse-spark-1.3` for conversation and reasoning, `muse-voice-transcribe-1.0` for speech-to-text. Standard models only. Never use a `-contributor` model in the app, because it handles health information.
+- Models in the app: `muse-spark-1.3` for conversation and reasoning, `muse-voice-transcribe-1.0` for speech-to-text, `muse-image-1.0` for the Memory book pictures, and `sam-3.1` to find her things in a photo (Find my things). Standard models only. Never use a `-contributor` model in the app, because it handles health information.
 - Every call to Meta lives in `app/meta_client.py`. Nothing else talks to `api.meta.ai`.
 
 ## Hard rules

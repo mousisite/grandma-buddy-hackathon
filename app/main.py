@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from app import db
 from app.config import get_settings
 from app import voice
-from app.routes import checkin, companion, diary, family, learned, meds, memories, notes, profile, scam
+from app.routes import checkin, companion, diary, family, find, learned, meds, memories, notes, profile, scam
 from app.routes import voice as voice_routes
 
 # The folder with index.html, styles.css, and app.js.
@@ -54,6 +54,8 @@ app.include_router(scam.router)
 app.include_router(family.router)
 # The Memory book: her stories, written in her words, each with a painting.
 app.include_router(memories.router)
+# Find my things: SAM 3.1 finds her glasses in a photo, Spark says where.
+app.include_router(find.router)
 # Buddy's natural voice (Kokoro, on this computer).
 app.include_router(voice_routes.router)
 # What Buddy has learned about her (Settings): see it, forget it, undo.

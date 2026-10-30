@@ -194,9 +194,33 @@ def transcribe(wav_bytes: bytes, keywords: list[str]) -> str:
 - Tests never call the real API. In `tests/conftest.py`, replace the functions in `app.meta_client` with fakes that return fixed replies, tool calls, and JSON results.
 - `scripts/check_meta.py` is the one live check that the key and billing work. It is run by hand, never by tests.
 
+## Finding things in a photo: SAM 3.1 (`meta_client.segment`)
+
+Checked against Meta's SAM docs on October 29, 2026, and with one real call (`scripts/check_find.py`).
+
+```python
+response = client.responses.create(
+    model=settings.sam_model,  # "sam-3.1"
+    input=[{"type": "message", "role": "user", "content": [
+        {"type": "input_text", "text": "glasses"},                      # ONE short noun phrase
+        {"type": "input_image", "image_url": "data:image/jpeg;base64,..."},
+    ]}],
+    metadata={"include_confidence": "true", "mask_encoding": "one_bit"},  # values are strings
+    store=False,  # Meta doesn't keep her photo; big inline photos can also 413 when stored
+)
+line = response.output_text  # "" when nothing matched
+```
+
+- The answer is one line: `<0f>0<|box;x1=..;y1=..;x2=..;y2=..;w=..;h=..;c=0.91|><|mask;x=0;y=0;data=H,W,!…|>,3<|box…|>…`. Each match is an id, a box, and a mask. Boxes are in the photo's own pixels, `x2` and `y2` included; `w,h` is the photo's size; `c` is the confidence (only with `include_confidence`).
+- Some everyday phrases find nothing: "pill bottle" matched nothing in a clear photo, while "medicine bottle" (0.82) and "bottle" (0.96) found it. Map her words to SAM's in `finder.SAM_WORDS`, and try a new phrase with the real model before trusting it.
+- No threshold or "max objects" input exists: every match comes back, so filter by `c` in our code (`finder.best_match`, at least 0.5).
+- The mask's base85 encoding isn't documented, and Meta's `meta-sam-parser` has no published license, so we don't use masks: the page draws a halo around the box.
+- $0.0025 per image. Retries on 429 like chat.
+
 ## Docs to check when unsure
 
 - Chat Completions: https://dev.meta.ai/docs/protocols/chat-completions
 - Models: https://dev.meta.ai/docs/models
 - Speech to text: https://dev.meta.ai/docs/speech-to-text
 - Transcribe API reference: https://dev.meta.ai/docs/api-reference/voice/transcribe
+- SAM 3.1: https://dev.meta.ai/docs/sam/reading-segmentation and https://dev.meta.ai/docs/api-reference/responses/create-response

@@ -122,6 +122,15 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - `scripts/seed_demo.py` fills every screen with a made-up week for Rose: two pills (mostly taken), two family contacts with 555 numbers, 5 check-ins with mixed moods, a knee pain that comes and goes in her own words, two doctor questions, one checked scam text, two painted Memory book pages, and what Buddy has learned about her. `--reset` saves a backup, then wipes and reseeds.
 - Done when: the welcome works on a fresh database, and after seeding every screen is filled in.
 
+### 12. Find my things (P1)
+
+- She can't find her glasses, keys, TV remote, or pill bottle. From the "Find my things" chip on Home, or by voice ("Buddy, where are my glasses?" gives a "Find my glasses" button), she says or types what she's looking for (quick picks for the usual things), then takes or chooses a photo of the room.
+- SAM 3.1 finds the thing from a short text prompt ("glasses"). The photo shows with a soft glowing halo in Buddy's orb colors around it (not a box), and the rest of the room dims a little.
+- Muse Spark 1.3 looks at the photo and says where it is in one plain sentence, read aloud: "Your glasses are on the side table, next to the lamp." If Spark is down, or its sentence isn't right for her, plain code says where in the photo it is instead.
+- If nothing is found, Buddy says so kindly and asks for another photo, maybe from a different spot with the lights on.
+- The safety net runs first on what she said. Her photo is never saved (and is sent to Meta with `store=false`). Buddy never reads labels, never says anything about medicines or health, and never describes people.
+- Done when: it works on 3 made-up test photos with the real SAM 3.1 (`scripts/check_find.py`), every Meta call has a mocked test, and the result screen is checked in a browser.
+
 ## Not building (out of scope)
 
 - Any medical advice: saying how serious a symptom is, what causes it, or what to do about it

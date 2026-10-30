@@ -1,9 +1,9 @@
 // Grandma Buddy: the first-time welcome (docs/DESIGN.md, "Welcome").
 // While no name is saved, the app opens here (app.js). Three steps: her
 // name, one or two people she loves, and her pills now or later. Each can be
-// typed, or said with "Say it": what she says goes through the safety net
-// first (/api/check-words), never to the AI, then fills the fields, which
-// she can correct. Buddy reads each question aloud (after her first tap:
+// typed, or said with "Say it" (sayit.js): what she says goes through the
+// safety net first (/api/check-words), never to the AI, then fills the
+// fields, which she can correct. Buddy reads each question aloud (after her first tap:
 // browsers stay silent until then, which is what "Let's begin" is for).
 
 "use strict";
@@ -22,11 +22,7 @@ var WELCOME_STEPS = [
     words: "I can remind you when it’s time for each one. A family member can help with this, now or later.",
     spoken: "Would you like to set up your pills now? A family member can help, now or later." },
 ];
-var SAY_IT_WORDS = { idle: "Say it", listening: "I’m done", working: "One moment…" };
-var SAY_IT_LIMIT_MS = 20 * 1000; // she can say a name and a number in this
 var welcomeStep = 0;
-var sayingIt = null; // the "Say it" button that is listening
-var sayItTimer = null;
 
 // The screen loader (screens.js): show the step she is on.
 function showWelcome() {
@@ -41,19 +37,28 @@ function showWelcomeStep(step, speakIt) {
   document.querySelectorAll(".welcome-step").forEach(function (part) {
     part.hidden = Number(part.getAttribute("data-step")) !== step;
   });
+  // "Step 2 of 3" says where she is; the dots only show it (aria-hidden).
+  // A screen reader hears it with each question (focus goes to the title).
+  var title = document.getElementById("welcome-title");
+  document.getElementById("welcome-progress").hidden = step === 0;
+  setText(document.getElementById("welcome-count"), "Step " + step + " of 3");
+  if (step === 0) {
+    title.removeAttribute("aria-describedby");
+  } else {
+    title.setAttribute("aria-describedby", "welcome-count");
+  }
   document.querySelectorAll("[data-dot]").forEach(function (dot) {
     var number = Number(dot.getAttribute("data-dot"));
-    dot.toggleAttribute("data-done", number <= step);
-    if (number === step) {
-      dot.setAttribute("aria-current", "step");
-    } else {
-      dot.removeAttribute("aria-current");
-    }
+    dot.toggleAttribute("data-done", number < step);
+    dot.toggleAttribute("data-current", number === step);
   });
+  // Back from step 2 or 3. Hidden, not removed, so the orb never jumps.
+  document.getElementById("welcome-back").style.visibility = step >= 2 ? "visible" : "hidden";
   document.getElementById("welcome-status").textContent = "";
   if (speakIt && shown.spoken) {
     speak(shown.spoken.replace("{name}", profile.preferred_name || profile.name || "you"));
   }
+  window.scrollTo(0, 0); // each step starts at the top: the orb, where she is, and Back
   document.getElementById("welcome-title").focus(); // screen readers hear the new question
 }
 
@@ -112,70 +117,7 @@ function finishWelcome(withPills) {
   }
 }
 
-// ---------- "Say it" ----------
-
-// Busy, never disabled: disabling a button she just tapped would drop
-// keyboard focus and leave its pressed look stuck.
-function setSayIt(button, state) {
-  button.setAttribute("data-state", state);
-  button.setAttribute("aria-disabled", String(state === "working"));
-  button.querySelector("span").textContent = SAY_IT_WORDS[state];
-  setBuddyState(state === "listening" ? "listening" : state === "working" ? "thinking" : "idle");
-}
-
-function sayIt(button) {
-  if (button.getAttribute("data-state") === "working") {
-    return; // still working out what she said
-  }
-  if (sayingIt) {
-    stopSayingIt();
-    return;
-  }
-  stopSpeaking(); // the microphone never hears Buddy
-  sayingIt = button;
-  setSayIt(button, "listening");
-  startRecording()
-    .then(function () {
-      sayItTimer = setTimeout(stopSayingIt, SAY_IT_LIMIT_MS);
-    })
-    .catch(function (reason) {
-      sayingIt = null;
-      setSayIt(button, "idle");
-      var blocked = reason && (reason.name === "NotAllowedError" || reason.name === "SecurityError");
-      document.getElementById("welcome-status").textContent = blocked
-        ? "I can’t hear you yet. Allow the microphone at the top of the window, or type it instead."
-        : "I can’t find a microphone. You can type it instead.";
-    });
-}
-
-function stopSayingIt() {
-  clearTimeout(sayItTimer);
-  var button = sayingIt;
-  sayingIt = null;
-  setSayIt(button, "working");
-  stopRecording()
-    .then(sendForTranscript)
-    .then(function (result) {
-      var words = (result.transcript || "").trim();
-      if (!words) {
-        throw problem("NotHeard");
-      }
-      // The safety net first, like everything she says to Buddy.
-      return api("/api/check-words", "POST", { text: words }).then(function (answer) {
-        if (answer.show) {
-          openSafetyScreen(answer.show, answer.reply, answer.actions);
-        } else {
-          fillFromWords(button.form, words);
-        }
-      });
-    })
-    .catch(function () {
-      document.getElementById("welcome-status").textContent = "I didn’t catch that. Please try again, or type it.";
-    })
-    .then(function () {
-      setSayIt(button, "idle");
-    });
-}
+// ---------- What she said with "Say it" (sayit.js) ----------
 
 function capitalized(word) {
   return word.charAt(0).toUpperCase() + word.slice(1);
@@ -216,11 +158,10 @@ function startWelcome() {
   document.getElementById("welcome-begin").addEventListener("click", function () { showWelcomeStep(1, true); });
   document.getElementById("welcome-name-form").addEventListener("submit", saveName);
   document.getElementById("welcome-family-form").addEventListener("submit", saveFamily);
-  document.querySelectorAll("[data-say-it]").forEach(function (button) {
-    button.addEventListener("click", function () { sayIt(button); });
-  });
-  document.querySelectorAll("[data-welcome-back]").forEach(function (button) {
-    button.addEventListener("click", function () { showWelcomeStep(welcomeStep - 1, false); });
+  SAY_IT_FILL["welcome-name-form"] = fillFromWords;
+  SAY_IT_FILL["welcome-family-form"] = fillFromWords;
+  document.getElementById("welcome-back").addEventListener("click", function () {
+    showWelcomeStep(welcomeStep - 1, false);
   });
   document.querySelector("[data-welcome-skip]").addEventListener("click", function () { showWelcomeStep(3, true); });
   document.getElementById("welcome-pills").addEventListener("click", function () { finishWelcome(true); });

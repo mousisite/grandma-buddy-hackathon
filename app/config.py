@@ -21,6 +21,7 @@ class Settings:
     chat_model: str = "muse-spark-1.3"  # conversation model (standard, never -contributor)
     transcribe_model: str = "muse-voice-transcribe-1.0"  # speech-to-text model
     image_model: str = "muse-image-1.0"  # paints the Memory book pictures (standard, never -contributor)
+    sam_model: str = "sam-3.1"  # finds her things in a photo ("Find my things")
     language: str = "English"  # the app's language, sent to speech-to-text as a hint
     database_path: str = "data/grandma_buddy.db"  # where the SQLite file lives
 
@@ -36,6 +37,7 @@ def get_settings() -> Settings:
         chat_model=os.getenv("CHAT_MODEL", "muse-spark-1.3"),
         transcribe_model=os.getenv("TRANSCRIBE_MODEL", "muse-voice-transcribe-1.0"),
         image_model=os.getenv("IMAGE_MODEL", "muse-image-1.0"),
+        sam_model=os.getenv("SAM_MODEL", "sam-3.1"),
         language=os.getenv("LANGUAGE", "English"),
         database_path=os.getenv("DATABASE_PATH", "data/grandma_buddy.db"),
     )

@@ -11,7 +11,7 @@ import json
 import re
 from datetime import date, datetime, timedelta
 
-from app import db, guard, reminders, safety
+from app import db, finder, guard, reminders, safety
 
 MOODS = ["great", "good", "okay", "low", "very_low"]
 SCREENS = ["today", "diary", "pills", "notes", "family", "scam", "memories"]
@@ -245,6 +245,11 @@ TOOLS = [
          "Save the memory she just told you in her memory book, when she says yes. Her words are saved "
          "automatically; Buddy then writes the page and paints a picture for it.",
          {}, []),
+    tool("find_my_things",
+         "Show a button to look for something she can't find (her glasses, keys, TV remote) in a photo of the "
+         "room she takes.",
+         {"thing": {"type": "string", "description": "What she is looking for, in a few words, like \"glasses\"."}},
+         ["thing"]),
 ]
 
 
@@ -402,6 +407,12 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
         if new:
             context["memory_saved"] = memory_id  # the route writes and paints it next
         return {"ok": True}, [OPEN_MEMORY_BOOK]
+
+    if name == "find_my_things":
+        thing = finder.clean_thing(str(args.get("thing", "")))
+        if not thing:
+            return {"ok": False, "error": "Ask her what she's looking for."}, []
+        return {"ok": True}, [{"type": "find", "thing": thing, "label": f"Find my {thing}"}]
 
     if name == "open_screen":
         screen = args.get("screen")

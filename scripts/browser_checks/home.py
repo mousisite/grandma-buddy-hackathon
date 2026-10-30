@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 ROOT = Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "test-output"
 PORT = 8001
-SCREENS = ["today", "talk", "diary", "pills", "notes", "scam", "family", "memories", "settings"]
+SCREENS = ["today", "talk", "diary", "pills", "notes", "scam", "find", "family", "memories", "settings"]
 SIZES = [(390, 844), (768, 1024), (1440, 900)]  # phone, tablet, desktop
 
 
@@ -263,13 +263,18 @@ def check_settings_form(page, problems: list[str]) -> None:
     if natural:
         assert voices[0] == "natural:af_heart", voices
         assert page.evaluate("chosenNatural()") == "af_heart", "the natural voice should be the default"
+        # A busy computer can take longer than the page's 6 seconds to make a
+        # sentence (then the page rightly uses the browser voice). Here the
+        # check is about the page playing the natural voice, so give it time.
+        page.evaluate("NATURAL_WAIT_MS = 60000")
         page.select_option("#voice-choice", "natural:af_bella")
         assert page.evaluate("chosenNatural()") == "af_bella"
         # Choosing it says a few words in it: made on this computer, played by the page.
-        page.wait_for_function("naturalAudio !== null && !naturalAudio.paused", timeout=20000)
+        page.wait_for_function("naturalAudio !== null && !naturalAudio.paused", timeout=60000)
         page.click("#voice-try")
-        page.wait_for_function("naturalAudio !== null && !naturalAudio.paused", timeout=20000)
+        page.wait_for_function("naturalAudio !== null && !naturalAudio.paused", timeout=60000)
         page.evaluate("stopSpeaking()")
+        page.evaluate("NATURAL_WAIT_MS = 6000")
     browser_voices = [value for value in voices if not value.startswith("natural:")]
     if len(browser_voices) > 1:
         assert browser_voices[0] == page.evaluate("englishVoices()[0].name")
@@ -694,6 +699,84 @@ def check_scam(browser) -> None:
         page.close()
 
 
+def found_in_the_middle(route) -> None:
+    """A stand-in for /api/find (no AI here): her thing is in the middle of
+    whatever photo the page sent, in that photo's own pixels."""
+    sent = route.request.post_data_json
+    width, height = sent["width"], sent["height"]
+    route.fulfill(json={
+        "found": True, "thing": "keys", "sentence": "Your keys are on the counter, next to the fruit bowl.",
+        "box": {"x1": width * 4 // 10, "y1": height * 4 // 10, "x2": width * 6 // 10, "y2": height * 6 // 10},
+        "width": width, "height": height,
+    })
+
+
+def check_find(browser) -> None:
+    """Find my things, with /api/find faked (the real SAM 3.1 runs only in
+    scripts/check_find.py): the Home chip, "say what you're looking for
+    first", a quick pick, a photo, then the halo, Buddy's sentence (the
+    photo's description, with focus on it), and the buttons; nothing found;
+    the safety net on her words (real, no AI); and "Buddy, where are my
+    glasses?" opening Find with "glasses" filled in."""
+    painted = ROOT / "scripts" / "find_photos" / "kitchen.webp"
+    for theme, width, height in [("light", 390, 844), ("dark", 1440, 900)]:
+        page = browser.new_page(viewport={"width": width, "height": height}, color_scheme=theme)
+        visit(page, "today")
+        page.click(".chips a[href='#/find']")
+        wait_for_screen(page, "find")
+        picture = painted if painted.exists() else OUT / "find-photo-sample.png"
+        if not painted.exists():
+            page.screenshot(path=str(picture), clip={"x": 0, "y": 0, "width": 390, "height": 300})
+        # No photo before she says what she's looking for.
+        page.click("#find-ask button[type=submit]")
+        page.wait_for_selector("#find-ask-problem")
+        page.click("[data-find-pick='keys']")
+        assert page.input_value("#find-thing") == "keys"
+        assert page.get_attribute("[data-find-pick='keys']", "aria-pressed") == "true"
+        check_layout(page, f"find, asking at {width}px")
+
+        page.route("**/api/find", found_in_the_middle)
+        page.set_input_files("#find-camera", str(picture))
+        page.wait_for_selector("#find-after:not([hidden])")
+        page.wait_for_timeout(1200)  # the halo has finished drawing
+        assert page.get_attribute("#find-photo", "data-state") == "found"
+        assert page.locator("#find-halo .find-ring").count() == 1
+        sentence = "Your keys are on the counter, next to the fruit bowl."
+        assert page.text_content("#find-answer") == sentence
+        assert page.get_attribute("#find-image", "alt") == sentence, "a screen reader hears where it is"
+        assert page.evaluate("document.activeElement.id") == "find-answer"
+        check_layout(page, f"find, found at {width}px")
+        page.screenshot(path=str(OUT / f"find-found-{width}-{theme}.png"), full_page=True)
+
+        # Nothing found: no halo, a kind sentence, and "Try another photo".
+        page.unroute("**/api/find")
+        page.route("**/api/find", lambda route: route.fulfill(json={
+            "found": False, "thing": "keys",
+            "sentence": "I couldn't spot your keys in this photo. Could you take another one, maybe from a different "
+                        "spot with the lights on?"}))
+        page.set_input_files("#find-camera", str(picture))
+        page.wait_for_function("document.getElementById('find-photo').dataset.state === 'missing'")
+        assert page.locator("#find-halo ellipse").count() == 0
+        assert page.is_visible("#find-retake")
+        page.unroute("**/api/find")
+
+        if width == 390:
+            # The safety net first (the real route; no AI is needed for it).
+            page.click("#find-other")
+            page.fill("#find-thing", "I took my pills twice by accident")
+            page.set_input_files("#find-camera", str(picture))
+            page.wait_for_selector("#safety-screen[open][data-kind='poison_control']")
+            page.click("#safety-close")
+            # "Buddy, where are my glasses?" gives a "Find my glasses" button (voice mode).
+            visit(page, "talk")
+            page.evaluate("showActions([{type: 'find', thing: 'glasses', label: 'Find my glasses'}])")
+            page.click("#actions button:has-text('Find my glasses')")
+            wait_for_screen(page, "find")
+            assert page.input_value("#find-thing") == "glasses"
+            assert page.get_attribute("[data-find-pick='glasses']", "aria-pressed") == "true"
+        page.close()
+
+
 def seed_demo_week(database: str) -> None:
     """Fill the test server's database with the made-up demo week
     (scripts/seed_demo.py --reset, which keeps a backup first; no paintings)."""
@@ -745,6 +828,8 @@ def check_welcome(browser) -> None:
     page.screenshot(path=str(OUT / "welcome-0-390.png"))
     check_layout(page, "welcome, the start")
     page.click("#welcome-begin")
+    assert page.text_content("#welcome-count") == "Step 1 of 3"
+    assert not page.is_visible("#welcome-back"), "no Back on the first question"
     say_it(page, "#welcome-name-form", "My name is Rose")
     assert page.input_value("#welcome-name") == "Rose"
     page.screenshot(path=str(OUT / "welcome-1-390.png"))
@@ -752,6 +837,15 @@ def check_welcome(browser) -> None:
     page.click("#welcome-name-form button[type=submit]")
     page.wait_for_selector("#welcome-family-form:not([hidden])")
     assert "Who should I call" in (page.text_content("#welcome-title") or "")
+    assert page.text_content("#welcome-count") == "Step 2 of 3"
+    # Back (top left) returns to her name, still filled in; Next comes back here.
+    back = page.locator("#welcome-back").bounding_box()
+    assert back and back["height"] >= 48 and back["y"] < 120, f"Back is a big target at the top: {back}"
+    page.click("#welcome-back")
+    page.wait_for_selector("#welcome-name-form:not([hidden])")
+    assert page.input_value("#welcome-name") == "Rose"
+    page.click("#welcome-name-form button[type=submit]")
+    page.wait_for_selector("#welcome-family-form:not([hidden])")
     page.fill("#welcome-family-name", "Maria")
     page.fill("#welcome-family-phone", "555-0100")
     say_it(page, "#welcome-family-form", "My son Daniel, 555 0144")
@@ -765,6 +859,8 @@ def check_welcome(browser) -> None:
     page.fill("#welcome-family2-phone", "555-0144")
     page.click("#welcome-family-form button[type=submit]")
     page.wait_for_selector("[data-step='3']:not([hidden])")
+    assert page.text_content("#welcome-count") == "Step 3 of 3"
+    assert page.is_visible("#welcome-back")
     page.screenshot(path=str(OUT / "welcome-3-390.png"))
     check_layout(page, "welcome, her pills")
     page.click("#welcome-later")
@@ -981,6 +1077,7 @@ def main() -> int:
                 check_memory_talk(page)
                 check_pills(page, problems)
                 check_scam(browser)
+                check_find(browser)
 
                 # The safety net, end to end: she says an emergency warning sign
                 # (faked speech-to-text), the real /api/chat answers with no AI,
@@ -1104,7 +1201,9 @@ def main() -> int:
             "entry, theme, text size, and Calm motion work, \"Something hurts\" talks in diary mode, the Memory book "
             "(chip, empty book, memory talk in memory mode, Save it in my memory book), pill reminders "
             "work (card, I took it, remind me, ring, round check, change, remove, undo), Check a message (paste, "
-            "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), Doctor notes on the demo week "
+            "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), Find my things (chip, \"What "
+            "are you looking for?\" first, quick pick, photo, halo and sentence, nothing found, safety net first, the "
+            "Find my glasses button), the welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
             "(sections, Asked and Undo, Add a question, 14 days, prints on one page), the family update (the email holds "
             "exactly the words on screen, Copy, Yesterday), the emergency screen never "
             "moves, Auto theme follows the computer and the evening, every screen at 390/768/1440px in light and "

@@ -135,6 +135,10 @@
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"></path><path d="M16 8.2A2.22 2.22 0 0 0 13.8 6c-.8 0-1.4.3-1.8.9-.4-.6-1-.9-1.8-.9A2.22 2.22 0 0 0 8 8.2c0 .6.3 1.2.7 1.6A226.652 226.652 0 0 0 12 13a404 404 0 0 0 3.3-3.1 2.413 2.413 0 0 0 .7-1.7"></path></svg>
           Memory book
         </a>
+        <a class="chip" href="#/find">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><circle cx="12" cy="12" r="3"></circle><path d="m16 16-1.9-1.9"></path></svg>
+          Find my things
+        </a>
       </nav>
 
       <!-- Today, as a clean list (screens.js fills in the details). -->
@@ -451,18 +455,92 @@
       <p class="note memory-share-note">This opens your email with the story written in. To share the painting too, tap Print and save it as a PDF.</p>
     </section>
 
+    <!-- ========== Find my things ==========
+         She says or types what she's looking for and takes a photo of the
+         room. SAM 3.1 finds it, Buddy draws a soft halo around it and says
+         where it is (find.js; docs/DESIGN.md, "Find my things"). -->
+    <section class="screen find" data-screen="find" aria-labelledby="find-title" hidden>
+      <header class="screen-head">
+        <h1 id="find-title" class="display" tabindex="-1">Find my things</h1>
+        <p class="lead">Can’t find your glasses or keys? Tell Buddy what you’re looking for, then take a photo of the room.</p>
+      </header>
+
+      <form id="find-ask" class="find-ask" novalidate>
+        <div class="field">
+          <label for="find-thing">What are you looking for?</label>
+          <input id="find-thing" name="thing" type="text" autocomplete="off" maxlength="80" placeholder="Like “my glasses”">
+        </div>
+        <div class="find-picks" role="group" aria-label="Things you often look for">
+          <button class="chip" type="button" data-find-pick="glasses" aria-pressed="false">Glasses</button>
+          <button class="chip" type="button" data-find-pick="keys" aria-pressed="false">Keys</button>
+          <button class="chip" type="button" data-find-pick="remote" aria-pressed="false">Remote</button>
+          <button class="chip" type="button" data-find-pick="pill bottle" aria-pressed="false">Pill bottle</button>
+          <button class="chip" type="button" data-find-pick="phone" aria-pressed="false">Phone</button>
+        </div>
+        <div class="find-actions">
+          <button class="pill-button pill-button--quiet pill-button--hero" type="button" data-say-it="find-status">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+            <span>Say it</span>
+          </button>
+          <button class="pill-button pill-button--ink pill-button--hero" type="submit">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+            Take a photo
+          </button>
+        </div>
+        <button id="find-choose" class="text-button find-choose" type="button">Choose a photo instead</button>
+        <!-- The camera, or her photos; the picture is shrunk before it is sent. -->
+        <input id="find-camera" type="file" accept="image/*" capture="environment" hidden>
+        <input id="find-library" type="file" accept="image/*" hidden>
+      </form>
+
+      <p id="find-status" class="note" role="status" aria-live="polite"></p>
+
+      <!-- Her photo. While Buddy looks, the orb thinks on top of it; then a
+           soft halo in Buddy's colors circles her thing, and the rest of the
+           room dims a little. Buddy's sentence is the photo's description. -->
+      <section id="find-result" class="find-result" aria-labelledby="find-answer" hidden>
+        <figure id="find-photo" class="find-photo" data-state="looking">
+          <img id="find-image" alt="">
+          <svg id="find-halo" class="find-halo" aria-hidden="true" focusable="false"></svg>
+          <div class="find-looking" aria-hidden="true">
+            <div class="orb orb--find"></div>
+          </div>
+        </figure>
+        <p id="find-answer" class="find-answer" tabindex="-1"></p>
+        <div class="find-actions" id="find-after" hidden>
+          <button id="find-say-again" class="pill-button pill-button--quiet pill-button--hero" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path></svg>
+            Say it again
+          </button>
+          <button id="find-retake" class="pill-button pill-button--ink pill-button--hero" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+            Try another photo
+          </button>
+        </div>
+        <button id="find-other" class="text-button find-choose" type="button" hidden>Look for something else</button>
+      </section>
+    </section>
+
     <!-- ========== Welcome (the first time, while no name is saved) ==========
          Three steps: her name, her family, pills now or later. Each can be
          typed or said ("Say it"); what she says goes through the safety net
          first (/api/check-words). welcome.js runs it. -->
     <section class="screen welcome" data-screen="welcome" aria-labelledby="welcome-title" hidden>
+      <!-- Back on steps 2 and 3. Its row is always there, so nothing jumps. -->
+      <button id="welcome-back" class="text-button welcome-back" type="button">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+        <span>Back</span>
+      </button>
       <div class="welcome-stage">
         <div class="orb orb--welcome" aria-hidden="true"></div>
-        <ol class="welcome-dots" aria-label="Steps">
-          <li data-dot="1"><span class="visually-hidden">Your name</span></li>
-          <li data-dot="2"><span class="visually-hidden">Your family</span></li>
-          <li data-dot="3"><span class="visually-hidden">Your pills</span></li>
-        </ol>
+        <div id="welcome-progress" class="welcome-progress" hidden>
+          <p id="welcome-count" class="welcome-count">Step 1 of 3</p>
+          <ol class="welcome-dots" aria-hidden="true">
+            <li data-dot="1"></li>
+            <li data-dot="2"></li>
+            <li data-dot="3"></li>
+          </ol>
+        </div>
         <h1 id="welcome-title" class="welcome-title" tabindex="-1">Hello! I’m Buddy.</h1>
         <p id="welcome-words" class="welcome-words">I’m an AI helper here to keep you company, remind you about your pills, and help you stay close to your family.</p>
       </div>
@@ -477,7 +555,7 @@
           <input id="welcome-name" name="preferred_name" type="text" autocomplete="off" maxlength="80" placeholder="Like “Rose”">
         </div>
         <div class="welcome-actions">
-          <button class="pill-button pill-button--quiet pill-button--hero" type="button" data-say-it>
+          <button class="pill-button pill-button--quiet pill-button--hero" type="button" data-say-it="welcome-status">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
             <span>Say it</span>
           </button>
@@ -509,14 +587,13 @@
           </div>
         </fieldset>
         <div class="welcome-actions">
-          <button class="pill-button pill-button--quiet pill-button--hero" type="button" data-say-it>
+          <button class="pill-button pill-button--quiet pill-button--hero" type="button" data-say-it="welcome-status">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
             <span>Say it</span>
           </button>
           <button class="pill-button pill-button--ink pill-button--hero" type="submit">Next</button>
         </div>
         <div class="welcome-more">
-          <button class="text-button" type="button" data-welcome-back>Back</button>
           <button class="text-button" type="button" data-welcome-skip>Skip for now</button>
         </div>
       </form>
@@ -525,9 +602,6 @@
         <div class="welcome-actions">
           <button id="welcome-pills" class="pill-button pill-button--ink pill-button--hero" type="button">Add my pills now</button>
           <button id="welcome-later" class="pill-button pill-button--quiet pill-button--hero" type="button">Later</button>
-        </div>
-        <div class="welcome-more">
-          <button class="text-button" type="button" data-welcome-back>Back</button>
         </div>
       </div>
       <p id="welcome-status" class="form-status" role="status" aria-live="polite"></p>
@@ -739,7 +813,9 @@
   <script src="/static/speech.js"></script>
   <script src="/static/talk.js"></script>
   <script src="/static/screens.js"></script>
+  <script src="/static/sayit.js"></script>
   <script src="/static/welcome.js"></script>
+  <script src="/static/find.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

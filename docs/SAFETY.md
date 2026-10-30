@@ -159,6 +159,13 @@ How the checker keeps to these rules (`app/scam.py`):
 - Pictures (Muse Image) always use one fixed watercolor-storybook style. People appear only as small figures seen from behind or far away, with no detailed faces, so a page never looks like a photo of a real person. Muse Image's web and image search are turned off for every picture: her story is never looked up, and the model never matches a real person's likeness.
 - Pages and pictures stay on this computer (`data/`, git-ignored). "Send to {family}" opens her own email app with the story written in, the same as the family update; nothing is sent until she presses Send.
 
+## 8b. Find my things
+
+- What she says or types ("Where are my pills? I think I took them twice") goes through the safety net first (`/api/find`, or `/api/check-words` for "Say it"), before SAM or Spark see anything. A match shows the fixed safety screen and saves the event, like `/api/chat`.
+- Buddy only says where the thing is. The `FIND` prompt forbids reading any label, writing, or number in the photo; saying anything about medicines, pills, health, or food (even for a pill bottle); describing people or pets; and any advice or warning. Plain code checks the sentence with the advice guard and a length limit; if it fails, or Spark is down, plain code says where in the photo it is instead ("Your pill bottle is on the right side of your photo.").
+- Her photo is never saved: not in the database, not on disk, not in logs (the server only prints the kind of failure, never her words or photo). It is sent to Meta with `store: false`, so Meta doesn't keep it either.
+- The test photos (`scripts/find_photos/`) were painted with Muse Image for this project: rooms only, no people, no writing.
+
 ## 9. Privacy
 
 - Health data stays in `data/grandma_buddy.db` on this computer and never goes to GitHub.

@@ -43,6 +43,15 @@
         "rule": "bounce-easing",
         "value": "var(--spring)",
         "createdAt": "2026-10-29T02:31:55.789Z"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "static/index.html"
+        ],
+        "createdAt": "2026-10-30T05:04:35.165Z",
+        "reason": "Claude triage: #find-image gets its src from find.js once she picks a photo; it sits inside #find-result, which stays hidden until then"
       }
     ]
   }

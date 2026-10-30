@@ -43,7 +43,7 @@ Light is the default; Auto follows the computer's light or dark setting (and, if
 | `--danger` | `#C21F3A` | `#FF6B7F` | emergency only |
 | `--alarm` | `#A8162E` | `#A8162E` | emergency and Poison Control screens (white words on it) |
 
-Buddy's colors live only inside the orb, never on words: amber `#F6B042`, peach `#F78C5B`, rose `#E1607E`, violet `#8B6CF2`.
+Buddy's colors live only in Buddy, never on words: the orb, and the halo Buddy draws in Find my things (Buddy's light around her thing). Amber `#F6B042`, peach `#F78C5B`, rose `#E1607E`, violet `#8B6CF2`.
 
 ### Contrast (from `scripts/check_contrast.py`)
 
@@ -123,6 +123,7 @@ Easing: a spring (`linear()` with a slight settle; `cubic-bezier(0.2, 0, 0, 1)` 
 | A pill is marked taken | Its check pops and draws itself; the ring fills |
 | Loading | A soft shimmer, never a spinner |
 | A Memory book page is written or painted | A slow band of light (2.4s) across a soft wash of Buddy's colors, with "Writing your page…" or "Painting your picture…"; the painting fades in (560ms) once loaded. Calm motion keeps the wash, the words, and the fade, but not the band |
+| Find my things finds her thing | The room dims like a spotlight (360ms), and a ring of Buddy's light draws itself around her thing once (900ms). Calm motion: both are simply there |
 | Emergency, Poison Control, crisis screens | Nothing: they appear instantly |
 
 **Chime.** An optional soft, low two-note tone (Web Audio, no sound files) when listening starts and stops. Off by default.
@@ -131,7 +132,7 @@ Easing: a spring (`linear()` with a slight settle; `cubic-bezier(0.2, 0, 0, 1)` 
 
 All screens live on one page (`static/index.html`), each in a `<section data-screen>`. The address shows which one is open (`#/talk`, `#/pills`…), so the browser's Back button works.
 
-**Home.** It opens on the greeting in Newsreader ("Good afternoon, Rose"), the date, and the whole orb, above the fold even on a 390 by 844 phone. Then "Talk to Buddy" (the only one on Home; the orb is a tap target, not a second button for the keyboard or screen readers), three chips (Something hurts, Check a message, Memory book: on phones, the way into the Memory book), and "Today" as a grouped list: the daily check-in first ("Not done yet", or her mood once she said it, and "Start" to do it any time), the next pill (with "Take" when one is due), the latest diary note today, and Doctor notes.
+**Home.** It opens on the greeting in Newsreader ("Good afternoon, Rose"), the date, and the whole orb, above the fold even on a 390 by 844 phone. Then "Talk to Buddy" (the only one on Home; the orb is a tap target, not a second button for the keyboard or screen readers), four chips (Something hurts, Check a message, Memory book: on phones, the way into the Memory book, and Find my things; on phones a 2×2 grid of tiles, icon above words, 76px tall, 16px corners, so no name is squeezed), and "Today" as a grouped list: the daily check-in first ("Not done yet", or her mood once she said it, and "Start" to do it any time), the next pill (with "Take" when one is due), the latest diary note today, and Doctor notes.
 
 **Daily check-in.** The first row of Home's Today list: "Daily check-in", "Not done yet", and **Start**. Start opens voice mode like "Something hurts": Buddy says its fixed opening ("Good morning, Rose. How are you feeling today?"), the button hint says "Your daily check-in", and the AI asks the other two questions one at a time. Leaving voice mode ends it. A browser can't speak before her first tap, which is why the check-in starts with a tap instead of talking on its own.
 
@@ -176,12 +177,20 @@ The page's sections, in the order a doctor reads them:
 
 **Settings.** Grouped rows: Appearance (Theme, Text size), Voice (Read replies aloud, Buddy's voice, Voice speed, Chime), Motion (Calm motion), and "Names and phone numbers", folded away for a family member. Switches and choices save at once with a "Settings saved" toast; the profile has its own "Save profile". A refused entry gets a `--warning` border and a note right under it saying how to fix it. "Buddy's voice" lists Buddy's natural voices first (Heart, the default, Bella, Nicole, Emma (British), Michael: made on this computer, the same in every browser), then the browser's own English voices best first (Edge's natural voices, Chrome's Google voices, Apple's, then the old Windows voices). It says the chosen one aloud at once and has "Try it". The choice is kept on this device. Only when there is no natural voice at all and the browser's voices are robotic does it suggest opening Buddy in Microsoft Edge. With the natural voice, the word-by-word highlight follows how far each sentence has played.
 
+**Find my things** (`#/find`, and `#/find/glasses` from "Buddy, where are my glasses?"). One bold moment, everything around it quiet.
+- **Asking:** "Find my things" (display), one line on what it does, then "What are you looking for?" (20px, semibold) over a large field, quick picks as chips (Glasses, Keys, Remote, Pill bottle, Phone; the picked one turns ink, `aria-pressed`), **Say it** (quiet, 56px) and **Take a photo** (ink, 56px, camera icon), and "Choose a photo instead" as a text button. Asking for a photo first nudges her, under the field, to say what she's looking for.
+- **Looking:** her photo in a frame of its own shape (20px corners, the raised shadow, never taller than 62% of the screen), gone quiet (less color), with a small thinking orb on top and "Buddy is looking…".
+- **Found:** the halo. The rest of the photo dims (a 42% ink layer with a soft, feathered hole), and an ellipse around her thing, a little bigger than it and never smaller than 6% of the photo, is drawn in Buddy's orb gradient (amber, peach, rose, violet) with a soft glow under it and a thin white edge, so it shows on any photo. Not a box: it's Buddy's light, so it uses the orb's colors (the one place outside the orb they appear, because it is Buddy). It's an SVG in the photo's own pixels, so it sits exactly on SAM's box at any size.
+- **Below:** Buddy's sentence, big (24px, 32px from 768px), read aloud and given focus; it is also the photo's description for screen readers. Then **Say it again** (quiet) and **Try another photo** (ink), and "Look for something else".
+- **Not found:** the photo as it is, no halo, Buddy's kind sentence, and Try another photo.
+
 **Welcome** (`#/welcome`, the first time, while no name is saved). The whole screen, like voice mode: no tab bar or sidebar, and the "call 911" note stays at the bottom.
-- **The stage:** Buddy's orb at the top, three step dots (ink up to her step), a Newsreader question, and one line of help.
+- **The stage:** Buddy's orb at the top, then where she is in words, "Step 2 of 3" (20px, semibold, `--text-2`), with three 14px dots under it that only show it (`aria-hidden`): an outline still to come, filled ink done, and a 28px ink pill for now. Then a Newsreader question and one line of help.
+- **Back:** a quiet "‹ Back" text button at the top left on steps 2 and 3 (48px tall, no fill). Its row is always there (hidden on the other steps), so the orb never jumps.
 - **The steps:**
   0. "Hello! I'm Buddy.", with **Let's begin**. Browsers stay silent until a first tap, so this tap lets Buddy speak.
   1. "What should I call you?": a large name field, **Say it**, and **Next**.
-  2. "Who should I call when you'd like to talk to someone?": two cards, "Someone you love" and "Someone else (if you like)", each with a name and a phone number. Then Say it, Next, Back, and Skip for now.
+  2. "Who should I call when you'd like to talk to someone?": two cards, "Someone you love" and "Someone else (if you like)", each with a name and a phone number. Then Say it, Next, and Skip for now.
   3. "Would you like to set up your pills now?": **Add my pills now** (Pills with "Set up pills" open) or **Later**.
 - **Voice:** each question is read aloud. "Say it" works like Tap to talk ("I'm done", then "One moment…"), fills the fields, and goes through the safety net first.
 - **Refused entries:** marked under their field, saying how to fix them.

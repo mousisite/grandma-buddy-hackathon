@@ -179,6 +179,7 @@ var SCREEN_TITLES = {
   family: "Family",
   memories: "Memory book",
   memory: "Memory book", // one page: #/memory/3
+  find: "Find my things", // #/find/glasses fills in what she's looking for (find.js)
   settings: "Settings",
   welcome: "Welcome", // the first time, while no name is saved (welcome.js)
 };

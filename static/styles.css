@@ -253,9 +253,11 @@ button:disabled {
   outline: none;
 }
 
-/* Headings get focus when a screen opens (for screen readers), no ring. */
+/* Headings get focus when a screen opens (for screen readers), no ring.
+   So does Buddy's answer in Find my things: it isn't something to press. */
 h1:focus,
-h2:focus {
+h2:focus,
+.find-answer:focus {
   outline: none;
 }
 
@@ -645,7 +647,35 @@ h2:focus {
 .chip .icon {
   width: 20px;
   height: 20px;
+  flex: none;
   color: var(--text-2);
+}
+
+/* On phones the four Home chips become a 2×2 grid of tiles, icon above
+   words: big, even targets, and no name gets squeezed onto two lines. */
+@media (max-width: 767px) {
+  .home .chips {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
+    width: 100%;
+  }
+
+  .home .chips .chip {
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--s-1);
+    min-height: 76px;
+    padding: var(--s-3) var(--s-2);
+    border-radius: var(--r-card);
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .home .chips .chip .icon {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 .today {
@@ -2560,6 +2590,152 @@ label.group-row .group-label {
   }
 }
 
+/* ---------- Find my things ---------- */
+
+.find-ask,
+.find-result {
+  display: grid;
+  gap: var(--s-5);
+}
+
+/* The question is the screen's main line, so it reads like one. */
+.find-ask .field label {
+  font-size: var(--t-20);
+}
+
+.find-ask input[type="text"] {
+  min-height: var(--main-action);
+  font-size: var(--t-20);
+}
+
+.find-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+/* The thing she picked: ink, like the one ink accent everywhere else. */
+.find-picks .chip[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.find-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+}
+
+.find-actions .pill-button {
+  flex: 1 1 11rem;
+}
+
+.find-choose {
+  justify-self: start;
+  margin-left: calc(-1 * var(--s-3));
+}
+
+/* Her photo, in a frame of its own shape (find.js sets --photo-aspect), so
+   the halo drawn in the photo's pixels sits right on her thing. Never taller
+   than most of the screen. */
+.find-photo {
+  position: relative;
+  justify-self: center;
+  width: min(100%, calc(62vh * var(--photo-aspect, 1.5)));
+  margin: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--tint);
+  box-shadow: var(--shadow-raised);
+}
+
+.find-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  transition: filter var(--slow) var(--ease);
+}
+
+.find-halo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* While Buddy looks: the photo goes quiet, and the orb thinks on top of it. */
+.find-looking {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+}
+
+.find-photo[data-state="looking"] .find-looking {
+  display: grid;
+}
+
+.find-photo[data-state="looking"] img {
+  filter: saturate(0.5) brightness(0.92);
+}
+
+.orb--find {
+  --orb-size: min(120px, 28vw);
+  view-transition-name: none;
+}
+
+/* The one bold moment: the room dims like a spotlight, and a ring of
+   Buddy's light draws itself around her thing. A white edge under the ring
+   keeps it clear on any photo. */
+.find-dim {
+  fill: rgba(28, 27, 25, 0.42);
+  animation: fade-in var(--slow) var(--ease) both;
+}
+
+.find-glow,
+.find-edge,
+.find-ring {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  animation: halo-draw 900ms var(--ease) both;
+}
+
+.find-glow {
+  opacity: 0.7;
+}
+
+.find-edge {
+  stroke: rgba(255, 255, 255, 0.85);
+}
+
+@keyframes halo-draw {
+  from { stroke-dashoffset: 1; }
+}
+
+/* Buddy's sentence: big, like its words in voice mode. */
+.find-answer {
+  max-width: 30ch;
+  font-size: var(--t-24);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
+}
+
+.find-answer:empty {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .find-answer {
+    font-size: var(--t-32);
+    line-height: 1.25;
+  }
+}
+
 /* ---------- Welcome (the first time) ---------- */
 
 /* Like voice mode: the whole screen is the welcome (the 911 note stays). */
@@ -2591,25 +2767,59 @@ label.group-row .group-label {
   --orb-size: min(168px, 44vw);
 }
 
-/* Where she is: three dots, ink up to her step. */
+/* Back, top left on steps 2 and 3: quiet (no fill), but a full-size target. */
+.welcome-back {
+  justify-self: start;
+  min-height: 48px;
+  margin: 0 0 calc(-1 * var(--s-6)) calc(-1 * var(--s-3));
+  font-size: var(--t-20);
+}
+
+.welcome-back .icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Where she is: "Step 2 of 3" in words, with dots that show it. */
+.welcome-progress {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+.welcome-count {
+  color: var(--text-2);
+  font-size: var(--t-20);
+  font-weight: 600;
+}
+
 .welcome-dots {
   display: flex;
+  align-items: center;
   gap: var(--s-2);
-  margin: var(--s-2) 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Upcoming: an outline. Done: filled ink. Now: a longer ink pill. */
 .welcome-dots li {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--border-strong);
-  transition: background-color var(--base) var(--ease);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--field-edge);
+  border-radius: var(--r-pill);
+  transition: background-color var(--base) var(--ease), border-color var(--base) var(--ease);
 }
 
-.welcome-dots li[data-done] {
+.welcome-dots li[data-done],
+.welcome-dots li[data-current] {
+  border-color: var(--text);
   background: var(--text);
+}
+
+.welcome-dots li[data-current] {
+  width: 28px;
 }
 
 .welcome-title {
