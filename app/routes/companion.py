@@ -7,12 +7,13 @@
 #   Otherwise Buddy's AI companion answers (app/companion.py).
 
 import sqlite3
+from datetime import timedelta
 
 import requests
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app import companion, db, meta_client, safety
+from app import companion, db, memories, meta_client, prompts, reminders, safety, tools
 
 router = APIRouter()
 
@@ -20,7 +21,7 @@ router = APIRouter()
 # bigger did not come from it, so it is refused before reaching Meta.
 MAX_AUDIO_BYTES = 10 * 1024 * 1024
 MAX_TEXT = 2000
-MODES = {"chat", "check_in", "diary"}
+MODES = {"chat", "check_in", "diary", "memory"}
 
 
 @router.post("/api/transcribe")
@@ -43,11 +44,11 @@ def transcribe(audio: UploadFile):
 class ChatRequest(BaseModel):
     conversation_id: str = "default"
     text: str
-    mode: str = "chat"  # "chat", "check_in", or "diary"
+    mode: str = "chat"  # "chat", "check_in", "diary", or "memory"
 
 
 @router.post("/api/chat")
-def chat(request: ChatRequest):
+def chat(request: ChatRequest, background: BackgroundTasks):
     """Her words in, Buddy's answer out. The safety net always goes first."""
     text = request.text.strip()
     if not text or request.mode not in MODES or len(request.conversation_id) > 80:
@@ -99,12 +100,78 @@ def chat(request: ChatRequest):
         connection.commit()
 
         # 2. Nothing urgent: Buddy's AI companion answers (app/companion.py).
-        return companion.answer(connection, profile, request.conversation_id, saved_text, request.mode)
+        answer = companion.answer(connection, profile, request.conversation_id, saved_text, request.mode)
+        if answer["memory_saved"]:
+            # After she has her answer: write the Memory book page and paint it.
+            background.add_task(memories.make_page, answer["memory_saved"])
+        if db.days_to_learn(connection, reminders.current_time().date().isoformat()):
+            # Her first talk of a new day: Buddy learns from the days before.
+            background.add_task(companion.learn_from_past_days)
+        return answer
     except sqlite3.Error as problem:
         print(f"Database problem: {problem}")
         if result is not None:
             return safety_screen(result, {"family_name": "", "family_phone": ""})
         raise HTTPException(status_code=503, detail="Please try again in a moment.")
+    finally:
+        connection.close()
+
+
+class WordsRequest(BaseModel):
+    text: str
+
+
+@router.post("/api/check-words")
+def check_words(request: WordsRequest):
+    """Words she said outside a talk (the welcome's "Say it"): only the
+    safety net, never the AI. A match shows the same fixed screen as in a
+    talk, and is saved the same way (her words never, for crisis words)."""
+    text = request.text.strip()[:MAX_TEXT]
+    result = safety.check(text) if text else None
+    if result is None:
+        return {"show": None}
+    connection = db.get_connection()
+    try:
+        profile = db.get_profile(connection)
+        result.message = safety.fixed_message(result.kind, profile["family_name"])
+        save_safety_records(connection, "welcome", result, text)
+        connection.commit()
+        return safety_screen(result, profile)
+    finally:
+        connection.close()
+
+
+GREETING_GAP = timedelta(hours=2)  # a talk after this long starts a new conversation
+
+
+class GreetingRequest(BaseModel):
+    conversation_id: str
+
+
+@router.post("/api/greeting")
+def greeting(request: GreetingRequest):
+    """At the start of a conversation (the first talk today, or after two
+    hours), Buddy's greeting: "Good afternoon, Rose!" and a follow-up that is
+    due ("Did Tom make it on Sunday?"), asked only once, or a warm opener.
+    Plain words, no AI. Kept in the conversation, so the AI knows what it
+    asked. Otherwise "" (she goes straight to talking)."""
+    if len(request.conversation_id) > 80:
+        raise HTTPException(status_code=400, detail="Please try again.")
+    now = reminders.current_time()
+    connection = db.get_connection()
+    try:
+        if db.last_talk_at(connection) > (now - GREETING_GAP).isoformat(timespec="seconds"):
+            return {"greeting": ""}
+        profile = db.get_profile(connection)
+        name = (profile["preferred_name"] or profile["name"]).strip()
+        week_ago = (now.date() - timedelta(days=tools.EVENT_DAYS)).isoformat()
+        due = db.due_follow_up(connection, now.date().isoformat(), week_ago)
+        words = prompts.greeting(name, reminders.part_of_day(now), due["follow_up"] if due else "", now.toordinal())
+        if due:
+            connection.execute("UPDATE facts SET asked_at = ? WHERE id = ?", (now.isoformat(timespec="seconds"), due["id"]))
+        db.save_message(connection, request.conversation_id, "assistant", words, at=now)
+        connection.commit()
+        return {"greeting": words}
     finally:
         connection.close()
 

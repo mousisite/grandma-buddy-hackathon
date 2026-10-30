@@ -156,6 +156,9 @@ function loadProfile() {
   return api("/api/profile")
     .then(function (saved) {
       useProfile(saved);
+      if (!saved.preferred_name && !saved.name) {
+        location.hash = "#/welcome"; // the first time: Buddy says hello and sets her up
+      }
       loadScreen(currentScreen());
     })
     .catch(function () {
@@ -174,12 +177,20 @@ var SCREEN_TITLES = {
   notes: "Doctor notes",
   scam: "Check a message",
   family: "Family",
+  memories: "Memory book",
+  memory: "Memory book", // one page: #/memory/3
   settings: "Settings",
+  welcome: "Welcome", // the first time, while no name is saved (welcome.js)
 };
 
 function currentScreen() {
-  var name = location.hash.replace(/^#\/?/, "");
+  var name = location.hash.replace(/^#\/?/, "").split("/")[0];
   return SCREEN_TITLES.hasOwnProperty(name) ? name : "today";
+}
+
+// What comes after the screen's name: "3" in #/memory/3.
+function screenDetail() {
+  return location.hash.replace(/^#\/?/, "").split("/")[1] || "";
 }
 
 // Fill a screen with fresh information (SCREEN_LOADERS is in screens.js).
@@ -219,9 +230,10 @@ function showScreen(moveFocus) {
   document.querySelectorAll("section[data-screen]").forEach(function (screen) {
     screen.hidden = screen.getAttribute("data-screen") !== name;
   });
-  // The tab bar and sidebar show where she is.
+  // The tab bar and sidebar show where she is (a memory page is in the Memory book).
+  var place = name === "memory" ? "memories" : name;
   document.querySelectorAll("[data-nav]").forEach(function (link) {
-    if (link.getAttribute("data-nav") === name) {
+    if (link.getAttribute("data-nav") === place) {
       link.setAttribute("aria-current", "page");
     } else {
       link.removeAttribute("aria-current");
@@ -269,7 +281,7 @@ function say(text) {
 // Every press shows the moment it lands: the button squeezes and darkens a
 // little (data-pressed, styles.css "Pressing"), and a circle of light
 // spreads from the spot she touched. Calm motion keeps only the color.
-var PRESSABLE = ".pill-button, .text-button, .chip, .tab, .nav-link, .row-link, .call-pill, .check, .for-family-summary, .segmented label, label.group-row";
+var PRESSABLE = ".pill-button, .text-button, .chip, .tab, .nav-link, .row-link, .call-pill, .check, .for-family-summary, .memory-card, .segmented label, label.group-row";
 
 function showPress(event) {
   var target = event.target.closest(PRESSABLE);

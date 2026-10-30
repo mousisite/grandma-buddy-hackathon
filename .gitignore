@@ -13,6 +13,9 @@ data/
 # Voice recordings
 *.wav
 
+# Buddy's natural voice model (downloaded by scripts/get_voice.py)
+models/
+
 # Screenshots and files from browser checks
 test-output/
 

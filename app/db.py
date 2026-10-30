@@ -7,7 +7,7 @@
 
 import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from app.config import get_settings
@@ -154,6 +154,60 @@ def init_db(db_path: str | None = None) -> None:
                 excerpt TEXT NOT NULL DEFAULT ''
             );
 
+            -- The Memory book: one page per memory she told Buddy. her_words
+            -- and talk are what was said; the AI writes title, story (a JSON
+            -- list of paragraphs) and scene (what the picture shows, also its
+            -- alt text). picture is a file name in data/memories/.
+            -- status: writing, painting, ready, or no_picture.
+            CREATE TABLE IF NOT EXISTS memories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT '',
+                conversation_id TEXT NOT NULL DEFAULT '',
+                her_words TEXT NOT NULL DEFAULT '',
+                talk TEXT NOT NULL DEFAULT '[]',
+                title TEXT NOT NULL DEFAULT '',
+                story TEXT NOT NULL DEFAULT '[]',
+                scene TEXT NOT NULL DEFAULT '',
+                picture TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'writing'
+            );
+
+            -- What Buddy remembers about her life (tools.remember_fact):
+            -- people, pets, hobbies, shows, plans. Never health or feelings.
+            -- follow_up is a question to ask on follow_up_on (an event's
+            -- day after); asked_at says it was asked. forgotten: she or her
+            -- family chose "Forget this" in Settings (Undo sets it back).
+            CREATE TABLE IF NOT EXISTS facts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT '',
+                kind TEXT NOT NULL,
+                fact TEXT NOT NULL,
+                follow_up TEXT NOT NULL DEFAULT '',
+                follow_up_on TEXT NOT NULL DEFAULT '',
+                asked_at TEXT NOT NULL DEFAULT '',
+                forgotten INTEGER NOT NULL DEFAULT 0
+            );
+
+            -- One or two sentences about each earlier day's talk, learned the
+            -- next day (companion.learn_from_past_days). How many days have
+            -- a row is how many days Buddy has learned from.
+            CREATE TABLE IF NOT EXISTS talk_summaries (
+                day TEXT PRIMARY KEY,
+                summary TEXT NOT NULL DEFAULT '',
+                made_at TEXT NOT NULL DEFAULT ''
+            );
+
+            -- How she likes to talk, learned day by day ("Loves puns",
+            -- "Prefers short replies"). Never health, moods, or her mind.
+            CREATE TABLE IF NOT EXISTS style_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL DEFAULT '',
+                note TEXT NOT NULL,
+                forgotten INTEGER NOT NULL DEFAULT 0
+            );
+
             -- Each pill reminder exists once per time per day.
             CREATE UNIQUE INDEX IF NOT EXISTS med_events_once ON med_events (medication_id, due_at);
             """
@@ -165,6 +219,9 @@ def init_db(db_path: str | None = None) -> None:
         add_column(connection, "profile", "chime", "INTEGER NOT NULL DEFAULT 0")  # October 28
         add_column(connection, "profile", "theme", "TEXT NOT NULL DEFAULT 'auto'")  # October 28
         add_column(connection, "moods", "conversation_id", "TEXT NOT NULL DEFAULT ''")  # October 28
+        # A second family member to call (the welcome, Settings): October 29.
+        add_column(connection, "profile", "family2_name", "TEXT NOT NULL DEFAULT ''")
+        add_column(connection, "profile", "family2_phone", "TEXT NOT NULL DEFAULT ''")
         # WAL mode lets one connection read while another writes. Writers
         # still take turns, so the companion saves after each round of tools
         # (app/companion.py) and never holds the lock while the AI thinks.
@@ -178,7 +235,7 @@ def init_db(db_path: str | None = None) -> None:
 
 PROFILE_TEXT_FIELDS = [
     "name", "preferred_name", "family_name", "family_email",
-    "family_phone", "doctor_name", "doctor_phone",
+    "family_phone", "family2_name", "family2_phone", "doctor_name", "doctor_phone",
 ]
 
 
@@ -192,8 +249,9 @@ def get_profile(connection: sqlite3.Connection) -> dict:
     return profile
 
 
-def save_message(connection: sqlite3.Connection, conversation_id: str, role: str, content: str) -> None:
-    """Remember one line of the conversation.
+def save_message(connection: sqlite3.Connection, conversation_id: str, role: str, content: str,
+                 at: datetime | None = None) -> None:
+    """Remember one line of the conversation (said now, or at a given time).
 
     Roles: "user" (her), "assistant" (Buddy's AI replies), and "safety"
     (the safety net's fixed messages, kept apart so they are never mixed up
@@ -201,7 +259,7 @@ def save_message(connection: sqlite3.Connection, conversation_id: str, role: str
     """
     connection.execute(
         "INSERT INTO messages (conversation_id, created_at, role, content) VALUES (?, ?, ?, ?)",
-        (conversation_id, now(), role, content),
+        (conversation_id, at.isoformat(timespec="seconds") if at else now(), role, content),
     )
 
 
@@ -250,6 +308,20 @@ def talk_messages(connection: sqlite3.Connection, conversation_id: str) -> list[
     ).fetchall()
 
 
+def memory_talk(connection: sqlite3.Connection, conversation_id: str, after: str) -> list[dict]:
+    """What she and Buddy said in this talk after a time, for a Memory book
+    page, oldest first. Only after the safety net last answered in ANY talk,
+    and never words that were not kept: nothing said around a safety screen
+    ever reaches a page."""
+    last_safety = connection.execute("SELECT MAX(id) FROM messages WHERE role = 'safety'").fetchone()[0] or 0
+    rows = connection.execute(
+        "SELECT role, content FROM messages WHERE conversation_id = ? AND id > ? AND created_at > ? "
+        "AND role IN ('user', 'assistant') AND content != ? ORDER BY id",
+        (conversation_id, last_safety, after, NOT_KEPT),
+    ).fetchall()
+    return [{"role": row["role"], "content": row["content"]} for row in rows]
+
+
 def save_mood(connection: sqlite3.Connection, conversation_id: str, mood: str, note: str) -> None:
     """Save how she feels overall: one mood per talk. The AI may save it again
     later in the same talk; then her latest words replace the first ones, so
@@ -275,12 +347,12 @@ def buddy_last_words(connection: sqlite3.Connection, conversation_id: str) -> st
     return row["content"] if row else ""
 
 
+NOT_KEPT = "(Not kept: she shared something painful, and Buddy showed the crisis screen.)"
+
+
 def forget_her_words(connection: sqlite3.Connection, message_ids: list[int]) -> None:
     """Replace her words in these messages (docs/SAFETY.md 7b: crisis words are never kept)."""
-    connection.executemany(
-        "UPDATE messages SET content = ? WHERE id = ?",
-        [("(Not kept: she shared something painful, and Buddy showed the crisis screen.)", i) for i in message_ids],
-    )
+    connection.executemany("UPDATE messages SET content = ? WHERE id = ?", [(NOT_KEPT, i) for i in message_ids])
 
 
 def add_safety_event(connection: sqlite3.Connection, kind: str, matched: list[str], excerpt: str = "") -> None:
@@ -374,6 +446,138 @@ def save_talk_entry(
         ),
     )
     return row["id"]
+
+
+# ---------- What Buddy remembers, and what it learned ----------
+
+def save_fact(connection: sqlite3.Connection, kind: str, fact: str, follow_up: str, follow_up_on: str) -> bool:
+    """Remember a fact about her life. The same fact again (any capitals,
+    with or without a period) updates it. False if she asked Buddy to
+    forget it: then it stays forgotten."""
+    same = fact.lower().rstrip(".")
+    row = connection.execute(
+        "SELECT id, forgotten FROM facts WHERE lower(rtrim(fact, '.')) = ? LIMIT 1", (same,)
+    ).fetchone()
+    if row is None:
+        connection.execute(
+            "INSERT INTO facts (created_at, updated_at, kind, fact, follow_up, follow_up_on) VALUES (?, ?, ?, ?, ?, ?)",
+            (now(), now(), kind, fact, follow_up, follow_up_on),
+        )
+        return True
+    if row["forgotten"]:
+        return False
+    connection.execute(
+        "UPDATE facts SET updated_at = ?, kind = ?, follow_up = ?, follow_up_on = ?, asked_at = '' WHERE id = ?",
+        (now(), kind, follow_up, follow_up_on, row["id"]),
+    )
+    return True
+
+
+def known_facts(connection: sqlite3.Connection, events_since: str, limit: int = 30) -> list[sqlite3.Row]:
+    """The facts Buddy keeps in mind, newest first: everything not
+    forgotten, but an event only until a week after it."""
+    return connection.execute(
+        "SELECT id, kind, fact, follow_up, follow_up_on FROM facts WHERE forgotten = 0 "
+        "AND (kind != 'event' OR follow_up_on = '' OR follow_up_on >= ?) ORDER BY updated_at DESC, id DESC LIMIT ?",
+        (events_since, limit),
+    ).fetchall()
+
+
+def due_follow_up(connection: sqlite3.Connection, today: str, since: str) -> sqlite3.Row | None:
+    """The oldest follow-up question due now (from `since` to today) and
+    not yet asked."""
+    return connection.execute(
+        "SELECT id, follow_up FROM facts WHERE forgotten = 0 AND follow_up != '' AND asked_at = '' "
+        "AND follow_up_on BETWEEN ? AND ? ORDER BY follow_up_on, id LIMIT 1",
+        (since, today),
+    ).fetchone()
+
+
+def learned_facts(connection: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Every fact not forgotten, newest first (for "What Buddy has learned")."""
+    return connection.execute(
+        "SELECT id, kind, fact, follow_up FROM facts WHERE forgotten = 0 ORDER BY updated_at DESC, id DESC"
+    ).fetchall()
+
+
+def style_notes(connection: sqlite3.Connection, forgotten: bool = False) -> list[sqlite3.Row]:
+    return connection.execute(
+        "SELECT id, note FROM style_notes WHERE forgotten = ? ORDER BY id", (int(forgotten),)
+    ).fetchall()
+
+
+def days_learned(connection: sqlite3.Connection) -> int:
+    return connection.execute("SELECT COUNT(*) FROM talk_summaries").fetchone()[0]
+
+
+def recent_summaries(connection: sqlite3.Connection, limit: int = 5) -> list[sqlite3.Row]:
+    """The last few days' summaries, oldest first (empty ones left out)."""
+    rows = connection.execute(
+        "SELECT day, summary FROM talk_summaries WHERE summary != '' ORDER BY day DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return list(reversed(rows))
+
+
+def days_to_learn(connection: sqlite3.Connection, today: str, limit: int = 5) -> list[str]:
+    """Earlier days (the last two weeks) when she talked with Buddy and that
+    Buddy hasn't learned from yet, oldest first, at most `limit`."""
+    since = (date.fromisoformat(today) - timedelta(days=14)).isoformat()
+    rows = connection.execute(
+        "SELECT DISTINCT substr(created_at, 1, 10) AS day FROM messages WHERE role = 'user' AND content != ? "
+        "AND substr(created_at, 1, 10) < ? AND substr(created_at, 1, 10) >= ? "
+        "AND substr(created_at, 1, 10) NOT IN (SELECT day FROM talk_summaries) ORDER BY day DESC LIMIT ?",
+        (NOT_KEPT, today, since, limit),
+    ).fetchall()
+    return [row["day"] for row in reversed(rows)]
+
+
+def day_talk(connection: sqlite3.Connection, day: str, limit: int = 80) -> list[dict]:
+    """What she and Buddy said on one day, oldest first: never the safety
+    net's messages or words that were not kept."""
+    rows = connection.execute(
+        "SELECT role, content FROM messages WHERE substr(created_at, 1, 10) = ? AND role IN ('user', 'assistant') "
+        "AND content != ? ORDER BY id DESC LIMIT ?",
+        (day, NOT_KEPT, limit),
+    ).fetchall()
+    return [{"role": row["role"], "content": row["content"][:300]} for row in reversed(rows)]
+
+
+def save_learned_day(connection: sqlite3.Connection, day: str, summary: str, notes: list[str]) -> None:
+    """One day learned: its summary, and her style notes as they are now
+    (only replaced when there are new ones; forgotten notes stay forgotten)."""
+    connection.execute("INSERT OR REPLACE INTO talk_summaries (day, summary, made_at) VALUES (?, ?, ?)",
+                       (day, summary, now()))
+    if notes:
+        connection.execute("DELETE FROM style_notes WHERE forgotten = 0")
+        connection.executemany("INSERT INTO style_notes (created_at, note) VALUES (?, ?)",
+                               [(now(), note) for note in notes])
+
+
+def last_talk_at(connection: sqlite3.Connection) -> str:
+    """When she or Buddy last said something ("" if never)."""
+    return connection.execute(
+        "SELECT MAX(created_at) FROM messages WHERE role IN ('user', 'assistant')"
+    ).fetchone()[0] or ""
+
+
+def buddy_last_reply(connection: sqlite3.Connection) -> str:
+    row = connection.execute("SELECT content FROM messages WHERE role = 'assistant' ORDER BY id DESC LIMIT 1").fetchone()
+    return row["content"] if row else ""
+
+
+def last_memory(connection: sqlite3.Connection, conversation_id: str) -> sqlite3.Row | None:
+    """The newest Memory book page made from this talk (id and created_at), or None."""
+    return connection.execute(
+        "SELECT id, created_at FROM memories WHERE conversation_id = ? ORDER BY id DESC LIMIT 1", (conversation_id,)
+    ).fetchone()
+
+
+def add_memory(connection: sqlite3.Connection, conversation_id: str, her_words: str, talk: list[dict]) -> int:
+    """A new Memory book page, waiting to be written and painted. Returns its id."""
+    return connection.execute(
+        "INSERT INTO memories (created_at, updated_at, conversation_id, her_words, talk) VALUES (?, ?, ?, ?, ?)",
+        (now(), now(), conversation_id, her_words, json.dumps(talk)),
+    ).lastrowid
 
 
 def talk_has_entry(connection: sqlite3.Connection, conversation_id: str) -> bool:

@@ -44,7 +44,7 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 
 ### Day 8: Mon, Nov 2 (doctor notes and family)
 - [x] `/api/doctor-notes`, printable one-page notes, add-a-question by voice. (Done early, Oct 28.)
-- [ ] `/api/family/summary`, "Send to {family}" email link, Copy button.
+- [x] `/api/family/summary`, "Send to {family}" email link, Copy button. (Done early, Oct 28.)
 - [x] `scripts/seed_demo.py` with a week of made-up data for "Rose". (Done early, Oct 28.)
 
 ### Day 9: Tue, Nov 3 (polish and demo)
@@ -71,6 +71,72 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 ## Status log
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
+
+- Oct 29 (welcome and demo week, for the video): screens are no longer empty.
+  - **First-time welcome** (`static/welcome.js`, `#/welcome` while no name is saved): Buddy's orb, three step dots, and Newsreader questions.
+    - The steps: "Let's begin" (the tap that lets Buddy speak), her name, one or two family members with phone numbers, then pills now or later. Home then says "Good evening, Rose".
+    - Every step can be typed or said. "Say it" records like Tap to talk, sends what she said through the safety net first (new `/api/check-words`, never the AI), then fills the fields.
+    - A refused number is named under its field.
+  - **The second family contact:** the profile gained `family2_name` and `family2_phone`. They're shown in Family's call buttons and in Settings, and the prompt names them.
+  - **The demo week** (`scripts/seed_demo.py`): Rose, Maria (555-0100) and Daniel (555-0144), Dr. Lee; 2 pills mostly taken; 5 check-ins (great, good, low, okay, good); 5 knee entries in her own words, the last one today; 2 doctor questions; 1 grandparent-scam check; 2 Memory book pages painted with Muse Image (about 2 cents, or `--no-paint`); and what Buddy learned, including Leo's Sunday visits with a follow-up due today, so the demo greeting asks about Leo.
+    - `--reset` replaces `--replace`: an SQLite backup, then every table and the paintings are wiped. Without it the script refuses when there's data.
+    - Every entry says "knee", so the Doctor notes show a single "Knee" topic.
+  - **Tests:** 461/461 pytest, with the new `tests/test_welcome.py` and the demo-week tests rewritten. The browser check starts with the welcome on its empty database: "Let's begin", a crisis phrase said into "Say it" opens the crisis screen, "My name is Rose" fills the name, "My son Daniel, 555 0144" fills the second contact, a refused number is named, then Later and the greeting by name. It also checks every screen on the demo week, and the greeting now asks about Leo.
+  - **Fixes found on the way:**
+    - "Say it" was disabled while working, which dropped keyboard focus and left the pressed look stuck; it's now marked busy instead.
+    - The demo diary had both "left knee" and "knee", which split the Doctor notes into two topics.
+  - **Screenshots:** every screen of the seeded week at 390 and 1440px, on a throwaway database with real paintings, looked at.
+
+- Oct 29 (Buddy as a friend, plus learning her over her first days): the heart of the app.
+  - **Personality:** the companion prompt is now warm, curious, and a little playful. It reacts first, then asks one question; 1 to 3 short spoken sentences; varied openers; her name only now and then and no pet names; gentle jokes if she likes them. When she's lonely or sad it listens first, suggests one person once, and never pushes after a no. All safety lines stay word for word.
+  - **Memory:**
+    - a new `remember_fact` tool (`facts` table): people, pets, hobbies, shows, plans, and follow-ups;
+    - plain code refuses health, hard feelings, judgments of her mind, crisis words, and anything the guards flag;
+    - the facts, the last 5 days' summaries, and how her last reply began go into every prompt.
+  - **Learning:** after her first chat each day, a background job learns each earlier day: a summary, plus up to 8 notes on how she likes to talk (`style_notes`). It never sees safety messages or words that weren't kept. Until 2 days are learned Buddy is "getting to know her"; after that it follows her notes.
+  - **Greeting:** `/api/greeting` (plain words) gives "Good afternoon, Rose! Did Tom make it on Sunday?" at the start of a conversation, and listening starts when Buddy finishes.
+  - **Settings:** "What Buddy has learned" shows every fact and note, with Forget this (asks first) and Undo.
+  - **Guards:** `companion.spoken()` strips markdown and emoji; the advice guard now also replaces "I'm all you need". Browser voices now rank "Online" voices above the old Windows ones.
+  - **Tests:** 454/454 pytest (29 new in `tests/test_friend.py`, every Meta call faked; three guards were broken on purpose and their tests failed). The browser check passes, including Forget and Undo and greet-then-listen.
+  - **Real AI** (`scripts/try_companion.py`, 3 runs, about 75 cents in all):
+    - run 1 found Buddy pushing a call after "I don't want to bother her", suggesting calls too early on a sad day, saying "hon", and "I'm glad you're here with me";
+    - run 2 fixed those but still showed a Call button after a no, and used her name in every reply;
+    - run 3 is clean. Learning showed: from two made-up days it learned "Prefers short replies", "Likes playful jokes", and "Enjoys talking about her garden".
+  - **Safety:** `/safety-check` passes. The advice questions were re-asked with the real AI; one reply's faint hint ("eating well is sensible") was fixed in the prompt and re-checked.
+
+- Oct 29 (fix): the natural voice didn't play in her browser.
+  - The app's log showed the browser never asked for `/api/voice` or `/api/speak`: it was still running its old cached `speech.js`.
+  - Root cause: the page and its files had no `Cache-Control` header, so browsers guessed how long to keep them, hours for an older file.
+  - Now `/` and `/static/` answer `Cache-Control: no-cache` (a middleware in `app/main.py`), so the browser checks for a newer version every time, and an unchanged file gets a quick "not modified". This was tested first.
+  - Her voice choice is now kept as `buddy-voice`, so a browser voice picked before the natural voices existed no longer hides them.
+  - Checked against the running app: the old pick is ignored, and a reply plays in the natural voice. 425/425 pytest; the browser check passes.
+
+- Oct 29 (natural voice, approved by the user): Buddy now sounds natural in every browser.
+  - Why: Meta has no voice model. Checked against Meta's docs: Muse Wonder and Muse Spark return text only, Voice Transcribe only listens, and the Model API has no audio output. Voicebox was never released.
+  - The voice: Kokoro (Apache-2.0) runs on this computer through `kokoro-onnx`.
+  - `app/voice.py` and `/api/voice` and `/api/speak` send WAV files. The model loads in the background at startup, and the same words are made only once. 5 voices are offered, Heart by default.
+  - `static/speech.js` plays one sentence at a time and makes the next while one plays. The word highlight is estimated from how far each sentence has played. On any trouble it falls back to the browser voice; safety messages wait at most 2.5 seconds for the natural one.
+  - Settings shows Buddy's natural voices first.
+  - Setup: `scripts/get_voice.py` downloads the model (354 MB, git-ignored `models/`). kokoro-onnx needs `--ignore-requires-python` on Python 3.14, though it runs fine on it.
+  - Speed: about 1 second for a 5-second sentence.
+  - Tests: 424/424 pytest (11 new; the voice model is faked, and `conftest.py` stops any test from loading the real one). The browser check covers the natural voices in Settings, choosing one, and "Try it" playing. In a real browser, a safety message plays in the natural voice; a failing voice server falls back at once and a hanging one after 2.5 seconds.
+  - Licenses are in `THIRD_PARTY_NOTICES.md` (phonemizer and espeak-ng are GPL-3.0, installed as packages and never copied in). `AGENTS.md`'s stack line was updated.
+
+- Oct 29 (voice and Meta check): Buddy's voice. Meta has no text-to-speech, so Buddy speaks with the browser's voices, and on this PC Windows only has the old robotic ones (David, Mark, Zira); Chrome adds Google voices, and Microsoft Edge adds natural neural ones (Ava, Jenny, Aria…). `speech.js` now ranks the voices (Edge natural, then Google, then Apple, then Zira) and uses her choice from the new "Buddy's voice" row in Settings (a list, best first, says the voice aloud when chosen, "Try it", kept on this device), with a hint to open Buddy in Edge when only robotic voices are there. Browser check covers the list and the kept choice. Also fixed `scripts/check_meta.py`: since the "Safety net" commit its key line literally read `api_key=[redacted]` (blanked by a filter in an earlier session), so it crashed; and its 50-token limit left the reply empty (hidden thinking counts). It now passes: "Meta API key works!". The app's own Meta calls (`app/meta_client.py`) were never affected.
+
+- Oct 29 (fix): On a 360px phone with Largest text, the tab bar's "Settings" label spilled out of its tab (66.5px of words in a 62.8px tab). The labels grew with Text size, but the five tabs keep a fixed share of the bar. Tab labels are now sized to the bar with a container query (`min(var(--t-13), 5.4cqi - 1.6px)`): unchanged at Large, 15.8px at Largest on 360px, 13.6px at Largest on 320px, always inside the tab. The browser check's 360px pass now uses Largest text (it failed first, then passed). 413/413 pytest.
+
+- Oct 29 (new feature, for "creative use of Meta's AI"): Memory book (Feature 10). She tells Buddy a memory: from "Tell Buddy a memory" (a new `memory` talk mode with its own conversation, one or two gentle follow-ups, saved by plain code at her 3rd answer if the AI didn't), or in ordinary talk, where the new `offer_memory_page` tool shows "Save it in my memory book" and `save_memory` saves it when she says yes. The tool only stores what was said; a background task (`app/memories.py`) then has Muse Spark write the page in her voice (structured output: title, 2 or 3 paragraphs, a scene) and Muse Image paint it. `meta_client.paint()` is the first Muse Image call: `POST /v1/images/generations`, `muse-image-1.0`, checked against Meta's docs, with its own web and image search turned off. Plain-code guards: every name and number on the page must come from the talk, and the advice guard must find nothing; one retry with what to fix, then her own words. Every picture uses one fixed watercolor-storybook style, people only small and faceless. Saved in `data/memories/`. New Memory book screen (cards, a calm shimmer while writing or painting, the painting fading in) and page (`#/memory/3`: Send to Maria, Print, Read it to me, Paint it again if painting failed). Sidebar link and a Home chip (the phone tab bar keeps five places). New pages appear in the family update. A fresh reviewer found 1 critical and 2 important problems, each reproduced, then fixed test-first:
+- Reading her profile left a write lock open while the AI wrote the page, so chat and pill reminders failed for those seconds. The job now commits before every AI call, and a test checks that another writer can save meanwhile.
+- Saving again repainted the page, and a second memory told the same day in ordinary talk was lost. Now a memory talk makes one page; in ordinary talk a new page needs a new memory since the last one; only new pages are painted.
+- Words from around a crisis screen in another talk could reach a page. A page now starts after the safety net's last answer in any talk and never includes words that were not kept.
+- Plus smaller fixes: the memory tools only work in ordinary and memory talks, the Save button keeps its own talk, a real WebP check, 15 minutes before a page counts as stuck, the AI knows it can open the Memory book, and a "Your memory page is ready" toast with keyboard focus kept.
+
+413/413 pytest (30 new, every Meta call faked; three guards were broken on purpose to confirm their tests fail). Browser check passes with the Memory book at every size. `scripts/check_memory.py` with the real AI (about 3 cents): both made-up memories passed the guards on their own and were painted (30 and 63 seconds); screenshots at 390 and 1440px, light and dark, looked at and two things fixed (an underlined back link, straight apostrophes). Advice questions asked mid-memory with the real AI got the no-advice reply with Call Dr. Lee, Call Maria, and Add to doctor notes. `/safety-check`, `/web-design-guidelines`, and `/senior-friendly-ui` pass.
+
+- Oct 29 (demo polish): Home opens on its strongest moment. The daily check-in card at the top of Home is gone (with its "Not today"); the check-in is the first row of the Today list ("Daily check-in", "Not done yet", Start), and Start opens the same check-in flow. The greeting, date, and the whole orb now come first, above the tab bar at 390 by 844. Home has one "Talk to Buddy": the sidebar's is hidden on Home only, and the orb is a tap target the keyboard and screen readers skip. Calm motion was already off by default and saved in her profile (no code change; the local demo profile had it switched on, now off). On this PC Windows "Show animations" is off, which browsers report as reduced motion, so the orb stands still until that is turned on. The browser check has a new Home check (orb fully visible and moving, one Talk button, the sidebar's back on Diary, reduced motion keeps the orb) at 390 and 1440px in light and dark, and passes. 383/383 pytest. `/web-design-guidelines` and `/senior-friendly-ui` pass.
+
+- Oct 28 (Day 8 work, done early): Family update (Feature 9). `app/family.py` writes one day in plain words with plain code (no AI, so no judgments): her mood, pills taken of total with missed times, her diary entries in her own words, and each safety screen with a fixed sentence and its time (a crisis named, never with her words). It reuses the Doctor notes facts (`notes.symptoms` and `notes.pills` gained an end time). `GET /api/family/summary?date=` (today, up to 30 days back). Family screen: the update exactly as it will be sent, Today / Yesterday, "Send to Maria" (a `mailto:` link: her own email app opens with it written, nothing sent until she presses Send) and Copy. 383/383 pytest (22 new); browser check on the demo week: the email holds exactly the words on screen, addressed to Maria; Copy copies them; Yesterday switches. `/safety-check` passes.
 
 - Oct 28 (Day 8 work, done early): Doctor notes (Feature 8) and the demo week. `app/notes.py` builds every fact with plain code straight from the logs (her words quoted exactly, where, pain, since, pills taken of total with missed dates, one mood a day, open questions); Muse Spark only groups her entries into topics, and its grouping is used only if every id is real, each entry appears once, and each label is 1 to 3 of her own words (otherwise by where she said it hurts). `GET /api/doctor-notes?days=7|14|30`, "Asked" and Undo for questions. Screen: a document with Questions, How I've been feeling, My pills, My mood, Add a question, 7/14/30 days, Print; a print stylesheet so a week fits on one page (measured with a PDF in the browser check). `scripts/seed_demo.py` grew from the profile-only version into a made-up week (2 pills, 2 missed doses, 5 diary entries, 7 moods, 3 questions); it refuses to overwrite data unless `--replace`, which backs up first. 361/361 pytest (28 new); browser check passes on the seeded week (every screen now screenshotted with data); real AI (`scripts/check_notes.py`): Left knee, Headache, Dizzy, every check passed. `/safety-check` passes.
 

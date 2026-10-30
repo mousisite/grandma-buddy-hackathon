@@ -9,7 +9,7 @@
 import pytest
 import requests
 
-from app import db, meta_client
+from app import db, meta_client, voice
 
 
 @pytest.fixture(autouse=True)
@@ -25,5 +25,12 @@ def safe_test_setup(tmp_path, monkeypatch):
     # gets its connection from meta_client._client(). Both are blocked.
     monkeypatch.setattr(requests, "post", no_real_calls)
     monkeypatch.setattr(meta_client, "_client", no_real_calls)
+
+    # The real voice model is big and slow to load: tests use a fake one.
+    def no_real_voice_model():
+        raise AssertionError("A test tried to load the real voice model.")
+
+    monkeypatch.setattr(voice, "load_engine", no_real_voice_model)
+    monkeypatch.setattr(voice, "_engine", None)
     db.init_db(db_path)
     return db_path

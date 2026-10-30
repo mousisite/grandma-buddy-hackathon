@@ -3,6 +3,7 @@
 # talks to api.meta.ai, and the browser never does, so the API key stays here.
 # Never print or log the API key.
 
+import base64
 import json
 import time
 
@@ -15,6 +16,12 @@ from app.config import get_settings
 BASE_URL = "https://api.meta.ai/v1"
 TIMEOUT_SECONDS = 60
 RETRIES = 3  # extra tries when Meta says it is too busy (HTTP 429)
+PAINT_TIMEOUT_SECONDS = 180  # painting takes longer than talking
+PICTURE_SIZE = "1536x1024"  # a landscape page picture (3:2)
+# Muse Image may look up reference pictures on the web. Never for her
+# memories: her story stays in the request, and it never copies a real
+# person's likeness.
+NO_LOOKUPS = {"enable_image_search": False, "enable_web_search": False, "enable_shell": False}
 
 
 class MetaError(Exception):
@@ -122,6 +129,42 @@ def _create(request: dict):
     if response.choices[0].finish_reason == "length":
         print("A reply ran out of room (max_completion_tokens).")  # never her words
     return response
+
+
+def paint(prompt: str) -> bytes:
+    """Paint one picture with Muse Image (POST /v1/images/generations, the
+    OpenAI Images format). Returns the picture's bytes (WebP by default).
+    Costs $0.01 per picture, so it is called once per Memory book page."""
+    settings = get_settings()
+    if not settings.model_api_key:
+        raise MetaError("no API key is set up in .env")
+    client = _client()
+    for attempt in range(RETRIES + 1):
+        try:
+            response = client.images.generate(
+                model=settings.image_model,  # muse-image-1.0, a standard model
+                prompt=prompt,
+                n=1,
+                size=PICTURE_SIZE,
+                extra_body={"tool_enablement": NO_LOOKUPS},  # a Meta extra, so it goes in extra_body
+                timeout=PAINT_TIMEOUT_SECONDS,
+            )
+            break
+        except (openai.RateLimitError, openai.InternalServerError) as problem:
+            # 429 (too busy) and 503 (painting failed this time) are worth
+            # another try; any other server problem is not.
+            if attempt == RETRIES or getattr(problem, "status_code", 0) not in (429, 503):
+                raise MetaError(f"paint failed with HTTP {problem.status_code}")
+            time.sleep(2**attempt)  # wait 1, then 2, then 4 seconds
+        except openai.APIStatusError as problem:
+            raise MetaError(f"paint failed with HTTP {problem.status_code}")
+        except (openai.APITimeoutError, openai.APIConnectionError) as problem:
+            raise MetaError(f"paint failed: {type(problem).__name__}")
+
+    picture = response.data[0].b64_json if response.data else None
+    if not picture:
+        raise MetaError("no picture came back")
+    return base64.b64decode(picture)
 
 
 def transcribe(wav_bytes: bytes, keywords: list[str]) -> str:

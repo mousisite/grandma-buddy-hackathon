@@ -75,7 +75,7 @@ Rules for the helper skills:
 - Backend: Python 3.12 or newer, FastAPI, Uvicorn. SQLite through Python's built-in `sqlite3`. The official `openai` Python package pointed at Meta's API for chat. `requests` for speech-to-text.
 - Frontend: plain HTML, CSS, and JavaScript in `static/`, served by FastAPI. No React, no npm, no build step.
 - Voice in: the browser records the microphone, converts it to 16 kHz mono 16-bit WAV in JavaScript, and posts it to our backend, which calls Muse Voice Transcribe.
-- Voice out: the browser's built-in `speechSynthesis`. Meta has no text-to-speech model.
+- Voice out: Meta has no text-to-speech model (checked against Meta's docs, Oct 29). Buddy speaks with Kokoro, an open voice model (Apache-2.0) that runs on this computer through `kokoro-onnx` (`app/voice.py`, `/api/speak`), so it sounds natural in every browser and nothing leaves the computer. The browser's built-in `speechSynthesis` is the backup: when the voice files aren't there, when she picks a browser voice, and whenever the natural voice has trouble (safety messages wait at most 2.5 seconds for it). Approved by the user on Oct 29.
 - Models in the app: `muse-spark-1.3` for conversation and reasoning, `muse-voice-transcribe-1.0` for speech-to-text. Standard models only. Never use a `-contributor` model in the app, because it handles health information.
 - Every call to Meta lives in `app/meta_client.py`. Nothing else talks to `api.meta.ai`.
 
@@ -98,6 +98,8 @@ Rules for the helper skills:
 ```powershell
 python -m venv .venv                                     # once: create the project's Python environment
 .venv\Scripts\python -m pip install -r requirements.txt  # install packages
+.venv\Scripts\python -m pip install kokoro-onnx==0.6.1 --no-deps --ignore-requires-python  # Buddy's natural voice (once)
+.venv\Scripts\python scripts\get_voice.py                # download the voice model, about 354 MB (once)
 .venv\Scripts\python scripts\check_meta.py               # check the API key and billing (one tiny real call)
 .venv\Scripts\python -m uvicorn app.main:app --reload    # start the app
 .venv\Scripts\python -m pytest                           # run tests

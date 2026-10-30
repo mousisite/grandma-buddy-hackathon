@@ -9,16 +9,79 @@
 
 import json
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
-from app import db, reminders, safety
+from app import db, guard, reminders, safety
 
 MOODS = ["great", "good", "okay", "low", "very_low"]
-SCREENS = ["today", "diary", "pills", "notes", "family", "scam"]
+SCREENS = ["today", "diary", "pills", "notes", "family", "scam", "memories"]
 SCREEN_NAMES = {
     "today": "Today", "diary": "My diary", "pills": "My pills",
-    "notes": "Doctor notes", "family": "Family", "scam": "Scam check",
+    "notes": "Doctor notes", "family": "Family", "scam": "Scam check", "memories": "Memory book",
 }
+# ---------- What Buddy remembers about her life ----------
+
+FACT_KINDS = ["person", "pet", "hobby", "show", "event", "other"]
+MAX_FACT = 200
+MAX_FOLLOW_UP = 160
+FOLLOW_UP_DAYS = 60  # a follow-up is planned for the next two months at most
+EVENT_DAYS = 7  # an event stays in Buddy's mind for a week after it
+
+# Words that never belong in a remembered fact or a learned note: health,
+# medicines, hard feelings, and anything like a judgment of her mind. Her
+# health goes in the diary (her own words), and crisis words are never kept.
+PRIVATE = re.compile(
+    r"\b(pain\w*|hurt\w*|ach(e|es|ing)|sick\w*|ill|illness\w*|diseas\w*|diagnos\w*|symptom\w*|medic\w*|pills?|"
+    r"tablets?|doses?|hospital\w*|surger\w*|operation|cancer|dementia|alzheimer\w*|depress\w*|anxi\w*|lonel\w*|"
+    r"sad\w*|grie\w*|mood\w*|confus\w*|forgetful\w*|memory loss|mental\w*|cognit\w*|declin\w*|"
+    r"suicid\w*|kill\w*|self.harm|die|dying|dead)\b",
+    re.IGNORECASE,
+)
+
+
+def private(words: str) -> bool:
+    """True if these words are about health, hard feelings, or her mind,
+    or the safety net or the advice guard would react to them."""
+    return bool(PRIVATE.search(words)) or safety.check(words) is not None or guard.check_reply(words) is not None
+
+
+def fact_problem(kind: str, fact: str, follow_up: str, follow_up_on: str) -> str:
+    """Why a fact can't be remembered ("" when it can)."""
+    if kind not in FACT_KINDS:
+        return "kind must be one of " + ", ".join(FACT_KINDS)
+    if not fact or len(fact) > MAX_FACT or len(follow_up) > MAX_FOLLOW_UP:
+        return "Keep the fact and the follow-up short."
+    if follow_up_on:
+        try:
+            when = date.fromisoformat(follow_up_on)
+        except ValueError:
+            return "follow_up_on must be a date like 2026-11-02, or empty."
+        today = reminders.current_time().date()
+        if not today <= when <= today + timedelta(days=FOLLOW_UP_DAYS):
+            return "follow_up_on must be today or within the next two months."
+    if private(fact) or private(follow_up):
+        return "Only remember her life: people, pets, hobbies, shows, and plans. Never health or hard feelings."
+    return ""
+
+
+def facts_for_prompt(connection) -> list[str]:
+    """What Buddy keeps in mind about her, newest first (at most 30)."""
+    since = (reminders.current_time().date() - timedelta(days=EVENT_DAYS)).isoformat()
+    lines = []
+    for row in db.known_facts(connection, since):
+        when = f" (around {date.fromisoformat(row['follow_up_on']):%A, %B} {date.fromisoformat(row['follow_up_on']).day})" \
+            if row["kind"] == "event" and row["follow_up_on"] else ""
+        lines.append(row["fact"] + when)
+    return lines
+
+
+MEMORY_MINUTES = 30  # a memory is what was said in the last half hour of the talk
+# ponytail: a word count tells a new memory from "Yes please, save it";
+# ask the AI to mark where a memory starts if this ever guesses wrong.
+NEW_MEMORY_WORDS = 10
+MEMORY_MODES = ("chat", "memory")  # never from a "Something hurts" talk or a check-in
+SAVE_MEMORY_BUTTON = {"type": "memory", "label": "Save it in my memory book"}
+OPEN_MEMORY_BOOK = {"type": "open", "screen": "memories", "label": "Open my memory book"}
 
 # ---------- Her own words in the diary (docs/SAFETY.md section 6) ----------
 
@@ -67,6 +130,32 @@ def check_in_words(connection, conversation_id: str) -> str:
         elif row["role"] == "user" and listening:
             words.append(row["content"])
     return joined(words[-6:] or db.her_recent_words(connection, conversation_id, limit=4))
+
+
+def save_memory(connection, conversation_id: str, mode: str) -> tuple[int | None, bool]:
+    """Save the memory she told in this talk for the Memory book: what was
+    said in its last half hour, or since its last page (Buddy's questions
+    too, so the writer understands her answers). The page is written and
+    painted afterward (app/memories.py), never inside a tool.
+
+    Returns (the page's id, True if it is a new page that still needs
+    writing and painting), or (None, False) if she hasn't told one yet.
+    Saving again is the same page, never a second painting:
+    - a memory talk ("Tell Buddy a memory") makes one page;
+    - in ordinary talk, a new page needs a new memory since the last one,
+      not just "Yes please, save it"."""
+    last = db.last_memory(connection, conversation_id)
+    if last is not None and mode == "memory":
+        return last["id"], False
+    since = (datetime.now() - timedelta(minutes=MEMORY_MINUTES)).isoformat(timespec="seconds")
+    after_last = last is not None and last["created_at"] >= since
+    talk = db.memory_talk(connection, conversation_id, last["created_at"] if after_last else since)
+    her_words = joined([part["content"] for part in talk if part["role"] == "user"])
+    if after_last and len(words_in(her_words)) < NEW_MEMORY_WORDS:
+        return last["id"], False
+    if not her_words:
+        return None, False
+    return db.add_memory(connection, conversation_id, her_words, talk), True
 
 
 def from_her_words(fact, her_words: str) -> str:
@@ -138,6 +227,24 @@ TOOLS = [
          "Write down that she took a pill, when she says she did. Use the pill's name, or \"all\" for every "
          "pill that is due now.",
          {"medication_name": {"type": "string"}}, ["medication_name"]),
+    tool("remember_fact",
+         "Remember something lasting about her life, to bring up warmly later: a person (their name and who they "
+         "are to her), a pet, a hobby, a favorite show, or an upcoming event. Never health, medicines, or "
+         "feelings. For an event, give a short, warm follow-up question to ask afterward and the date to ask it "
+         "(YYYY-MM-DD, the day after the event); otherwise leave both empty.",
+         {"kind": {"type": "string", "enum": FACT_KINDS},
+          "fact": {"type": "string", "description": "In plain words, like \"Her grandson Tom visits on Sunday\"."},
+          "follow_up": {"type": "string"},
+          "follow_up_on": {"type": "string"}},
+         ["kind", "fact", "follow_up", "follow_up_on"]),
+    tool("offer_memory_page",
+         "Show a button to save the memory she is telling you in her memory book, when she starts telling a "
+         "memory from her life or says she wants to tell you one.",
+         {}, []),
+    tool("save_memory",
+         "Save the memory she just told you in her memory book, when she says yes. Her words are saved "
+         "automatically; Buddy then writes the page and paints a picture for it.",
+         {}, []),
 ]
 
 
@@ -269,6 +376,32 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
     if name == "suggest_calling_family":
         buttons = call_family(profile)
         return {"ok": True, "shown": len(buttons)}, buttons
+
+    if name == "remember_fact":
+        kind = str(args.get("kind", ""))
+        fact = " ".join(str(args.get("fact", "")).split())
+        follow_up = " ".join(str(args.get("follow_up", "")).split())
+        follow_up_on = str(args.get("follow_up_on", "")).strip()
+        problem = fact_problem(kind, fact, follow_up, follow_up_on)
+        if problem:
+            return {"ok": False, "error": problem}, []
+        if not db.save_fact(connection, kind, fact, follow_up if follow_up_on else "", follow_up_on):
+            return {"ok": False, "error": "She asked Buddy to forget this."}, []
+        return {"ok": True}, []
+
+    if name in ("offer_memory_page", "save_memory") and context["mode"] not in MEMORY_MODES:
+        return {"ok": False, "error": "Memories are saved in ordinary talk or a memory talk, not here."}, []
+
+    if name == "offer_memory_page":
+        return {"ok": True}, [SAVE_MEMORY_BUTTON]
+
+    if name == "save_memory":
+        memory_id, new = save_memory(connection, context["conversation_id"], context["mode"])
+        if memory_id is None:
+            return {"ok": False, "error": "She hasn't told a memory in this talk yet."}, []
+        if new:
+            context["memory_saved"] = memory_id  # the route writes and paints it next
+        return {"ok": True}, [OPEN_MEMORY_BOOK]
 
     if name == "open_screen":
         screen = args.get("screen")

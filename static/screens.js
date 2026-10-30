@@ -14,8 +14,16 @@ var SCREEN_LOADERS = {
   diary: showDiary,
   pills: showPillsScreen,
   notes: showNotes,
-  family: showFamilyCalls,
-  settings: fillSettingsForm,
+  family: function () {
+    showFamilyCalls();
+    showFamilyUpdate();
+  },
+  memories: showMemories,
+  memory: showMemoryPage,
+  settings: function () {
+    fillSettingsForm();
+    showLearned();
+  },
 };
 
 // ---------- Pill reminders (on every screen) ----------
@@ -466,12 +474,22 @@ function savePill(event) {
     });
 }
 
-// "Are you sure?" first. Keep it is where the cursor starts.
+// The "Are you sure?" sheet, shared by Remove (a pill) and Forget this
+// (something Buddy learned). Keep it is where the cursor starts.
+var onConfirm = null;
+
+function askFirst(title, text, yesWords, action) {
+  document.getElementById("confirm-title").textContent = title;
+  document.getElementById("confirm-text").textContent = text;
+  document.getElementById("confirm-yes").textContent = yesWords;
+  onConfirm = action;
+  document.getElementById("confirm-dialog").showModal();
+}
+
 function confirmRemove(pill) {
   pillToRemove = pill;
-  document.getElementById("confirm-text").textContent =
-    "Buddy will stop reminding her about " + pill.name + ". You can undo this.";
-  document.getElementById("confirm-dialog").showModal();
+  askFirst("Remove this pill?", "Buddy will stop reminding her about " + pill.name + ". You can undo this.",
+    "Yes, remove it", removePill);
 }
 
 function removePill() {
@@ -564,12 +582,11 @@ function showDiary() {
 
 var MOOD_WORDS = { great: "Feeling great", good: "Feeling good", okay: "Feeling okay", low: "Feeling low", very_low: "Feeling very low" };
 
-// The card on her first visit each day, and the check-in row in the Today
-// list: her mood once she told Buddy how she feels.
+// The check-in row, first in the Today list: her mood once she told Buddy
+// how she feels.
 function showCheckIn() {
   api("/api/check-in")
     .then(function (today) {
-      document.getElementById("check-in-card").hidden = !today.due;
       var words = "Not done yet";
       if (today.mood) {
         words = (MOOD_WORDS[today.mood.mood] || "Checked in") + ", at " +
@@ -581,20 +598,6 @@ function showCheckIn() {
     })
     .catch(function () {
       // No connection to our own server: keep what is shown.
-    });
-}
-
-// "Not today": the card goes away until tomorrow.
-function skipCheckIn() {
-  api("/api/check-in/skip", "POST")
-    .then(function () {
-      document.getElementById("check-in-card").hidden = true;
-      setText(document.getElementById("today-check-in"), "Done for today");
-      focusScreenHeading(); // the button she tapped is gone
-      toast("Okay, maybe tomorrow");
-    })
-    .catch(function () {
-      toast("I couldn’t save that just now. Please try again.", true);
     });
 }
 
@@ -1045,10 +1048,193 @@ function shrinkPhoto(file) {
   });
 }
 
+// ---------- The Memory book ----------
+
+// Her stories as pages, newest first (/api/memories). A page is written and
+// painted in the background after she tells it, so while any page is
+// "writing" or "painting" the screen asks again every 3 seconds.
+var MEMORY_POLL_MS = 3000;
+var memoryPoll = null;
+var shownMemories = ""; // what the screen shows now, so a poll redraws only on a change
+
+function memoryPages() {
+  return api("/api/memories").then(function (answer) {
+    return answer.pages;
+  });
+}
+
+function stillPainting(pages) {
+  return pages.some(function (page) {
+    return page.status === "writing" || page.status === "painting";
+  });
+}
+
+// A page she watched being painted is ready: say so (toasts are read out
+// by screen readers too).
+var memoryStatuses = {}; // page id -> its status last time
+
+function tellWhenReady(pages) {
+  var ready = pages.some(function (page) {
+    var before = memoryStatuses[page.id];
+    return page.status === "ready" && (before === "writing" || before === "painting");
+  });
+  pages.forEach(function (page) { memoryStatuses[page.id] = page.status; });
+  if (ready) {
+    toast("Your memory page is ready");
+  }
+}
+
+// Ask again in a moment, while she is still on that screen.
+function pollMemories(pages, screen, load) {
+  clearTimeout(memoryPoll);
+  if (stillPainting(pages)) {
+    memoryPoll = setTimeout(function () {
+      if (currentScreen() === screen) {
+        load();
+      }
+    }, MEMORY_POLL_MS);
+  }
+}
+
+// The picture: a soft wash of Buddy's colors with a calm shimmer while
+// Buddy writes or paints, and the painting fading in once it has loaded.
+// A painting that didn't work gets "Paint it again" (on the page itself).
+var PICTURE_WORDS = { writing: "Writing your page…", painting: "Painting your picture…" };
+
+function memoryPicture(page, onItsPage) {
+  var picture = element("div", "memory-picture");
+  picture.setAttribute("data-status", page.status);
+  if (page.picture) {
+    var image = element("img", "memory-img");
+    image.alt = page.scene ? "Painting: " + page.scene : "A painting for this memory";
+    image.width = 1536;
+    image.height = 1024;
+    image.decoding = "async";
+    image.loading = onItsPage ? "eager" : "lazy"; // the book's lower pages load as she scrolls
+    image.addEventListener("load", function () { image.classList.add("shown"); });
+    image.addEventListener("error", function () { image.remove(); });
+    image.src = page.picture;
+    picture.appendChild(image);
+  } else if (PICTURE_WORDS[page.status]) {
+    var words = element("p", "memory-picture-words", PICTURE_WORDS[page.status]);
+    if (page.status === "writing") {
+      words.setAttribute("aria-hidden", "true"); // the title already says "Writing your page…"
+    }
+    picture.appendChild(words);
+  } else if (onItsPage) {
+    var again = element("button", "pill-button pill-button--quiet pill-button--small memory-paint-again", "Paint it again");
+    again.type = "button";
+    again.addEventListener("click", function () {
+      again.disabled = true;
+      api("/api/memories/" + page.id + "/paint", "POST")
+        .then(showMemoryPage)
+        .catch(function () {
+          again.disabled = false;
+          toast("I couldn’t paint it just now. Please try again in a moment.", true);
+        });
+    });
+    picture.appendChild(again);
+  }
+  return picture;
+}
+
+function showMemories() {
+  var list = document.getElementById("memory-cards");
+  var status = document.getElementById("memories-status");
+  memoryPages()
+    .then(function (pages) {
+      status.hidden = pages.length > 0;
+      status.textContent = "Your memory book is empty. Tap “Tell Buddy a memory” to make the first page.";
+      tellWhenReady(pages);
+      var drawn = JSON.stringify(pages);
+      if (drawn !== shownMemories) {
+        shownMemories = drawn;
+        // Redrawing keeps keyboard focus on the card she was on.
+        var focused = document.activeElement.closest && document.activeElement.closest(".memory-card");
+        var focusedPage = focused ? focused.getAttribute("href") : "";
+        list.textContent = "";
+        pages.forEach(function (page) {
+          var card = element("a", "memory-card");
+          card.href = "#/memory/" + page.id;
+          card.appendChild(memoryPicture(page, false));
+          var words = element("span", "memory-card-text");
+          words.appendChild(element("h2", "memory-card-title", page.title || "Writing your page…"));
+          words.appendChild(element("span", "memory-card-date", page.date));
+          card.appendChild(words);
+          var item = document.createElement("li");
+          item.appendChild(card);
+          list.appendChild(item);
+          if (card.getAttribute("href") === focusedPage) {
+            card.focus();
+          }
+        });
+      }
+      list.removeAttribute("aria-busy");
+      pollMemories(pages, "memories", showMemories);
+    })
+    .catch(function () {
+      list.removeAttribute("aria-busy");
+      status.hidden = false;
+      status.textContent = "I couldn’t open your memory book just now. Please try again in a moment.";
+    });
+}
+
+var memoryOnScreen = null; // the page shown at #/memory/3, for "Read it to me"
+
+function showMemoryPage() {
+  var id = Number(screenDetail());
+  var status = document.getElementById("memory-status");
+  memoryPages()
+    .then(function (pages) {
+      var page = pages.filter(function (one) { return one.id === id; })[0];
+      document.querySelector(".memory-page").hidden = !page;
+      document.getElementById("memory-actions").hidden = !page || !page.mailto;
+      document.querySelector(".memory-share-note").hidden = !page || !page.mailto;
+      status.hidden = Boolean(page);
+      if (!page) {
+        status.textContent = "I couldn’t find that page. It may be in your memory book under another day.";
+        return;
+      }
+      tellWhenReady([page]);
+      document.title = (page.title || "Memory book") + " · Grandma Buddy";
+      var drawn = JSON.stringify(page);
+      if (drawn !== JSON.stringify(memoryOnScreen)) {
+        memoryOnScreen = page;
+        var picture = document.getElementById("memory-picture");
+        picture.textContent = "";
+        picture.appendChild(memoryPicture(page, true));
+        setText(document.getElementById("memory-title"), page.title || "Writing your page…");
+        setText(document.getElementById("memory-date"), page.date);
+        var story = document.getElementById("memory-story");
+        story.textContent = "";
+        page.paragraphs.forEach(function (paragraph) {
+          story.appendChild(element("p", "", paragraph));
+        });
+      }
+      var send = document.getElementById("memory-send");
+      send.href = page.mailto;
+      setText(send, "Send to " + (profile.family_name || "family"));
+      document.getElementById("memory-read").hidden = !voiceSettings.on; // it would stay silent
+      pollMemories([page], "memory", showMemoryPage);
+    })
+    .catch(function () {
+      status.hidden = false;
+      status.textContent = "I couldn’t open this page just now. Please try again in a moment.";
+    });
+}
+
+// "Read it to me": the title, then the story, in Buddy's voice.
+function readMemory() {
+  if (memoryOnScreen && talkState === "idle") {
+    speak(memoryOnScreen.title + ". " + memoryOnScreen.paragraphs.join(" "));
+  }
+}
+
 // ---------- Family and settings ----------
 
 // The text entries on the form, named like the profile fields.
-var PROFILE_TEXT_FIELDS = ["name", "preferred_name", "family_name", "family_phone", "family_email", "doctor_name", "doctor_phone"];
+var PROFILE_TEXT_FIELDS = ["name", "preferred_name", "family_name", "family_phone", "family_email", "family2_name",
+  "family2_phone", "doctor_name", "doctor_phone"];
 var VOICE_RATES = ["0.75", "0.9", "1.1"]; // Slower, Normal, Faster
 
 // Big call buttons for the family member and the doctor, when their
@@ -1058,6 +1244,7 @@ function showFamilyCalls() {
   row.textContent = "";
   var people = [
     { name: profile.family_name || "family", phone: profile.family_phone },
+    { name: profile.family2_name || "family", phone: profile.family2_phone },
     { name: profile.doctor_name || "the doctor", phone: profile.doctor_phone },
   ];
   people.forEach(function (person) {
@@ -1068,6 +1255,60 @@ function showFamilyCalls() {
   });
   row.hidden = row.children.length === 0;
   document.getElementById("family-calls-empty").hidden = row.children.length > 0;
+}
+
+// ---------- The family update ----------
+
+var familyUpdate = null; // the update on screen: its words, and its email link
+
+// "2026-10-28" for today (0) or yesterday (1), on this computer's clock.
+function updateDay(daysBack) {
+  var day = new Date();
+  day.setDate(day.getDate() - daysBack);
+  var two = function (number) { return (number < 10 ? "0" : "") + number; };
+  return day.getFullYear() + "-" + two(day.getMonth() + 1) + "-" + two(day.getDate());
+}
+
+// Ask for the day's update and show it exactly as it will be sent.
+function showFamilyUpdate() {
+  var back = Number(document.querySelector('input[name="update-day"]:checked').value);
+  var box = document.getElementById("update-text");
+  var status = document.getElementById("update-status");
+  var send = document.getElementById("update-send");
+  var name = profile.family_name || "family";
+  box.setAttribute("aria-busy", "true");
+  setText(document.getElementById("update-title"), (back ? "Yesterday’s" : "Today’s") + " update for " + name);
+  setText(send, "Send to " + name);
+  api("/api/family/summary?date=" + updateDay(back))
+    .then(function (update) {
+      familyUpdate = update;
+      status.hidden = true;
+      setText(box, update.text);
+      send.href = update.mailto;
+      document.getElementById("update-no-email").hidden = Boolean(update.to);
+    })
+    .catch(function () {
+      status.hidden = false;
+      status.textContent = "I couldn’t write the update just now. Please try again in a moment.";
+    })
+    .then(function () {
+      box.removeAttribute("aria-busy");
+    });
+}
+
+// "Copy": the same words, for a text message or anywhere else.
+function copyUpdate() {
+  if (!familyUpdate) {
+    return;
+  }
+  var copying = navigator.clipboard ? navigator.clipboard.writeText(familyUpdate.text) : Promise.reject();
+  copying
+    .then(function () {
+      toast("Copied");
+    })
+    .catch(function () {
+      toast("I couldn’t copy it. Please select the words and copy them yourself.", true);
+    });
 }
 
 // Put the saved profile into the form. Profile entries that aren't saved
@@ -1085,6 +1326,7 @@ function fillSettingsForm() {
   form.elements.text_size.value = String(wordStep());
   form.elements.voice_on.checked = profile.voice_on !== false;
   form.elements.calm_mode.checked = profile.calm_mode === true;
+  showVoiceChoices();
   form.elements.chime.checked = profile.chime === true;
   // The closest of Slower, Normal, Faster to the saved speed.
   var rate = Number(profile.voice_rate) || 0.9;
@@ -1092,6 +1334,131 @@ function fillSettingsForm() {
     return Math.abs(option - rate) < Math.abs(best - rate) ? option : best;
   });
   form.elements.voice_rate.value = closest;
+}
+
+// ---------- What Buddy has learned ----------
+
+// The facts Buddy remembers about her life, and its notes on how she likes
+// to talk (/api/learned). Each can be forgotten ("Are you sure?", then Undo).
+var KIND_WORDS = { person: "Someone she loves", pet: "A pet", hobby: "Something she enjoys",
+  show: "A favorite show", event: "A plan", other: "About her" };
+
+function showLearned() {
+  api("/api/learned")
+    .then(function (learned) {
+      setText(document.getElementById("learned-lead"), learned.days_learned >= 2
+        ? "Buddy has learned from " + learned.days_learned + " days of talks, to talk with her like a friend. Nothing here is about her health."
+        : "Buddy is still getting to know her. After a couple of days of talks, it learns how she likes to talk. Nothing here is about her health.");
+      learnedRows(document.getElementById("learned-notes"), learned.notes, "notes", "Nothing yet.", function (note) {
+        return { words: note.note, hint: "" };
+      });
+      learnedRows(document.getElementById("learned-facts"), learned.facts, "facts", "Nothing yet.", function (fact) {
+        return { words: fact.fact, hint: KIND_WORDS[fact.kind] + (fact.follow_up ? " · Buddy will ask: “" + fact.follow_up + "”" : "") };
+      });
+    })
+    .catch(function () {
+      setText(document.getElementById("learned-undo"), "I couldn’t open this just now. Please try again in a moment.");
+    });
+}
+
+function learnedRows(group, items, what, emptyWords, describe) {
+  group.textContent = "";
+  if (!items.length) {
+    group.appendChild(element("p", "group-row empty", emptyWords));
+    return;
+  }
+  items.forEach(function (item) {
+    var shown = describe(item);
+    var row = element("div", "group-row");
+    row.setAttribute("role", "listitem");
+    var words = element("span", "group-label", shown.words);
+    if (shown.hint) {
+      words.appendChild(element("span", "group-hint", shown.hint));
+    }
+    row.appendChild(words);
+    row.appendChild(smallButton("Forget this", "Forget: " + shown.words, function () {
+      askFirst("Forget this?", "Buddy will no longer remember “" + shown.words + "”. You can undo this.",
+        "Yes, forget it", function () { forgetLearned(what, item.id, shown.words); });
+    }));
+    group.appendChild(row);
+  });
+}
+
+function forgetLearned(what, id, words) {
+  document.getElementById("confirm-dialog").close();
+  var line = document.getElementById("learned-undo");
+  api("/api/learned/" + what + "/" + id + "/forget", "POST")
+    .then(function () {
+      showLearned();
+      line.textContent = "Forgot “" + words + "”. ";
+      var undo = smallButton("Undo", "Undo: remember “" + words + "” again", function () {
+        api("/api/learned/" + what + "/" + id + "/restore", "POST")
+          .then(function () {
+            line.textContent = "Buddy remembers it again.";
+            focusScreenHeading(); // the Undo button she tapped is gone
+            showLearned();
+          })
+          .catch(function () {
+            line.textContent = "I couldn’t bring it back just now. Please try again.";
+          });
+      });
+      line.appendChild(undo);
+      undo.focus();
+    })
+    .catch(function () {
+      line.textContent = "I couldn’t forget that just now. Please try again.";
+    });
+}
+
+// ---------- Buddy's voice ----------
+
+// "Microsoft Ava Online (Natural) - English (United States)" -> "Ava (natural), United States"
+function voiceLabel(voice) {
+  return voice.name.replace(/^Microsoft /, "").replace(/ Online \(Natural\)/, " (natural)")
+    .replace(/ - English \((.+)\)$/, ", $1");
+}
+
+// A group of choices in the voice list.
+function voiceGroup(select, label, choices) {
+  if (!choices.length) {
+    return;
+  }
+  var group = document.createElement("optgroup");
+  group.label = label;
+  choices.forEach(function (choice) {
+    var option = document.createElement("option");
+    option.value = choice.value;
+    option.textContent = choice.label;
+    group.appendChild(option);
+  });
+  select.appendChild(group);
+}
+
+// The voices in Settings: Buddy's natural voices first (when they are set
+// up on this computer), then this browser's own, best first, with hers
+// chosen. Called again when the voices arrive late (speech.js).
+function showVoiceChoices() {
+  var select = document.getElementById("voice-choice");
+  select.textContent = "";
+  var natural = naturalVoice.available ? naturalVoice.voices : [];
+  voiceGroup(select, "Buddy’s natural voices", natural.map(function (voice) {
+    return { value: NATURAL + voice.id, label: voice.name };
+  }));
+  voiceGroup(select, "This browser’s voices", englishVoices().map(function (voice) {
+    return { value: voice.name, label: voiceLabel(voice) };
+  }));
+  var current = chosenNatural();
+  select.value = current ? NATURAL + current : chosenVoice ? chosenVoice.name : "";
+  select.disabled = select.options.length === 0;
+  document.getElementById("voice-try").disabled = select.options.length === 0;
+  document.getElementById("voice-hint").hidden = natural.length > 0 || !onlyRoboticVoices();
+}
+
+// "Try it": a few words in the chosen voice and speed.
+function tryVoice() {
+  if (talkState === "idle") {
+    speak("Hello, I’m Buddy. I’m here whenever you’d like to talk.", { preview: true });
+  }
 }
 
 function clearProblem(form) {
@@ -1128,6 +1495,11 @@ function saveChoice(event) {
   if (field === "text_size") {
     setWords(Number(input.value));
     toast("Text size changed");
+    return;
+  }
+  if (field === "voice_name") {
+    chooseVoice(input.value);
+    tryVoice(); // she hears her choice at once
     return;
   }
   var change = {};
@@ -1202,7 +1574,7 @@ function startScreens() {
     resetPillForm();
     document.getElementById("pill-status").textContent = "";
   });
-  document.getElementById("confirm-yes").addEventListener("click", removePill);
+  document.getElementById("confirm-yes").addEventListener("click", function () { onConfirm(); });
   document.getElementById("confirm-no").addEventListener("click", function () {
     document.getElementById("confirm-dialog").close();
   });
@@ -1216,7 +1588,13 @@ function startScreens() {
     }
   });
   document.getElementById("today-take").addEventListener("click", function () { answerReminder("taken"); });
-  document.getElementById("check-in-skip").addEventListener("click", skipCheckIn);
+  document.getElementById("voice-try").addEventListener("click", tryVoice);
+
+  // The family update.
+  document.querySelectorAll('input[name="update-day"]').forEach(function (choice) {
+    choice.addEventListener("change", showFamilyUpdate);
+  });
+  document.getElementById("update-copy").addEventListener("click", copyUpdate);
 
   // Doctor notes.
   document.querySelectorAll('input[name="notes-days"]').forEach(function (choice) {
@@ -1226,6 +1604,12 @@ function startScreens() {
     window.print();
   });
   document.getElementById("question-form").addEventListener("submit", addQuestion);
+
+  // The Memory book.
+  document.getElementById("memory-print").addEventListener("click", function () {
+    window.print();
+  });
+  document.getElementById("memory-read").addEventListener("click", readMemory);
 
   // Check a message.
   document.getElementById("scam-check").addEventListener("click", function () { checkMessage("text"); });

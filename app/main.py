@@ -4,6 +4,7 @@
 # Run it with: .venv\Scripts\python -m uvicorn app.main:app --reload
 # Then open http://localhost:8000 in Chrome or Edge.
 
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -13,7 +14,9 @@ from fastapi.staticfiles import StaticFiles
 
 from app import db
 from app.config import get_settings
-from app.routes import checkin, companion, diary, meds, notes, profile, scam
+from app import voice
+from app.routes import checkin, companion, diary, family, learned, meds, memories, notes, profile, scam
+from app.routes import voice as voice_routes
 
 # The folder with index.html, styles.css, and app.js.
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -23,6 +26,10 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 async def lifespan(app: FastAPI):
     # Runs once when the server starts: make sure the database exists.
     db.init_db(get_settings().database_path)
+    # Buddy's natural voice loads in the background (about 3 seconds), so
+    # the app opens at once and her first reply never waits for it.
+    if voice.available():
+        threading.Thread(target=voice.warm_up, daemon=True).start()
     yield
     # Nothing to clean up when the server stops.
 
@@ -43,6 +50,25 @@ app.include_router(meds.router)
 app.include_router(checkin.router)
 # Check a message: is it a scam?
 app.include_router(scam.router)
+# The family update: one day in plain words, sent from her own email app.
+app.include_router(family.router)
+# The Memory book: her stories, written in her words, each with a painting.
+app.include_router(memories.router)
+# Buddy's natural voice (Kokoro, on this computer).
+app.include_router(voice_routes.router)
+# What Buddy has learned about her (Settings): see it, forget it, undo.
+app.include_router(learned.router)
+
+
+@app.middleware("http")
+async def always_check_for_updates(request, call_next):
+    """The page and its files are always checked for a newer version
+    ("no-cache"), so a browser never keeps running an old copy after the app
+    changes. Unchanged files just get a quick "not modified" answer."""
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 @app.get("/api/ping")

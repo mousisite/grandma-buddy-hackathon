@@ -12,7 +12,7 @@ Every color, size, and timing is a custom property at the top of `static/styles.
 
 ## The rules (checked by `/senior-friendly-ui`)
 
-1. **Voice first.** "Talk to Buddy" is the main action on Home and in the sidebar. Everything she can tap, she can also say.
+1. **Voice first.** "Talk to Buddy" is the main action on Home (one button, under the orb) and in the sidebar on every other screen. Everything she can tap, she can also say.
 2. **Legible.** Body text 17px or more; short labels (tabs, captions) 13px or more. "Text size" in Settings (Standard, Large, Largest: 100, 118, 135%) grows everything. It starts at Large on a first visit, and her choice is remembered on this device.
 3. **Easy to tap.** Every target at least 44 by 44px; the main actions (Talk to Buddy, I took it, call buttons) 56px or more.
 4. **Contrast.** Text 4.5:1 or more in light AND dark; large text, icons, and the edges of fields 3:1. Measured by `scripts/check_contrast.py`.
@@ -23,7 +23,7 @@ Every color, size, and timing is a custom property at the top of `static/styles.
 9. **Nothing is lost by mistake.** Removing asks first (a bottom sheet) and offers Undo. Unsaved profile entries stay when she moves to another screen. Form problems stay inline under the entry until fixed.
 10. **Red means emergency.** `--danger` and `--alarm` only on the emergency and Poison Control screens (and the Poison Control call on the pill reminder). A "Likely scam" verdict uses `--warning` with a stop icon.
 11. **Keyboard and screen readers.** Visible focus ring in both themes; focus moves to each screen's heading; new text is announced (`aria-live="polite"`); a "Skip to the page" button is the first stop.
-12. **Calm motion.** Reduced motion (the computer's setting) or "Calm motion" in Settings turns movement into simple fades. The orb stands still but keeps its glow.
+12. **Calm motion.** Off at first. Reduced motion (the computer's setting) or "Calm motion" in Settings (saved in her profile) turns movement into simple fades. The orb stands still but keeps its glow.
 
 ## Color
 
@@ -78,8 +78,8 @@ Buddy's colors live only inside the orb, never on words: amber `#F6B042`, peach 
 
 ## Layout
 
-- **Phones (under 768px):** content full width with 20px sides; a floating glass tab bar at the bottom: Home, Diary, Pills, Family, Settings.
-- **768px and up:** a slim glass sidebar (the Buddy wordmark, the same five places, and "Talk to Buddy" at the bottom); content at most 760px wide.
+- **Phones (under 768px):** content full width with 20px sides; a floating glass tab bar at the bottom: Home, Diary, Pills, Family, Settings. Its labels grow with Text size only as far as their tab allows (sized to the bar with a container query), so "Settings" never spills out on a narrow phone with Largest text, and never goes below 13px.
+- **768px and up:** a slim glass sidebar (the Buddy wordmark, the same five places, and "Talk to Buddy" at the bottom, hidden on Home, which has its own); content at most 760px wide.
 - Voice mode hides both, and fills the screen.
 - "Check a message" and "Doctor notes" open from Home's chips and Today list.
 
@@ -122,6 +122,7 @@ Easing: a spring (`linear()` with a slight settle; `cubic-bezier(0.2, 0, 0, 1)` 
 | "Are you sure?" | A bottom sheet slides up (centered on bigger screens) |
 | A pill is marked taken | Its check pops and draws itself; the ring fills |
 | Loading | A soft shimmer, never a spinner |
+| A Memory book page is written or painted | A slow band of light (2.4s) across a soft wash of Buddy's colors, with "Writing your page…" or "Painting your picture…"; the painting fades in (560ms) once loaded. Calm motion keeps the wash, the words, and the fade, but not the band |
 | Emergency, Poison Control, crisis screens | Nothing: they appear instantly |
 
 **Chime.** An optional soft, low two-note tone (Web Audio, no sound files) when listening starts and stops. Off by default.
@@ -130,9 +131,9 @@ Easing: a spring (`linear()` with a slight settle; `cubic-bezier(0.2, 0, 0, 1)` 
 
 All screens live on one page (`static/index.html`), each in a `<section data-screen>`. The address shows which one is open (`#/talk`, `#/pills`…), so the browser's Back button works.
 
-**Home.** The greeting in Newsreader ("Good afternoon, Rose"), the date, the orb, "Talk to Buddy", two chips (Something hurts, Check a message), and "Today" as a grouped list: the daily check-in (her mood once she said it, and "Start" to do it any time), the next pill (with "Take" when one is due), the latest diary note today, and Doctor notes.
+**Home.** It opens on the greeting in Newsreader ("Good afternoon, Rose"), the date, and the whole orb, above the fold even on a 390 by 844 phone. Then "Talk to Buddy" (the only one on Home; the orb is a tap target, not a second button for the keyboard or screen readers), three chips (Something hurts, Check a message, Memory book: on phones, the way into the Memory book), and "Today" as a grouped list: the daily check-in first ("Not done yet", or her mood once she said it, and "Start" to do it any time), the next pill (with "Take" when one is due), the latest diary note today, and Doctor notes.
 
-**Daily check-in.** On her first visit each day, a flat card sits at the top of Home: "Your daily check-in", "Three quick questions: how you feel, anything that hurts, and your morning pills.", **Start check-in** (ink, 56px) and **Not today** (quiet). Start opens voice mode like "Something hurts": Buddy says its fixed opening ("Good morning, Rose. How are you feeling today?"), the button hint says "Your daily check-in", and the AI asks the other two questions one at a time. Leaving voice mode ends it. A browser can't speak before her first tap, which is why the check-in starts with a tap instead of talking on its own.
+**Daily check-in.** The first row of Home's Today list: "Daily check-in", "Not done yet", and **Start**. Start opens voice mode like "Something hurts": Buddy says its fixed opening ("Good morning, Rose. How are you feeling today?"), the button hint says "Your daily check-in", and the AI asks the other two questions one at a time. Leaving voice mode ends it. A browser can't speak before her first tap, which is why the check-in starts with a tap instead of talking on its own.
 
 **Pill reminder card.** On every screen, at the top, while a pill is due: "Pill time", the words "It's time for your morning pill: …" with each label exactly as typed, "I took it", "Remind me in 10 minutes", and "Say it again". Read aloud once, brought into view once, and it stays until she answers. After a Poison Control screen today, its fixed message and call button come first.
 
@@ -162,9 +163,32 @@ The page's sections, in the order a doctor reads them:
 
 "Add a question" sits below the page. On paper: only the page, 10.5pt, the date beside her words, pill counts beside their names, and moods in 4 columns. A week of the demo data fits on one page (checked in the browser check).
 
-**Family.** A document with large call buttons for her family member and doctor.
+**Family.** A document with large call buttons for her family member and doctor. Below them:
+- "Today's update for Maria", with a Today / Yesterday choice;
+- the update in a card, exactly the words that will be sent;
+- **Send to Maria** (ink, 56px, opens her email app with it written) and **Copy** (a "Copied" toast);
+- "Nothing is sent until you press Send there.";
+- a note pointing to Settings when there's no email set up.
 
-**Settings.** Grouped rows: Appearance (Theme, Text size), Voice (Read replies aloud, Voice speed, Chime), Motion (Calm motion), and "Names and phone numbers", folded away for a family member. Switches and choices save at once with a "Settings saved" toast; the profile has its own "Save profile". A refused entry gets a `--warning` border and a note right under it saying how to fix it.
+**Memory book.** "Memory book" (Newsreader display), one line on what it is, and **Tell Buddy a memory** (ink, 56px, the mic icon), which opens voice mode with "I'd love to hear one of your memories. What would you like to tell me about?". Then the pages, newest first: one column on phones, two from 768px. Each card has the painting (3:2, 16px corners, on a soft wash of Buddy's colors until it arrives), the title in Newsreader (24px), and the day. A card being written or painted shimmers and says so. Under the pages: "Buddy's AI writes each page from your own words and paints its picture." The empty book says "Tap 'Tell Buddy a memory' to make the first page." It is in the sidebar (book-heart icon) and opens from a Home chip on phones; the tab bar keeps its five places, because a sixth label would not fit at Large text.
+
+**A memory page** (`#/memory/3`). "Memory book" back link, then the page like a picture book: the painting, the title in Newsreader (32px, 44px from 768px), the day, and her story in Newsreader at 20px with 1.6 line height. Then **Send to Maria** (ink, 56px, opens her email with the story written in), **Print** (quiet, 56px), and "Read it to me" (hidden when Read replies aloud is off). A note says the email holds the words only: to share the painting, Print and save it as a PDF. A painting that didn't work shows "Paint it again" on the wash. On paper: just the page, painting and all.
+
+**Settings.** Grouped rows: Appearance (Theme, Text size), Voice (Read replies aloud, Buddy's voice, Voice speed, Chime), Motion (Calm motion), and "Names and phone numbers", folded away for a family member. Switches and choices save at once with a "Settings saved" toast; the profile has its own "Save profile". A refused entry gets a `--warning` border and a note right under it saying how to fix it. "Buddy's voice" lists Buddy's natural voices first (Heart, the default, Bella, Nicole, Emma (British), Michael: made on this computer, the same in every browser), then the browser's own English voices best first (Edge's natural voices, Chrome's Google voices, Apple's, then the old Windows voices). It says the chosen one aloud at once and has "Try it". The choice is kept on this device. Only when there is no natural voice at all and the browser's voices are robotic does it suggest opening Buddy in Microsoft Edge. With the natural voice, the word-by-word highlight follows how far each sentence has played.
+
+**Welcome** (`#/welcome`, the first time, while no name is saved). The whole screen, like voice mode: no tab bar or sidebar, and the "call 911" note stays at the bottom.
+- **The stage:** Buddy's orb at the top, three step dots (ink up to her step), a Newsreader question, and one line of help.
+- **The steps:**
+  0. "Hello! I'm Buddy.", with **Let's begin**. Browsers stay silent until a first tap, so this tap lets Buddy speak.
+  1. "What should I call you?": a large name field, **Say it**, and **Next**.
+  2. "Who should I call when you'd like to talk to someone?": two cards, "Someone you love" and "Someone else (if you like)", each with a name and a phone number. Then Say it, Next, Back, and Skip for now.
+  3. "Would you like to set up your pills now?": **Add my pills now** (Pills with "Set up pills" open) or **Later**.
+- **Voice:** each question is read aloud. "Say it" works like Tap to talk ("I'm done", then "One moment…"), fills the fields, and goes through the safety net first.
+- **Refused entries:** marked under their field, saying how to fix them.
+
+**The greeting.** "Talk to Buddy" at the start of a conversation (the first talk today, or after two hours): Buddy says "Good afternoon, Rose!" with a follow-up that is due ("Did Tom make it on Sunday?") or a warm opener, shown big and read aloud, and the microphone opens by itself once Buddy has finished (never while it speaks). Otherwise she goes straight to talking, as before.
+
+**What Buddy has learned** (Settings, folded away under "For a family member"). One line on how far Buddy has got ("still getting to know her" or "learned from 3 days of talks"), "Nothing here is about her health", then two grouped lists: "How she likes to talk" (the notes) and "Her people, pets, and plans" (each fact, with what Buddy will ask and when). Each row has "Forget this", which asks first in the shared bottom sheet and then offers Undo.
 
 **Safety screens.** Full-bleed, no motion, texts word for word from `docs/SAFETY.md`. Emergency and Poison Control: `--alarm` red with white words (44px title, 32px message) and one huge white call button (104px); any other call buttons are outlined. Crisis: the page color with ink words and one huge ink call button.
 

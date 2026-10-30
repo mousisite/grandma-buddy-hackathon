@@ -14,6 +14,18 @@ Grandma Buddy's coding agent uses some skills written by other people. Each one 
 
 The skills `meta-model-api`, `safety-check`, `senior-friendly-ui`, and `demo-prep` were written for this project.
 
+## Buddy's natural voice
+
+Meta has no text-to-speech model, so Buddy speaks with an open voice model that runs on the user's own computer. None of these files are copied into this repository: the packages come from pip, and `scripts/get_voice.py` downloads the model into the git-ignored `models/` folder.
+
+| Part | Source | License | Changes |
+| --- | --- | --- | --- |
+| Kokoro-82M voice model and its voices | [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M); ONNX export `kokoro-v1.0.onnx` and `voices-v1.0.bin` from [thewh1teagle/kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) (release model-files-v1.1) | Apache License 2.0 | None |
+| kokoro-onnx 0.6.1 | [thewh1teagle/kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) | MIT | None (installed with `--ignore-requires-python` on Python 3.14) |
+| onnxruntime | [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) | MIT | None |
+| phonemizer | [bootphon/phonemizer](https://github.com/bootphon/phonemizer) | GPL-3.0 | None (a separate package, used as is) |
+| espeak-ng, through espeakng-loader | [espeak-ng/espeak-ng](https://github.com/espeak-ng/espeak-ng), [thewh1teagle/espeakng-loader](https://github.com/thewh1teagle/espeakng-loader) | GPL-3.0 | None (a separate package, used as is) |
+
 ## Fonts used by the app
 
 | Font | Source | License | Changes |

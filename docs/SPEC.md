@@ -78,7 +78,11 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - It talks about her life, memories, family, hobbies, and the day. It remembers what she shared.
 - When she sounds lonely, it listens and gently encourages real connection: "Would you like to call {family} today?" with a big call button.
 - It is a friend, not a therapist: no psychological advice or coping techniques. Crisis words trigger the fixed crisis screen from the safety net.
-- Done when: the companion test phrases in `docs/SAFETY.md` behave correctly and a lonely conversation ends with a gentle nudge toward a real person.
+- Feels like a friend she looks forward to talking to: warm, curious, a little playful; it reacts to what she said first, then asks one natural question; 1 to 3 short spoken sentences, varied openers, no lists; gentle jokes if she likes them.
+- Remembers her life: people, pets, hobbies, shows, and plans (`remember_fact`), the last few days' talks, and follows up ("Did Tom make it on Sunday?").
+- Starts conversations well: at the start of a conversation, "Good afternoon, Rose!" and a follow-up that's due, then it listens.
+- Learns her over her first couple of days: while getting to know her it asks gentle questions about her life; then, from what it learned each day ("Prefers short replies", "Loves puns"), it talks the way she likes. She and her family can see and forget anything it learned (Settings).
+- Done when: the companion test phrases in `docs/SAFETY.md` behave correctly and a lonely conversation ends with a gentle nudge toward a real person. `scripts/try_companion.py` (8 conversations with the real AI) reads warm, short, and safe.
 
 ### 7. Scam checker (P1)
 
@@ -101,6 +105,22 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - A daily summary: mood, pills taken or missed, new diary entries, and any safety-net events.
 - "Send to {family}" opens her email app with the summary already written (a `mailto:` link), so no email passwords are stored. A "Copy" button is there too.
 - Done when: the summary for a demo day is accurate and the email opens pre-filled.
+
+### 10. Memory book (P1)
+
+- She tells Buddy a story from her life: from "Tell Buddy a memory" on the Memory book screen, or in ordinary talk ("I want to tell you a memory"), where Buddy offers to save it.
+- Buddy listens and asks one or two gentle questions, one at a time (when was it, who was there).
+- Muse Spark writes a short page in her own voice: a title and 2 or 3 warm paragraphs. It keeps her details and never invents facts. Plain code checks that every name and number came up in her talk with Buddy (so "Was Maria there?" "Yes!" keeps Maria).
+- Muse Image paints one picture for it, always in the same soft watercolor-storybook style. No photorealistic faces of real people.
+- The Memory book shows the pages newest first as cards (picture, title, date). Each opens as a full page with "Send to {family}" (the family update's email link) and "Print". New pages appear in the family update.
+- It fights loneliness by turning her stories into a keepsake for her family. No advice of any kind, and the safety net still runs first on everything she says.
+- Done when: a told memory becomes a page with a painting; a page with a name or number she never said, or with advice, falls back to her own words; and the family update names new pages.
+
+### 11. First-time welcome and the demo week (P1)
+
+- The first time (no name saved), Buddy's orb greets her and three short steps set her up, by voice ("Say it") or by typing: her name; one or two family members with phone numbers; pills now or later. Then Home says "Good evening, Rose".
+- `scripts/seed_demo.py` fills every screen with a made-up week for Rose: two pills (mostly taken), two family contacts with 555 numbers, 5 check-ins with mixed moods, a knee pain that comes and goes in her own words, two doctor questions, one checked scam text, two painted Memory book pages, and what Buddy has learned about her. `--reset` saves a backup, then wipes and reseeds.
+- Done when: the welcome works on a fresh database, and after seeding every screen is filled in.
 
 ## Not building (out of scope)
 

@@ -27,6 +27,16 @@ def test_home_page_loads():
     assert "Tap to talk" in response.text
 
 
+def test_the_page_and_its_files_are_always_checked_for_updates():
+    # Without this, a browser can keep an old copy of a script for hours
+    # after it changed (it kept the old speech.js and its robotic voice).
+    from app.main import app
+
+    client = TestClient(app)
+    for path in ["/", "/static/speech.js", "/static/styles.css"]:
+        assert client.get(path).headers.get("cache-control") == "no-cache", path
+
+
 def test_database_has_all_tables(tmp_path):
     # db.py must create every table from docs/ARCHITECTURE.md.
     from app import db

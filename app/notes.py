@@ -86,14 +86,15 @@ def gather(connection, days: int) -> dict:
     }
 
 
-def symptoms(connection, since: str) -> list[dict]:
-    """Her diary entries, oldest first, exactly as written down. (Crisis
-    events are never on this page: only emergencies are in her diary.)"""
+def symptoms(connection, since: str, until: str = "9999") -> list[dict]:
+    """Her diary entries from `since` up to `until` (not included), oldest
+    first, exactly as written down. (Crisis events are never here: only
+    emergencies are in her diary.)"""
     found = []
     for row in connection.execute(
         "SELECT id, created_at, description, body_area, pain_level, since, source FROM symptoms "
-        "WHERE created_at >= ? ORDER BY created_at, id",
-        (since,),
+        "WHERE created_at >= ? AND created_at < ? ORDER BY created_at, id",
+        (since, until),
     ):
         when = datetime.fromisoformat(row["created_at"])
         found.append({
@@ -112,17 +113,19 @@ def symptoms(connection, since: str) -> list[dict]:
     return found
 
 
-def pills(connection, since: str, now: datetime) -> list[dict]:
+def pills(connection, since: str, now: datetime, until: str = "") -> list[dict]:
     """Each pill exactly as labeled, with how many reminders were taken and
     which were missed (the same rules as the reminders: missed after 2
-    hours with no answer). A reminder still waiting for her isn't counted."""
+    hours with no answer), from `since` up to now (or to `until`, for a
+    day that is over). A reminder still waiting for her isn't counted."""
     found = []
+    end = min(until or "9999", now.isoformat(timespec="seconds"))
     for pill in reminders.active_pills(connection):
         taken, missed = 0, []
         for row in connection.execute(
             "SELECT due_at, status, snooze_until FROM med_events WHERE medication_id = ? AND due_at >= ? AND due_at <= ? "
             "ORDER BY due_at",
-            (pill["id"], since, now.isoformat(timespec="seconds")),
+            (pill["id"], since, end),
         ):
             state = reminders.status(dict(row), now)
             if state == "taken":

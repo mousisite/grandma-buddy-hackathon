@@ -83,7 +83,9 @@ REMEDIES = re.compile(
 THERAPY = re.compile(
     r"\b(deep breaths?|breathing exercises?|meditat\w*|mindful\w*|cheer up|bright side|think positive\w*"
     r"|positive thinking|you don't mean that|don't be sad|count your blessings|journal\w*|gratitude list"
-    r"|therap\w*|counsel\w*|self care)\b"
+    r"|therap\w*|counsel\w*|self care"
+    # Never "I'm all you need" (docs/SAFETY.md section 7): real people matter most.
+    r"|i'm all you need|i am all you need|you only need me|you don't need anyone)\b"
 )
 
 

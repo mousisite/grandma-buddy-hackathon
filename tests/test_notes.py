@@ -225,33 +225,75 @@ def load_seed_script():
     return module
 
 
+SEEDED = ("symptoms", "medications", "med_events", "moods", "check_ins", "doctor_questions", "scam_checks",
+          "memories", "facts", "style_notes", "talk_summaries")
+
+
 def counts(path):
     connection = db.get_connection(path)
-    found = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-             for table in ("symptoms", "medications", "med_events", "moods", "doctor_questions")}
+    found = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in SEEDED}
     connection.close()
     return found
 
 
-def test_the_demo_week_fills_an_empty_database(safe_test_setup):
-    assert load_seed_script().main([]) == 0
+def test_the_demo_week_fills_every_screen(safe_test_setup):
+    assert load_seed_script().main(["--no-paint"]) == 0
     found = counts(safe_test_setup)
-    assert found["symptoms"] >= 4 and found["medications"] == 2 and found["moods"] == 7 and found["doctor_questions"] == 3
-    assert found["med_events"] >= 14
+    assert found == dict(found, medications=2, moods=5, check_ins=5, symptoms=5, doctor_questions=2, scam_checks=1,
+                         memories=2, style_notes=3, talk_summaries=3)
+    connection = db.get_connection(safe_test_setup)
+    taken = connection.execute("SELECT COUNT(*) FROM med_events WHERE status = 'taken'").fetchone()[0]
+    moods = {row[0] for row in connection.execute("SELECT mood FROM moods")}
+    knee = [row[0] for row in connection.execute("SELECT description FROM symptoms")]
+    facts = " ".join(row[0] for row in connection.execute("SELECT fact FROM facts"))
+    scam = connection.execute("SELECT verdict, excerpt FROM scam_checks").fetchone()
+    profile = db.get_profile(connection)
+    connection.close()
+    assert taken >= 6 and len(moods) >= 3  # some pills taken; mixed moods
+    assert all("knee" in words.lower() for words in knee)  # the knee pain that comes and goes, in her words
+    assert "Leo" in facts and "gardening" in facts
+    assert scam["verdict"] == "likely_scam" and not any(ch.isdigit() for ch in scam["excerpt"].replace("2,000", ""))
+    assert (profile["preferred_name"], profile["family_name"], profile["family2_name"]) == ("Rose", "Maria", "Daniel")
 
 
-def test_the_demo_week_never_overwrites_data_without_replace(safe_test_setup):
+def test_the_demo_week_is_made_up(safe_test_setup):
+    load_seed_script().main(["--no-paint"])
+    connection = db.get_connection(safe_test_setup)
+    profile = db.get_profile(connection)
+    connection.close()
+    for field in ("family_phone", "family2_phone", "doctor_phone"):
+        assert profile[field].startswith("555-"), field  # 555 numbers are reserved for fiction
+    assert profile["family_email"].endswith("@example.com")
+
+
+def test_the_memory_pages_are_painted_unless_told_not_to(safe_test_setup, monkeypatch):
+    from app import meta_client
+    painted = []
+    monkeypatch.setattr(meta_client, "paint", lambda prompt: painted.append(prompt) or b"RIFF\x24\x00\x00\x00WEBPVP8 " + b"\x00" * 24)
+    assert load_seed_script().main([]) == 0
+    assert len(painted) == 2
+    connection = db.get_connection(safe_test_setup)
+    assert [row[0] for row in connection.execute("SELECT status FROM memories")] == ["ready", "ready"]
+    connection.close()
+
+
+def test_the_demo_week_never_overwrites_data_without_reset(safe_test_setup):
     seed = load_seed_script()
-    seed.main([])
+    seed.main(["--no-paint"])
     before = counts(safe_test_setup)
-    assert seed.main([]) == 1  # refuses: there is data already
+    assert seed.main(["--no-paint"]) == 1  # refuses: there is data already
     assert counts(safe_test_setup) == before
 
 
-def test_replace_keeps_a_backup_first(safe_test_setup):
+def test_reset_keeps_a_backup_then_starts_from_an_empty_database(safe_test_setup):
     seed = load_seed_script()
-    seed.main([])
-    assert seed.main(["--replace"]) == 0
+    seed.main(["--no-paint"])
+    connection = db.get_connection(safe_test_setup)
+    db.add_symptom(connection, "An extra entry from before", "chat")
+    connection.commit()
+    connection.close()
+    assert seed.main(["--reset", "--no-paint"]) == 0
     backups = list(Path(safe_test_setup).parent.glob("backup-*.db"))
     assert len(backups) == 1
-    assert counts(str(backups[0]))["symptoms"] == counts(safe_test_setup)["symptoms"]  # the old week, kept
+    assert counts(str(backups[0]))["symptoms"] == 6  # the old data, kept in the backup
+    assert counts(safe_test_setup)["symptoms"] == 5  # wiped, then the demo week again

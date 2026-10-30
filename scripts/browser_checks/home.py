@@ -9,18 +9,19 @@
 import os
 import re
 import struct
-from datetime import datetime
+from datetime import datetime, timedelta
 import subprocess
 import tempfile
 import sys
 import time
 import urllib.request
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "test-output"
 PORT = 8001
-SCREENS = ["today", "talk", "diary", "pills", "notes", "scam", "family", "settings"]
+SCREENS = ["today", "talk", "diary", "pills", "notes", "scam", "family", "memories", "settings"]
 SIZES = [(390, 844), (768, 1024), (1440, 900)]  # phone, tablet, desktop
 
 
@@ -253,6 +254,32 @@ def check_settings_form(page, problems: list[str]) -> None:
     page.screenshot(path=str(OUT / "settings-desktop.png"), full_page=True)
     check_layout(page, "Settings screen, desktop")
 
+    # Buddy's voice: the natural voices first (when set up on this computer),
+    # then this browser's own, best first; the Edge hint only when all of
+    # them are robotic; her choice is kept on this device.
+    voices = page.eval_on_selector_all("#voice-choice option", "options => options.map(o => o.value)")
+    natural = page.evaluate("naturalVoice.available")
+    assert page.is_visible("#voice-hint") == (not natural and page.evaluate("onlyRoboticVoices()"))
+    if natural:
+        assert voices[0] == "natural:af_heart", voices
+        assert page.evaluate("chosenNatural()") == "af_heart", "the natural voice should be the default"
+        page.select_option("#voice-choice", "natural:af_bella")
+        assert page.evaluate("chosenNatural()") == "af_bella"
+        # Choosing it says a few words in it: made on this computer, played by the page.
+        page.wait_for_function("naturalAudio !== null && !naturalAudio.paused", timeout=20000)
+        page.click("#voice-try")
+        page.wait_for_function("naturalAudio !== null && !naturalAudio.paused", timeout=20000)
+        page.evaluate("stopSpeaking()")
+    browser_voices = [value for value in voices if not value.startswith("natural:")]
+    if len(browser_voices) > 1:
+        assert browser_voices[0] == page.evaluate("englishVoices()[0].name")
+        page.select_option("#voice-choice", browser_voices[1])
+        assert page.evaluate("localStorage.getItem('buddy-voice')") == browser_voices[1]
+        assert page.evaluate("pickVoice(), chosenVoice.name") == browser_voices[1], "the chosen voice wasn't kept"
+        assert page.evaluate("chosenNatural()") == "", "a chosen browser voice should be used"
+    page.select_option("#voice-choice", voices[0])  # back to the best one
+    page.evaluate("stopSpeaking()")
+
     # Calm motion: on, and the whole page stops moving; off again.
     page.check("input[name=calm_mode]")
     page.wait_for_function("document.documentElement.hasAttribute('data-calm')")
@@ -268,10 +295,10 @@ def check_settings_form(page, problems: list[str]) -> None:
     page.wait_for_function("document.documentElement.dataset.theme === 'light'")
     page.wait_for_function("profile.theme === 'auto'")
 
-    # Family now has big call buttons for Maria and Dr. Lee.
+    # Family now has big call buttons for Maria, Daniel (from the welcome), and Dr. Lee.
     open_screen(page, "family", "Family")
     hrefs = page.eval_on_selector_all("#family-calls a", "links => links.map(a => a.getAttribute('href'))")
-    assert hrefs == ["tel:555-0100", "tel:555-0199"], hrefs
+    assert hrefs == ["tel:555-0100", "tel:555-0144", "tel:555-0199"], hrefs
     assert page.text_content("#family-calls a") == "Call Maria"
     assert not page.is_visible("#family-calls-empty")
     page.screenshot(path=str(OUT / "family-desktop.png"))
@@ -318,6 +345,114 @@ def check_diary_talk(page) -> None:
     assert sent[-1]["mode"] == "diary", sent[-1]
     assert "-diary-" in sent[-1]["conversation_id"], sent[-1]
     page.wait_for_selector(".toast:has-text('Saved to diary')")
+
+
+def check_memory_talk(page) -> None:
+    """The Memory book from Home's chip: empty at first; "Tell Buddy a
+    memory" asks for one in voice mode, her answer goes to /api/chat in
+    memory mode with its own conversation id, and memory mode ends once it
+    is saved. In ordinary talk, "Save it in my memory book" saves it."""
+    sent, saved = [], []
+
+    def fake_chat(route):
+        sent.append(route.request.post_data_json)
+        if sent[-1]["mode"] == "memory":
+            route.fulfill(json={"reply": "I'm writing that into your memory book, and painting a picture for it.",
+                                "show": None, "memory_saved": 1, "memory_done": True,
+                                "actions": [{"type": "open", "screen": "memories", "label": "Open my memory book"}]})
+        else:
+            route.fulfill(json={"reply": "What a lovely memory. Would you like it in your memory book?", "show": None,
+                                "actions": [{"type": "memory", "label": "Save it in my memory book"}]})
+
+    def fake_save(route):
+        saved.append(route.request.post_data_json)
+        route.fulfill(json={"id": 1})
+
+    page.unroute("**/api/chat")
+    page.route("**/api/chat", fake_chat)
+    page.route("**/api/memories", lambda route: fake_save(route) if route.request.method == "POST" else route.continue_())
+    open_screen(page, "memories", "Memory book")
+    page.wait_for_selector("#memories-status:not([hidden])")
+    assert "Your memory book is empty" in (page.text_content("#memories-status") or "")
+
+    page.click("[data-start-memory]")
+    wait_for_screen(page, "talk")
+    page.wait_for_function("document.querySelector('#message').textContent.includes('one of your memories')")
+    assert page.text_content("#talk-hint") == "Buddy is listening for your memory book"
+    page.click("#talk-button")
+    page.wait_for_selector("#talk-button[data-state='listening']")
+    page.wait_for_timeout(600)
+    page.click("#talk-button")
+    page.wait_for_function("document.querySelector('#talk-hint').textContent === 'Buddy writes down what you say'")
+    assert sent[-1]["mode"] == "memory", sent[-1]
+    assert "-memory-" in sent[-1]["conversation_id"], sent[-1]
+    page.wait_for_selector(".toast:has-text('Saved to your memory book')")
+    assert page.is_visible("#actions button:has-text('Open my memory book')")
+
+    # Ordinary talk: Buddy offers the button, and it saves this talk's memory.
+    page.click("#talk-button")
+    page.wait_for_selector("#talk-button[data-state='listening']")
+    page.wait_for_timeout(600)
+    page.click("#talk-button")
+    page.click("#actions button:has-text('Save it in my memory book')")
+    page.wait_for_selector("#actions button:has-text('Open my memory book')")
+    assert saved[-1]["conversation_id"] == sent[-1]["conversation_id"] and sent[-1]["mode"] == "chat", (saved, sent)
+    page.click("#actions button:has-text('Open my memory book')")
+    wait_for_screen(page, "memories")
+    page.unroute("**/api/memories")
+
+
+def check_friend(browser, database: str) -> None:
+    """Buddy as a friend. Settings shows what Buddy learned (a note on how
+    she likes to talk, a fact about her life); "Forget this" asks first and
+    Undo brings it back. And "Talk to Buddy" at the start of a conversation
+    greets her by name with a follow-up that is due, then listens."""
+    import sqlite3
+
+    now = datetime.now()
+    connection = sqlite3.connect(database)
+    stamp = now.isoformat(timespec="seconds")
+    connection.execute("INSERT INTO style_notes (created_at, note) VALUES (?, 'Loves a good pun')", (stamp,))
+    connection.execute("INSERT INTO facts (created_at, updated_at, kind, fact, follow_up, follow_up_on) "
+                       "VALUES (?, ?, 'event', 'Her grandson Tom visits on Sunday', 'Did Tom make it on Sunday?', ?)",
+                       (stamp, stamp, now.date().isoformat()))
+    # Her last talk was three hours ago: the next one starts a conversation.
+    earlier = (now - timedelta(hours=3)).isoformat(timespec="seconds")
+    connection.execute("UPDATE messages SET created_at = ? WHERE created_at > ?", (earlier, earlier))
+    connection.commit()
+    connection.close()
+
+    page = browser.new_page(viewport={"width": 390, "height": 844}, permissions=["microphone"])
+    page.route("**/api/transcribe", lambda route: route.fulfill(json={"transcript": ""}))
+    visit(page, "settings")
+    page.click("#learned-setup summary")
+    page.wait_for_selector("#learned-facts >> text=Her grandson Tom visits on Sunday")
+    assert page.is_visible("#learned-notes >> text=Loves a good pun")
+    page.eval_on_selector("#learned-setup", "details => details.scrollIntoView()")
+    # Measured once its rows have finished rising in (they start at 98% size).
+    page.wait_for_function("document.querySelector('#learned-setup .for-family-body').getAnimations()"
+                           ".every(a => a.playState === 'finished')")
+    page.screenshot(path=str(OUT / "settings-learned-390.png"))
+    check_layout(page, "What Buddy has learned")
+    page.click("#learned-facts button:has-text('Forget this')")
+    page.wait_for_selector("#confirm-dialog[open]")
+    assert page.text_content("#confirm-title") == "Forget this?"
+    page.click("#confirm-yes")
+    page.wait_for_selector("#learned-facts >> text=Her grandson Tom visits on Sunday", state="detached")
+    page.click("#learned-undo button:has-text('Undo')")
+    page.wait_for_selector("#learned-facts >> text=Her grandson Tom visits on Sunday")
+
+    # The greeting, then listening once Buddy has finished speaking. It asks
+    # the oldest follow-up that's due: the demo week's, about Leo.
+    page.click("[data-nav='today']:visible")
+    wait_for_screen(page, "today")
+    page.click("#start-talk")
+    wait_for_screen(page, "talk")
+    page.wait_for_function("document.getElementById('message').textContent.includes('Did Leo come by on Sunday?')")
+    assert (page.text_content("#message") or "").startswith("Good "), "the greeting says good morning, afternoon, or evening"
+    page.wait_for_selector("#talk-button[data-state='listening']", timeout=30000)
+    page.screenshot(path=str(OUT / "greeting-390.png"))
+    page.close()
 
 
 def check_pills(page, problems: list[str]) -> None:
@@ -414,21 +549,55 @@ def check_pills(page, problems: list[str]) -> None:
     check_layout(page, "Pills screen, desktop")
 
 
-def check_check_in(browser) -> None:
-    """The daily check-in on a fresh day: the card on Home (light, dark,
-    desktop), "Not today" hides it, and "Start" in the Today list opens
-    voice mode with Buddy's opening question, sends her answer in
-    "check_in" mode with the check-in's own conversation, and goes back to
-    ordinary talk when she leaves voice mode."""
-    for theme, width, height in [("light", 390, 844), ("dark", 390, 844), ("light", 1440, 900)]:
-        page = browser.new_page(viewport={"width": width, "height": height}, color_scheme=theme)
+def check_home_hero(browser) -> None:
+    """Home opens on the greeting, the date, and the whole orb (above the
+    tab bar on a phone), with the orb moving: Calm motion starts off. The
+    daily check-in is the first row of the Today list. Home has one Talk to
+    Buddy button; the sidebar's comes back on the other screens. With
+    reduced motion the orb is still there, standing still."""
+    for theme, width, height in [("light", 390, 844), ("dark", 390, 844), ("light", 1440, 900), ("dark", 1440, 900)]:
+        page = browser.new_page(viewport={"width": width, "height": height}, color_scheme=theme, reduced_motion="no-preference")
         page.goto(f"http://localhost:{PORT}/", wait_until="networkidle")
-        page.wait_for_selector("#check-in-card:not([hidden])")
-        page.wait_for_timeout(1200)
-        page.screenshot(path=str(OUT / f"check-in-card-{width}-{theme}.png"))
-        check_layout(page, f"check-in card at {width}px, {theme}")
+        page.wait_for_function("document.getElementById('today-check-in').textContent === 'Not done yet'")
+        page.wait_for_timeout(1200)  # let Buddy wake up
+        page.screenshot(path=str(OUT / f"home-hero-{width}-{theme}.png"))
+        check_layout(page, f"Home at {width}px, {theme}")
+        orb = page.locator(".hero-orb .orb").bounding_box()
+        greeting = page.locator("#greeting").bounding_box()
+        bottom = page.locator(".tabbar").bounding_box()["y"] if width < 768 else height
+        assert greeting["y"] < orb["y"] and orb["y"] >= 0 and orb["y"] + orb["height"] <= bottom, \
+            f"the whole orb should show under the greeting without scrolling at {width}px: {orb}"
+        assert not page.evaluate("document.documentElement.hasAttribute('data-calm')"), "Calm motion should start off"
+        moving = page.evaluate("getComputedStyle(document.querySelector('.hero-orb .orb-blob')).animationName")
+        assert moving != "none", "the orb should move on Home"
+        first_row = page.locator(".rows .row").first
+        assert first_row.locator(".row-title").text_content() == "Daily check-in"
+        assert first_row.locator("[data-start-check-in]").text_content() == "Start"
+        talk = page.get_by_role("button", name="Talk to Buddy", exact=True)
+        assert talk.count() == 1 and talk.get_attribute("id") == "start-talk", "Home should have one Talk to Buddy button"
+        if width >= 768:
+            assert not page.is_visible(".sidebar-talk"), "the sidebar's Talk to Buddy should hide on Home"
+            page.click("[data-nav='diary']:visible")
+            wait_for_screen(page, "diary")
+            assert page.is_visible(".sidebar-talk"), "the sidebar's Talk to Buddy should be back on other screens"
         page.close()
 
+    calm = browser.new_page(viewport={"width": 390, "height": 844}, reduced_motion="reduce")
+    calm.goto(f"http://localhost:{PORT}/", wait_until="networkidle")
+    calm.wait_for_timeout(600)
+    assert calm.evaluate("document.documentElement.hasAttribute('data-calm')"), "reduced motion should turn on Calm motion"
+    assert calm.is_visible(".hero-orb .orb-core"), "the orb should still be there with reduced motion"
+    still = calm.evaluate("getComputedStyle(document.querySelector('.hero-orb .orb-blob')).animationName")
+    assert still == "none", f"the orb should stand still with reduced motion, not {still!r}"
+    calm.screenshot(path=str(OUT / "home-hero-390-reduced-motion.png"))
+    calm.close()
+
+
+def check_check_in(browser) -> None:
+    """The daily check-in: "Start" in the Today list opens voice mode with
+    Buddy's opening question, sends her answer in "check_in" mode with the
+    check-in's own conversation, and goes back to ordinary talk when she
+    leaves voice mode."""
     sent = []
 
     def fake_chat(route):
@@ -440,16 +609,6 @@ def check_check_in(browser) -> None:
     page.route("**/api/transcribe", lambda route: route.fulfill(json={"transcript": "I'm feeling pretty good"}))
     page.route("**/api/chat", fake_chat)
     page.goto(f"http://localhost:{PORT}/", wait_until="networkidle")
-    page.wait_for_selector("#check-in-card:not([hidden])")
-    # "Not today": the card goes, and stays gone after a reload.
-    page.click("#check-in-skip")
-    page.wait_for_selector("#check-in-card", state="hidden")
-    page.wait_for_selector(".toast:has-text('Okay, maybe tomorrow')")
-    page.reload(wait_until="networkidle")
-    page.wait_for_function("document.getElementById('today-check-in').textContent === 'Done for today'")
-    assert not page.is_visible("#check-in-card"), "the card came back after Not today"
-
-    # "Start" in the Today list still runs it (and in the demo).
     page.click(".row [data-start-check-in]")
     wait_for_screen(page, "talk")
     page.wait_for_function("document.getElementById('message').textContent.includes('How are you feeling today?')")
@@ -537,10 +696,81 @@ def check_scam(browser) -> None:
 
 def seed_demo_week(database: str) -> None:
     """Fill the test server's database with the made-up demo week
-    (scripts/seed_demo.py --replace, which keeps a backup first)."""
+    (scripts/seed_demo.py --reset, which keeps a backup first; no paintings)."""
     env = dict(os.environ, DATABASE_PATH=database)
-    subprocess.run([sys.executable, str(ROOT / "scripts" / "seed_demo.py"), "--replace"], cwd=ROOT, env=env,
-                   check=True, stdout=subprocess.DEVNULL)
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "seed_demo.py"), "--reset", "--no-paint"], cwd=ROOT,
+                   env=env, check=True, stdout=subprocess.DEVNULL)
+
+
+def say_it(page, form: str, heard: str) -> None:
+    """ "Say it" in the welcome, with the fake microphone, and the words
+    the fake speech-to-text hears."""
+    page.unroute("**/api/transcribe")
+    page.route("**/api/transcribe", lambda route: route.fulfill(json={"transcript": heard}))
+    page.click(f"{form} [data-say-it]")
+    page.wait_for_selector(f"{form} [data-say-it][data-state='listening']")
+    page.wait_for_timeout(600)
+    page.click(f"{form} [data-say-it]")
+    page.wait_for_selector(f"{form} [data-say-it][data-state='idle']")
+
+
+def check_welcome(browser) -> None:
+    """The first time (no name saved), the welcome opens instead of Home:
+    no tab bar; "Let's begin", then her name (said: "My name is Rose"), her
+    family (typed, and said: "My son Daniel, 555 0144"; a refused number is
+    named under its field), and pills Later. Then Home greets her by name.
+    "Say it" goes through the safety net first: a crisis phrase shows the
+    crisis screen."""
+    wide = browser.new_page(viewport={"width": 1440, "height": 900}, permissions=["microphone"])
+    wide.goto(f"http://localhost:{PORT}/", wait_until="networkidle")
+    wait_for_screen(wide, "welcome")
+    wide.wait_for_timeout(800)
+    wide.screenshot(path=str(OUT / "welcome-0-1440.png"))
+    wide.click("#welcome-begin")
+    wide.wait_for_selector("#welcome-name-form:not([hidden])")
+    # (A crisis phrase: it is never stored, so later checks find an empty diary.)
+    say_it(wide, "#welcome-name-form", "I wish I wasn't here anymore")
+    wide.wait_for_selector("#safety-screen[open][data-kind='crisis']")
+    wide.click("#safety-close")
+    wide.screenshot(path=str(OUT / "welcome-1-1440.png"))
+    check_layout(wide, "welcome at 1440px")
+    wide.close()
+
+    page = browser.new_page(viewport={"width": 390, "height": 844}, permissions=["microphone"])
+    page.goto(f"http://localhost:{PORT}/", wait_until="networkidle")
+    wait_for_screen(page, "welcome")
+    assert not page.is_visible(".tabbar"), "the welcome is the whole screen"
+    assert page.is_visible(".footnote-call"), "call 911 stays one tap away"
+    page.wait_for_timeout(800)
+    page.screenshot(path=str(OUT / "welcome-0-390.png"))
+    check_layout(page, "welcome, the start")
+    page.click("#welcome-begin")
+    say_it(page, "#welcome-name-form", "My name is Rose")
+    assert page.input_value("#welcome-name") == "Rose"
+    page.screenshot(path=str(OUT / "welcome-1-390.png"))
+    check_layout(page, "welcome, her name")
+    page.click("#welcome-name-form button[type=submit]")
+    page.wait_for_selector("#welcome-family-form:not([hidden])")
+    assert "Who should I call" in (page.text_content("#welcome-title") or "")
+    page.fill("#welcome-family-name", "Maria")
+    page.fill("#welcome-family-phone", "555-0100")
+    say_it(page, "#welcome-family-form", "My son Daniel, 555 0144")
+    assert (page.input_value("#welcome-family2-name"), page.input_value("#welcome-family2-phone")) == ("Daniel", "555 0144")
+    page.screenshot(path=str(OUT / "welcome-2-390.png"), full_page=True)
+    check_layout(page, "welcome, her family")
+    page.fill("#welcome-family2-phone", "call him")
+    page.click("#welcome-family-form button[type=submit]")
+    page.wait_for_selector("#welcome-family-form-problem")
+    assert "second family member" in (page.text_content("#welcome-family-form-problem") or "")
+    page.fill("#welcome-family2-phone", "555-0144")
+    page.click("#welcome-family-form button[type=submit]")
+    page.wait_for_selector("[data-step='3']:not([hidden])")
+    page.screenshot(path=str(OUT / "welcome-3-390.png"))
+    check_layout(page, "welcome, her pills")
+    page.click("#welcome-later")
+    wait_for_screen(page, "today")
+    page.wait_for_function("document.getElementById('greeting').textContent.endsWith(', Rose')")
+    page.close()
 
 
 def check_notes(browser) -> None:
@@ -555,13 +785,13 @@ def check_notes(browser) -> None:
     assert (page.text_content("#notes-doc .doc-meta") or "").startswith("Rose, ")
     assert page.is_visible("[data-screen='notes'] >> text=I’m an AI helper. I can’t give medical advice.")
     topics = page.eval_on_selector_all("#notes-doc .doc-topic", "items => items.map(i => i.textContent)")
-    assert topics[0] == "Left knee" and topics[-1] == "Other things", topics
+    assert topics == ["Knee"], topics  # one knee that comes and goes
     words = page.eval_on_selector_all("#notes-doc .doc-words", "items => items.map(i => i.textContent)")
-    assert "“My left knee is sore when I walk, about a 4”" in words, words
+    assert "“My knee is sore when I walk, about a 4”" in words, words
     counts = page.eval_on_selector_all("#notes-doc .doc-count", "items => items.map(i => i.textContent)")
     assert all(count.startswith("Taken ") for count in counts), counts
     assert page.locator("#notes-doc .doc-missed").count() == 2, "the two missed doses should show"
-    assert page.locator("#notes-doc .doc-moods li").count() == 7
+    assert page.locator("#notes-doc .doc-moods li").count() == 5
 
     # A week of notes prints on one page.
     pdf = page.pdf(format="Letter", print_background=True)
@@ -571,17 +801,17 @@ def check_notes(browser) -> None:
 
     # "Asked" takes a question off, Undo brings it back.
     questions = "#notes-doc .doc-questions li"
-    assert page.locator(questions).count() == 3
+    assert page.locator(questions).count() == 2
     page.click(f"{questions} >> nth=0 >> button")
-    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 2")
+    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 1")
     page.click("#notes-undo button")
-    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 3")
+    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 2")
 
     # Add a question.
     page.fill("#question-text", "Can I go swimming with my knee?")
     page.click("#question-form button[type=submit]")
     page.wait_for_selector(".toast:has-text('Added to doctor notes')")
-    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 4")
+    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 3")
 
     # 14 days: a longer period.
     page.click(".notes-controls label:has-text('14 days')")
@@ -590,6 +820,39 @@ def check_notes(browser) -> None:
     page.screenshot(path=str(OUT / "doctor-notes-1440.png"), full_page=True)
     check_layout(page, "Doctor notes at 1440px")
     page.close()
+
+
+def check_family(browser) -> None:
+    """The family update on the demo week: exactly the words on screen go in
+    the email, addressed to Maria; Copy copies them; Yesterday switches day."""
+    context = browser.new_context(viewport={"width": 1440, "height": 900},
+                                  permissions=["clipboard-read", "clipboard-write"])
+    page = context.new_page()
+    visit(page, "family")
+    page.wait_for_function("document.getElementById('update-text').textContent.startsWith('Hi Maria,')")
+    assert page.text_content("#update-title") == "Today’s update for Maria"
+    assert page.text_content("#update-send") == "Send to Maria"
+    shown = page.text_content("#update-text") or ""
+    assert "Mood: " in shown and "Pills: " in shown and "Diary: " in shown and "Safety screens" in shown, shown
+    link = urlsplit(page.get_attribute("#update-send", "href") or "")
+    assert link.scheme == "mailto" and unquote(link.path) == "maria@example.com", link
+    body = parse_qs(link.query)["body"][0].replace("\r\n", "\n")
+    assert body == shown, "the email must hold exactly the words on screen"
+    assert not page.is_visible("#update-no-email")
+
+    page.click("#update-copy")
+    page.wait_for_selector(".toast:has-text('Copied')")
+    copied = page.evaluate("navigator.clipboard.readText()")
+    # Windows keeps line breaks in the clipboard as \r\n.
+    assert copied.replace("\r\n", "\n") == shown, "Copy must copy exactly the words on screen"
+
+    page.click(".family-update label:has-text('Yesterday')")
+    page.wait_for_function("document.getElementById('update-title').textContent.startsWith('Yesterday’s')")
+    page.wait_for_function(f"document.getElementById('update-text').textContent !== {shown!r}")
+    page.wait_for_timeout(400)
+    page.screenshot(path=str(OUT / "family-update-1440.png"), full_page=True)
+    check_layout(page, "family update at 1440px")
+    context.close()
 
 
 def check_greeting_and_theme(browser) -> None:
@@ -686,6 +949,7 @@ def main() -> int:
                 args=["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"]
             )
             try:
+                check_welcome(browser)  # first, while the test database has no name
                 page = browser.new_page(viewport={"width": 1280, "height": 900}, permissions=["microphone"])
                 page.on("console", lambda msg: problems.append(msg.text) if msg.type == "error" else None)
                 page.on("pageerror", lambda err: problems.append(str(err)))
@@ -694,6 +958,7 @@ def main() -> int:
                 page.wait_for_timeout(1200)  # let Buddy wake up
                 page.screenshot(path=str(OUT / "home-desktop.png"))
                 check_layout(page, "desktop")
+                check_home_hero(browser)
                 check_check_in(browser)
 
                 # Talk: speech-to-text and Buddy's AI reply are faked, so Meta
@@ -713,6 +978,7 @@ def main() -> int:
                 check_talk(page, uploads)
                 check_settings_form(page, problems)
                 check_diary_talk(page)
+                check_memory_talk(page)
                 check_pills(page, problems)
                 check_scam(browser)
 
@@ -793,12 +1059,15 @@ def main() -> int:
                     check_layout(phone, f"{name} screen, 390px with the largest text")
                     phone.screenshot(path=str(OUT / f"{name}-390-largest.png"), full_page=True)
 
-                # The narrowest phones (360px).
+                # The narrowest phones (360px), with the largest text: the
+                # tightest fit there is, like the tab bar's "Settings".
                 narrow = browser.new_page(viewport={"width": 360, "height": 780})
+                narrow.add_init_script("localStorage.setItem('words', '2')")
                 for name in SCREENS:
                     visit(narrow, name)
                     narrow.wait_for_timeout(400)
-                    check_layout(narrow, f"{name} screen at 360px")
+                    check_layout(narrow, f"{name} screen at 360px with the largest text")
+                narrow.screenshot(path=str(OUT / "tabbar-360-largest.png"), clip={"x": 0, "y": 680, "width": 360, "height": 100})
                 narrow.close()
 
                 # 200% browser zoom on a 1280px screen shows 640 CSS px: same check.
@@ -815,6 +1084,8 @@ def main() -> int:
                 # The made-up demo week: the doctor notes, then every screen with real-looking data.
                 seed_demo_week(test_env["DATABASE_PATH"])
                 check_notes(browser)
+                check_family(browser)
+                check_friend(browser, test_env["DATABASE_PATH"])
                 check_every_screen(browser)
                 check_buddy_states(browser)
             finally:
@@ -828,12 +1099,14 @@ def main() -> int:
 
         print(
             "Home check OK: Talk to Buddy opens voice mode (16 kHz mono WAV sent, words and reply shown, reading "
-            "progress, Earlier, the orb finishes and closes), the daily check-in (card, Not today, Start, check_in "
-            "mode with its own talk), Settings saves choices at once and names a refused "
-            "entry, theme, text size, and Calm motion work, \"Something hurts\" talks in diary mode, pill reminders "
+            "progress, Earlier, the orb finishes and closes), Home opens on the greeting and the whole moving orb with "
+            "one Talk to Buddy, the daily check-in (first Today row, Start, check_in mode with its own talk), Settings saves choices at once and names a refused "
+            "entry, theme, text size, and Calm motion work, \"Something hurts\" talks in diary mode, the Memory book "
+            "(chip, empty book, memory talk in memory mode, Save it in my memory book), pill reminders "
             "work (card, I took it, remind me, ring, round check, change, remove, undo), Check a message (paste, "
             "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), Doctor notes on the demo week "
-            "(sections, Asked and Undo, Add a question, 14 days, prints on one page), the emergency screen never "
+            "(sections, Asked and Undo, Add a question, 14 days, prints on one page), the family update (the email holds "
+            "exactly the words on screen, Copy, Yesterday), the emergency screen never "
             "moves, Auto theme follows the computer and the evening, every screen at 390/768/1440px in light and "
             "dark, the orb's states and reduced motion look right, no layout problems. Screenshots in test-output/."
         )

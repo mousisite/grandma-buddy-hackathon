@@ -20,6 +20,7 @@ class Settings:
     model_api_key: str = ""  # Meta Model API key. Empty means "not set up yet".
     chat_model: str = "muse-spark-1.3"  # conversation model (standard, never -contributor)
     transcribe_model: str = "muse-voice-transcribe-1.0"  # speech-to-text model
+    image_model: str = "muse-image-1.0"  # paints the Memory book pictures (standard, never -contributor)
     language: str = "English"  # the app's language, sent to speech-to-text as a hint
     database_path: str = "data/grandma_buddy.db"  # where the SQLite file lives
 
@@ -34,6 +35,7 @@ def get_settings() -> Settings:
         model_api_key=os.getenv("MODEL_API_KEY", ""),
         chat_model=os.getenv("CHAT_MODEL", "muse-spark-1.3"),
         transcribe_model=os.getenv("TRANSCRIBE_MODEL", "muse-voice-transcribe-1.0"),
+        image_model=os.getenv("IMAGE_MODEL", "muse-image-1.0"),
         language=os.getenv("LANGUAGE", "English"),
         database_path=os.getenv("DATABASE_PATH", "data/grandma_buddy.db"),
     )

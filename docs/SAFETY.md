@@ -94,6 +94,19 @@ After a crisis response, keep the conversation open and gentle. Never end it abr
 
 > I'm here with you, and I'm glad you told me. The people who care about you can help with this more than I can. Would you like to call {family_name} or talk to your doctor?
 
+## 7c. What Buddy remembers and learns about her
+
+- **Facts** (`remember_fact`): people, pets, hobbies, shows, and plans, each with an optional follow-up question for later ("Did Tom make it on Sunday?").
+- **Daily learning:** each earlier day gets a one- or two-sentence summary, and Buddy keeps up to 8 notes on how she likes to talk ("Prefers short replies", "Loves puns").
+- **What plain code refuses** (`tools.private`, `companion.checked_notes`, `companion.checked_summary`):
+  - in a fact or a note: anything about health, medicines, hard feelings, or her mind ("seems depressed" or "confused" are never kept);
+  - in a fact, a note, or a summary: anything the safety net or the advice guard reacts to.
+  - Her health goes in the diary in her own words.
+- **What learning never sees:** the safety net's messages, or words that were not kept (crisis words are never stored).
+- **She and her family can check it:** Settings → "What Buddy has learned" shows every fact and note, with "Forget this" (asks first, then offers Undo). A forgotten note is never learned again.
+- **Always the same rules:** the prompt keeps every rule above word for word, and the advice guard still checks every reply. The guard also replaces "I'm all you need", "you only need me", and "you don't need anyone" with the fixed gentle reply.
+- **When she sounds lonely or sad, Buddy listens first:** in its first reply it only asks a gentle question. It then suggests one real connection once. If she says no or doesn't want to bother them, it doesn't suggest that person again or show their call button in that talk; it may mention a friend, a neighbor, or a senior center once. Checked with the real AI in `scripts/try_companion.py`.
+
 ## 7a. The advice guard (`app/guard.py`)
 
 Every AI reply is checked by plain rules after it is written and before she sees or hears it. Dose amounts, instructions near a health action ("you should rest", "try ice", "have you tried resting it?"), guesses at a cause or condition ("could be a sprain", "caused by", "probably nothing"), and medicines or remedies that aren't her own pills are replaced with the fixed reply from section 2. Whenever she asks for advice herself ("should I…", "can I take…", "is it OK to…"), Call {doctor_name}, Call {family_name}, and "Add to doctor notes" are always shown. Side effects and missed doses always add the fixed lines from section 5. `scripts/check_advice.py` (run by hand) sends the section 10 phrases to the real model to confirm.
@@ -108,7 +121,8 @@ Every AI reply is checked by plain rules after it is written and before she sees
 - After a crisis screen, every reply that day keeps Call 988 and Call {family_name} visible, and the AI is told to stay gentle. A repeated crisis phrase always shows the crisis screen again.
 - The safety net does not run on a message she asks the scam checker about: those are someone else's words, and a scammer's "Grandma, I'm bleeding, send money" must get a scam verdict, not the 911 screen. Her own words always go through the safety net when she talks to Buddy.
 - If her words can't reach the safety net (no internet, microphone problem, words not understood), Call 911 and Call {family_name} are shown with the kind message. The note at the bottom of the home screen has a "call 911" phone link at all times.
-- Safety messages are read aloud even if voice is turned off.
+- The first-time welcome's "Say it" is talking to Buddy too: what she says goes to `/api/check-words` (the safety net only, never the AI) before it fills a field. A match shows the same fixed screen and is saved the same way (crisis words never).
+- Safety messages are read aloud even if voice is turned off. In Buddy's natural voice when it answers within 2.5 seconds; otherwise, or on any trouble with it, right away in the browser's own voice (checked in a real browser: a failing and a hanging voice server both fall back).
 
 ## 8. Scams
 
@@ -134,11 +148,23 @@ How the checker keeps to these rules (`app/scam.py`):
 - Links and phone numbers from the message are never repeated in Buddy's words. A likely scam shows Call {family_name} and Call the Elder Fraud Hotline.
 - Red is never used: "Likely scam" is shown in the warning color with a stop icon.
 
+## 8a. Memory book
+
+- Her words go through `/api/chat` like any other talk, so the safety net runs first on every message. A memory talk ends after a safety screen, and crisis words are never kept, so they can't end up on a page.
+- The page is a keepsake, not advice. Muse Spark writes it in her voice from what she said, and never adds a lesson, advice, or comments on health, on feelings she didn't say, or on what the memory means.
+- Plain code checks every page before it is kept (`app/memories.py`):
+  - the advice guard must find nothing in it;
+  - every name and number in it must have come up in the talk.
+  If the page fails, it is written once more; if it fails again, the page is simply her own words.
+- Pictures (Muse Image) always use one fixed watercolor-storybook style. People appear only as small figures seen from behind or far away, with no detailed faces, so a page never looks like a photo of a real person. Muse Image's web and image search are turned off for every picture: her story is never looked up, and the model never matches a real person's likeness.
+- Pages and pictures stay on this computer (`data/`, git-ignored). "Send to {family}" opens her own email app with the story written in, the same as the family update; nothing is sent until she presses Send.
+
 ## 9. Privacy
 
 - Health data stays in `data/grandma_buddy.db` on this computer and never goes to GitHub.
 - The app uses standard Meta models only (never `-contributor`), so her conversations aren't used for training.
-- Family updates go only to the person she chose, and only when she taps "Send".
+- Family updates go only to the person she chose, and only when she taps "Send": that opens her own email app with the update written (a `mailto:` link), and nothing is sent until she presses Send there. No email password is stored.
+- The family update is written by plain code from the logs, never by the AI, so it only says what happened: her mood, pills taken and missed, her diary entries in her own words, and each safety screen with a fixed sentence and its time. A crisis is named ("Buddy showed her the 988 Suicide & Crisis Lifeline. Please call her today."), never with her words.
 - Demos, tests, and screenshots use made-up data only.
 
 ## 10. Test phrases

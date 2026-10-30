@@ -6,7 +6,9 @@
  Grandma's browser (Chrome or Edge)                Our backend (Python, FastAPI)            Meta Model API
  ----------------------------------                -----------------------------            --------------
  Tap to talk -> recorder.js makes a WAV  --POST-->  /api/transcribe  ---------------------->  Muse Voice Transcribe
- Big text + speechSynthesis reads aloud  <--JSON--  /api/chat
+ Big text, read aloud                    <--JSON--  /api/chat
+ Buddy's natural voice, one sentence     <--WAV---  /api/speak: Kokoro on this computer (no internet;
+   at a time (browser voice as backup)                Meta has no text-to-speech model)
                                                       1. safety.py checks for warning signs
                                                          (plain rules, no AI, works offline)
                                                       2. companion prompt + tools  -------->  Muse Spark 1.3
@@ -14,7 +16,11 @@
                                                                                               structured outputs,
  Pill banner (checks every 30 seconds)   <--JSON--  /api/reminders                            image input)
  Diary, pills, scam, notes, family       <--JSON--  feature routes
+ Memory book (shimmer, then the picture) <--JSON--  /api/memories
+                                                      background: memories.make_page  ---->  Muse Spark 1.3 (writes the page)
+                                                                                       ---->  Muse Image 1.0 (paints it)
                                                     SQLite file: data/grandma_buddy.db
+                                                    Pictures: data/memories/<id>.webp
 ```
 
 Key ideas:
@@ -23,7 +29,8 @@ Key ideas:
 - The safety net is plain Python that runs before any AI. Emergencies are caught even if the AI or the internet is down, and its messages are fixed text, never AI-generated.
 - One AI "companion" handles conversation and uses tools to do things: write a diary entry, mark a pill taken, add a doctor question, show a call button. That is what makes it an agent, not just a chatbot.
 - The AI never gives medical advice (`docs/SAFETY.md`). It records, reminds, and connects her to people.
-- Reports (scam verdict, doctor notes) use structured outputs (JSON schemas), so the screen can show clean cards instead of walls of text.
+- Reports (scam verdict, doctor notes, Memory book pages) use structured outputs (JSON schemas), so the screen can show clean cards instead of walls of text.
+- The Memory book uses two Meta models together: Muse Spark writes her story as a page in her own words, and Muse Image paints its picture in one fixed watercolor style. Plain code checks the page first.
 
 ## Folder map
 
@@ -49,9 +56,12 @@ grandma-buddy-hackathon/
     main.py                  creates the FastAPI app, serves static/, includes the routes
     config.py                reads settings from .env (only place that does)
     db.py                    SQLite connection, creates tables, small query helpers
-    meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), transcribe()
+    meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), paint() (Muse Image), transcribe()
     safety.py                emergency, crisis, and medication mix-up rules with fixed messages
     prompts.py               system prompts for companion, diary, scam, notes, family
+    family.py                the family update: one day in plain words (plain code, no AI) and its mailto: link
+    memories.py              the Memory book: write the page (checked: only her names and numbers, no advice), paint it, the picture style
+    voice.py                 Buddy's natural voice: Kokoro (kokoro-onnx) on this computer, the voices on offer, WAV making, a cache of recent words
     notes.py                 Doctor notes: facts straight from the logs (plain code); the AI only groups, checked
     scam.py                  Check a message: red-flag rules (a floor the AI can't lower), the AI's verdict, fixed what-to-do
     tools.py                 companion tool definitions and what each one does
@@ -63,17 +73,21 @@ grandma-buddy-hackathon/
       scam.py                /api/scam-check
       notes.py               /api/doctor-notes, /api/doctor-questions (add, asked, reopen)
       family.py              /api/family/summary
+      memories.py            /api/memories (the pages, a picture, save, paint again)
+      voice.py               /api/voice (is the natural voice here, which voices), /api/speak (words in, WAV out)
+      learned.py             /api/learned: what Buddy remembers and learned about her (Settings), forget, undo
       profile.py             /api/profile
       checkin.py             /api/check-in (the daily check-in: due today? start, skip)
   static/
-    index.html               one page, one <section data-screen> per screen: today, talk, diary, pills, notes, scam, family, settings
+    index.html               one page, one <section data-screen> per screen: today, talk, diary, pills, notes, scam, family, memories, memory (one page, #/memory/3), settings
     styles.css               the design system: tokens (light and dark), the orb, every screen, motion, Calm motion, print (see docs/DESIGN.md)
     app.js                   page shell: greeting, theme (Auto/Light/Dark), text size, Calm motion, api() helper, router with View Transitions (#/talk…)
     buddy.js                 Buddy, the living orb: drifting color blobs and its states (idle, listening, thinking, speaking)
     talk.js                  voice mode: listening, /api/chat, latest and earlier exchanges, reading progress, chime, call buttons, safety screens
-    screens.js               the other screens: diary timeline, pills (ring, round checks) and reminder card, family, settings, toasts
+    welcome.js               the first-time welcome: name, family, pills now or later; typed or said ("Say it", through /api/check-words first)
+    screens.js               the other screens: diary timeline, pills (ring, round checks) and reminder card, family, Memory book, settings, toasts
     recorder.js              microphone -> 16 kHz mono 16-bit WAV
-    speech.js                read-aloud wrapper around speechSynthesis (speed, voice, replay)
+    speech.js                read-aloud: Buddy's natural voice (/api/speak, one sentence at a time, the next made while one plays, the highlight estimated from how far it has played), else the browser's speechSynthesis (her choice in Settings, else the best English voice); any trouble falls back to the browser voice
     fonts/                   Figtree (all text) and Newsreader (greeting and documents), with their licenses
     LICENSE-lucide.txt       license for the Lucide icons inlined in index.html and the scripts
   scripts/
@@ -84,16 +98,21 @@ grandma-buddy-hackathon/
     check_checkin.py         hand-run: a whole daily check-in through the real AI (mood, diary entry, pill taken, no advice?)
     check_scam.py            hand-run: the SAFETY.md scam messages and one photo through the real AI (right verdicts?)
     check_notes.py           hand-run: the demo week's doctor notes grouped by the real AI (labels in her words?)
+    check_memory.py          hand-run: two made-up memories written and painted by the real AI (about 3 cents), then screenshots
+    try_companion.py         hand-run: 8 made-up conversations with the real AI (about 25 cents), incl. a returning chat after real daily learning
+    get_voice.py             hand-run once: downloads Buddy's natural voice model (Kokoro, about 354 MB) into models/
     check_contrast.py        measures the contrast of every color pair the screens use
-    seed_demo.py             a made-up week for "Rose" (pills, diary, moods, questions); refuses to overwrite data unless --replace, which backs up first
+    seed_demo.py             a made-up week for "Rose" that fills every screen (pills, check-ins, knee diary, questions, a scam check, 2 painted Memory book pages, what Buddy learned); refuses to overwrite data unless --reset, which backs up first, then wipes; --no-paint skips the 2 paintings (about 2 cents)
     browser_checks/          Playwright scripts that check screens in a real browser (/webapp-testing)
   tests/
     conftest.py              temporary database + fake Meta client for every test
     test_safety.py           safety-net phrases (see docs/SAFETY.md)
     test_diary.py, test_meds.py, test_reminders.py, test_scam.py, test_tools.py
   test-output/               screenshots from browser checks. Git-ignored.
+  models/                    Buddy's natural voice (kokoro-v1.0.onnx, voices-v1.0.bin). Git-ignored.
   data/
     grandma_buddy.db         created when the app runs. Git-ignored.
+    memories/                the Memory book's paintings (<id>.webp). Git-ignored.
 ```
 
 ## Settings (.env)
@@ -103,6 +122,7 @@ grandma-buddy-hackathon/
 | `MODEL_API_KEY` | none (required) | Meta Model API key for the app |
 | `CHAT_MODEL` | `muse-spark-1.3` | conversation and reasoning model (standard, never `-contributor`) |
 | `TRANSCRIBE_MODEL` | `muse-voice-transcribe-1.0` | speech-to-text model |
+| `IMAGE_MODEL` | `muse-image-1.0` | paints the Memory book pictures (standard mode; Meta lists no `-contributor` version) |
 | `LANGUAGE` | `English` | the app's language, sent to speech-to-text as `languageBias` |
 | `DATABASE_PATH` | `data/grandma_buddy.db` | where the SQLite file lives |
 
@@ -110,11 +130,13 @@ grandma-buddy-hackathon/
 
 `fastapi`, `uvicorn[standard]`, `python-multipart` (file uploads), `openai` (chat, pointed at Meta), `requests` (speech-to-text upload), `python-dotenv`, `pytest`, `httpx` (needed by FastAPI's test client), `playwright` (browser checks only). They're installed into `.venv` in the project.
 
+Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `numpy` (BSD), `phonemizer` and `espeakng-loader` (GPL-3.0; espeak-ng's pronunciation dictionary). `kokoro-onnx` is plain Python but not yet marked for Python 3.14, so it is installed with `--no-deps --ignore-requires-python` (see `requirements.txt`); everything it needs has Python 3.14 builds. The voice model itself (Kokoro-82M, Apache-2.0, by hexgrad, exported to ONNX by thewh1teagle) is downloaded by `scripts/get_voice.py`. Without them the app runs fine with the browser's voice.
+
 ## Data model (SQLite)
 
 | Table | Columns |
 |---|---|
-| `profile` (one row) | id, name, preferred_name, language, family_name, family_email, family_phone, doctor_name, doctor_phone, voice_on, voice_rate, text_size, calm_mode (no movement), chime (tone when listening starts and stops), theme ('auto', 'light', or 'dark'). Older databases get new columns on startup (`db.add_column`) |
+| `profile` (one row) | id, name, preferred_name, language, family_name, family_email, family_phone, family2_name, family2_phone (an optional second family member), doctor_name, doctor_phone, voice_on, voice_rate, text_size, calm_mode (no movement), chime (tone when listening starts and stops), theme ('auto', 'light', or 'dark'). Older databases get new columns on startup (`db.add_column`) |
 | `medications` | id, name, label_dose (exactly as on the label), times (JSON list like `["08:00","20:00"]`), notes, active, created_at |
 | `med_events` | id, medication_id, due_at, status (`due`, `snoozed`, or `taken`: only her answers are stored; `upcoming` and `missed` follow from the clock), snooze_until, acted_at. One row per pill per time (`med_events_once` unique index) |
 | `symptoms` (the diary) | id, created_at, description (her own words), body_area, pain_level (0 to 10, optional), since (her words, like "since Tuesday"), source (`check_in`, `diary`, `chat`, `safety_net`), conversation_id (the talk it came from; one entry per "Something hurts" talk) |
@@ -124,6 +146,10 @@ grandma-buddy-hackathon/
 | `messages` | id, conversation_id, created_at, role, content |
 | `scam_checks` | id, created_at, input_kind (`voice`, `text`, `photo`), excerpt, verdict, red_flags (JSON) |
 | `safety_events` | id, created_at, kind (`emergency`, `poison_control`, `crisis`), matched (JSON), excerpt |
+| `facts` | id, created_at, updated_at, kind (`person`, `pet`, `hobby`, `show`, `event`, `other`), fact (her life in plain words, up to 200 characters), follow_up (a question to ask later), follow_up_on (`YYYY-MM-DD`), asked_at, forgotten. The same fact again updates it; never health or feelings (`tools.private`) |
+| `talk_summaries` | day (`YYYY-MM-DD`, one row per earlier day learned from), summary (one or two sentences, "" if a guard dropped it), made_at. The number of rows is how many days Buddy has learned from |
+| `style_notes` | id, created_at, note ("Prefers short replies"), forgotten. Up to 8 at a time, replaced by each day's learning; forgotten ones are never learned again |
+| `memories` (the Memory book) | id, created_at, updated_at, conversation_id, her_words (her own words, joined), talk (JSON: what she and Buddy said), title, story (JSON list of paragraphs), scene (what the picture shows; also its alt text), picture (file name in `data/memories/`), status (`writing`, `painting`, `ready`, `no_picture`). Saving again never paints twice: a memory talk makes one page, and in ordinary talk a new page needs a new memory (10 words or more) since the last one |
 
 ## API routes
 
@@ -131,7 +157,7 @@ grandma-buddy-hackathon/
 |---|---|---|
 | `GET /api/ping` | | `{"ok": true}` (server check) |
 | `POST /api/transcribe` | WAV file | `{"transcript": "..."}` |
-| `POST /api/chat` | `{"conversation_id", "text", "mode"}` where `mode` is `"chat"`, `"check_in"`, or `"diary"` | `{"reply", "show", "actions", "diary_saved", "diary_done"}` where `show` is `null`, `"emergency"`, `"poison_control"`, or `"crisis"`; `diary_saved` is true when a diary entry was saved this turn, and `diary_done` when a "Something hurts" talk is over |
+| `POST /api/chat` | `{"conversation_id", "text", "mode"}` where `mode` is `"chat"`, `"check_in"`, `"diary"`, or `"memory"` | `{"reply", "show", "actions", "diary_saved", "diary_done", "memory_saved", "memory_done"}` where `show` is `null`, `"emergency"`, `"poison_control"`, or `"crisis"`; `diary_saved` is true when a diary entry was saved this turn, and `diary_done` when a "Something hurts" talk is over; `memory_saved` is the id of a Memory book page saved this turn (then written and painted in the background), and `memory_done` when a memory talk is over |
 | `GET /api/diary?days=7` | `days` from 1 to 90 (the Diary screen asks for 30) | diary entries, newest first |
 | `GET/POST/PUT/DELETE /api/meds` | `{"name", "label_dose", "times": ["08:00", …]}` (1 to 6 times) | medication list; DELETE only hides it |
 | `POST /api/meds/{id}/restore` | | brings a removed pill back (Undo) |
@@ -142,7 +168,17 @@ grandma-buddy-hackathon/
 | `GET /api/doctor-notes?days=7` | `days` is 7, 14, or 30 | doctor notes (below) |
 | `POST /api/doctor-questions` | `{"question"}` | saved question |
 | `POST /api/doctor-questions/{id}/asked` and `/reopen` | | she asked it (off the page; never deleted), or Undo |
-| `GET /api/family/summary?date=YYYY-MM-DD` | | `{"text", "mailto"}` |
+| `GET /api/family/summary?date=YYYY-MM-DD` | the day (today when left out; up to 30 days back) | `{"date", "subject", "text", "mailto", "to"}`: the update in plain words, and a `mailto:` link with it written (line breaks as `%0D%0A`) |
+| `GET /api/memories` | | `{"pages": [{"id", "date", "title", "paragraphs", "scene", "status", "picture", "mailto"}]}`, newest first. `status` is `writing`, `painting`, `ready`, or `no_picture` (also when stuck over 15 minutes); `picture` is a URL once painted; `mailto` is "Send to {family}" with the story written in |
+| `GET /api/memories/{id}/picture` | | the painting (WebP), only a file name saved by our own code; 404 before it is painted |
+| `POST /api/memories` | `{"conversation_id", "mode"}` (`chat` or `memory`, the talk the button was shown in) | "Save it in my memory book": the page made from what was said in that talk (400 if she said nothing), written and painted in the background. Already saved: the same page, not painted again |
+| `POST /api/memories/{id}/paint` | | "Paint it again", only for a page with `no_picture` (writes it first if it has no title) |
+| `POST /api/check-words` | `{"text"}` | words she said outside a talk (the welcome's "Say it"): the safety net only, never the AI. `{"show": null}`, or the same safety-screen answer as `/api/chat` (saved the same way) |
+| `POST /api/greeting` | `{"conversation_id"}` | `{"greeting"}`: at the start of a conversation (no talk in the last 2 hours), "Good afternoon, Rose!" plus a follow-up that's due (asked once) or a warm opener; plain words, no AI; saved in the conversation. Otherwise `""` |
+| `GET /api/learned` | | `{"facts": [{"id", "kind", "fact", "follow_up"}], "notes": [{"id", "note"}], "days_learned"}` for Settings |
+| `POST /api/learned/{facts or notes}/{id}/forget` and `/restore` | | "Forget this" and Undo |
+| `GET /api/voice` | | `{"available", "default", "voices": [{"id", "name"}]}`: is Buddy's natural voice set up on this computer, and which voices she can choose (Heart, Bella, Nicole, Emma (British), Michael) |
+| `POST /api/speak` | `{"text", "voice", "speed"}` (a sentence, up to 600 characters; speed 0.6 to 1.4) | the words as a WAV (24 kHz mono). 503 when the natural voice isn't set up or fails: the page then uses the browser voice. The words are in the body, never the address, so they never show in the server log. The same words are made once (a cache of 64), and the model loads in the background when the app starts |
 | `GET/PUT /api/profile` | profile fields | profile |
 | `GET /api/check-in` | | `{"due", "mood"}`: whether today's check-in is still to do, and today's latest mood (`{"mood", "at"}` or `null`) |
 | `POST /api/check-in/start` | `{"conversation_id"}` | `{"opening"}`: Buddy's fixed first question ("Good morning, Rose. How are you feeling today?"), also saved in that talk so the AI knows it was asked |
@@ -165,6 +201,30 @@ grandma-buddy-hackathon/
 4. `log_symptom` saves all her messages in the talk, in her own words. The AI may fill in where, pain, and since, but each is kept only if she said those words (so "possible sprain" or a made-up pain number never reaches her diary). Saving again in the same talk updates the same entry.
 5. The reply says "I've written that down for your doctor" with Call {doctor} and Call {family}; Python adds those buttons whenever an entry is saved, even if the AI forgot. It never comments on what the symptom means.
 6. The server says when the talk is done (`diary_done`): once the entry is saved and Buddy's own words aren't asking anything more, or at her 4th answer, when Buddy is told "this is her last answer: save it now if something hurts". The page also ends it after a safety screen, when she leaves Today, or after 10 minutes without an answer.
+
+**Buddy as a friend (memory and learning)**
+
+1. Every reply's instructions (`prompts.companion_prompt`) add what Buddy knows, built by plain code (`companion.memory_for_prompt`):
+   - her facts: at most 30; an event only until a week after it;
+   - the last 5 days' summaries;
+   - how she likes to talk (her style notes, once Buddy has learned from 2 days), or, before that in ordinary talk, a "getting to know her" note;
+   - how Buddy's last reply began, so the next one starts differently.
+2. Every AI reply is made spoken words only (`companion.spoken`: no markdown, bullets, or emoji), then checked by the advice guard as before.
+3. After a chat, if there are earlier days (the last two weeks) not yet learned from, a background task (`companion.learn_from_past_days`) learns each one, oldest first, at most 5 at a time:
+   - one structured Muse Spark call per day (low reasoning): a summary and her updated style notes;
+   - it never sees the safety net's messages or words that were not kept;
+   - plain code keeps a summary only if the guards are quiet, and a note only if it's short and not about health, feelings, or her mind;
+   - it commits after each day and never holds the database while the AI thinks; one job at a time.
+4. "Talk to Buddy" asks `/api/greeting` first. With a greeting, it's shown and read aloud, and listening starts when it has finished; otherwise listening starts at once.
+5. `scripts/try_companion.py` runs 8 made-up conversations against the real AI (about 25 cents) to judge warmth, length, and the safety rules.
+
+**Memory book (`mode: "memory"`, and `offer_memory_page` in ordinary talk)**
+
+1. "Tell Buddy a memory" (on the Memory book screen) starts a memory talk, like "Something hurts": the fixed opening "I'd love to hear one of your memories. What would you like to tell me about?" and its own conversation id (`<day>-memory-<time>`). In ordinary talk, when she starts reminiscing, the AI calls `offer_memory_page`, which shows "Save it in my memory book", and asks whether she'd like it in her book.
+2. Safety rules run first on every message, exactly as above.
+3. The companion asks one or two gentle follow-ups, one at a time (when it was, who was there), then calls `save_memory`. At her 3rd answer Buddy is told to save now, and if it still didn't, Python saves it anyway, so her story is never lost. The talk is over (`memory_done`) once it is saved and Buddy isn't asking anything, or at her 3rd answer.
+4. `save_memory` (or the button, `POST /api/memories`) only stores what was said: tools never use the internet. That is the talk's last half hour, or since its last page, and only after the safety net last answered in any talk, never words that were not kept (`db.memory_talk`). The tools only work in ordinary talk and memory talks, never in "Something hurts" or a check-in. A page is new only once: a memory talk makes one page, and in ordinary talk a short "Yes please, save it" after a page is the same page, while a new memory (10 words or more) is a new one. Only a new page is queued: after the reply is sent, a FastAPI background task (`memories.make_page`) writes and paints it, and does nothing for a page that is painted already. It commits before each AI call (reading her profile can start a write, so that is committed too), so the screen shows the title while the picture is painted and chat, pill reminders, and the Memory book never wait on the database (a test holds the lock check).
+5. The Memory book screen asks again every 3 seconds while a page is writing or painting, shows a shimmer meanwhile, and fades the painting in.
 
 **Pill reminders**
 
@@ -189,6 +249,10 @@ grandma-buddy-hackathon/
 | `add_doctor_question` | question | saves to `doctor_questions` |
 | `show_call_buttons` | who (`doctor`, `family`, or both) | tells the screen to show big call buttons |
 | `suggest_calling_family` | none | tells the screen to show a big "Call {family_name}" button |
+| `remember_fact` | kind, fact, follow_up, follow_up_on | remembers something lasting about her life in `facts`. Plain code refuses an unknown kind, long text, a date that isn't today to 60 days ahead, and anything about health, hard feelings, or her mind, or that the safety net or advice guard reacts to |
+| `offer_memory_page` | none | tells the screen to show "Save it in my memory book" |
+| `save_memory` | none | saves what was said in the talk for a Memory book page (her own words; Buddy's questions too, for context) and shows "Open my memory book". The page is written and painted afterward. Saving again is the same page. Ordinary talk and memory talks only |
+| `open_screen` | screen (`today`, `diary`, `pills`, `notes`, `family`, `scam`, `memories`) | tells the screen to show "Open …" |
 
 **Structured outputs (`meta_client.structured()`)**
 
@@ -229,6 +293,23 @@ Otherwise, or when the AI is down, entries are grouped by where she said it hurt
   "questions": [{"id": 1, "question": "..."}]
 }
 ```
+
+Memory book page (`app/memories.py`). The AI writes, in her voice, only:
+
+```json
+{"title": "Summers at the lake", "paragraphs": ["2 or 3 short paragraphs"], "scene": "one moment to paint, no names or faces"}
+```
+
+The page is kept only if:
+- it has a title, 2 or 3 paragraphs, and a scene, all short;
+- the advice guard (`guard.check_reply`) finds nothing in it;
+- every name (a capitalized word that doesn't start a sentence) and every number in the title and paragraphs came up in the talk (`memories.invented`). A plural or a possessive counts.
+
+Otherwise it is written once more with a note saying what to fix (like "These were not in what she said: Paris"). If that fails too, or the AI is down, the page is her own words under the title "A memory".
+
+**Painting (`meta_client.paint()`, Muse Image)**
+
+`POST /v1/images/generations` through the `openai` package's `images.generate` (Meta's endpoint follows the OpenAI Images format): `model` (`muse-image-1.0`), `prompt`, `n: 1`, `size: "1536x1024"`, and `extra_body: {"tool_enablement": {...all false}}`. That last part turns off Muse Image's own web and image search, so her story stays in the request and it never matches a real person's likeness. The answer is base64 (WebP by default). Our code saves it only if its first bytes are a real WebP, PNG, or JPEG. The prompt is always the fixed `memories.STYLE` (a soft watercolor storybook in Buddy's colors, no text, people only as small figures from behind or far away) followed by the writer's scene. That's what makes every page in the book look like the same book. It costs $0.01 per picture, so each page is painted once; "Paint it again" only appears when painting failed. Waits and retries on 429 and 503; a 180-second timeout.
 
 ## Errors and offline behavior
 

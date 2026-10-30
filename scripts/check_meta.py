@@ -28,7 +28,7 @@ def main() -> int:
 
     client = OpenAI(
         base_url="https://api.meta.ai/v1",
-        api_key=[redacted],
+        api_key=settings.model_api_key,  # read from .env by app/config.py; never printed
         timeout=60,
         max_retries=2,
     )
@@ -36,7 +36,7 @@ def main() -> int:
         model=settings.chat_model,
         messages=[{"role": "user", "content": 'Say "Meta API key works!"'}],
         reasoning_effort="low",
-        max_completion_tokens=50,
+        max_completion_tokens=500,  # counts its hidden thinking too; at 50 the words came back empty
     )
     reply = (response.choices[0].message.content or "").strip()
     print("Success! Muse Spark answered:")

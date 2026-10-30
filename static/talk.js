@@ -13,18 +13,24 @@ var TALK_LABELS = { idle: "Tap to talk", listening: "I’m done", working: "One 
 var BUDDY_FOR_TALK = { listening: "listening", working: "thinking" };
 var talkState = "idle"; // "idle", "listening", or "working"
 var talkTimer = null;
-var talkMode = "chat"; // "chat", "check_in" (the daily check-in), or "diary" ("Something hurts")
+// "chat", "check_in" (the daily check-in), "diary" ("Something hurts"), or
+// "memory" ("Tell Buddy a memory", for the Memory book)
+var talkMode = "chat";
 var lastExchange = null; // { her, buddy }: moves to "Earlier" when a new one starts
 var EARLIER_MAX = 10;
 
-// "Something hurts": a short talk that ends in a diary entry. It gets its
-// own conversation id, so the entry holds exactly what she said in it. The
-// server says when the talk is done (diary_done in its answer).
-var DIARY_OPENING = "I’m sorry something hurts. Tell me what you’re feeling.";
-var DIARY_IDLE_MS = 10 * 60 * 1000; // a talk left alone for 10 minutes is over
+// "Something hurts" and "Tell Buddy a memory": short talks that end in a
+// diary entry or a Memory book page. Each gets its own conversation id, so
+// the entry or page holds exactly what she said in it. The server says when
+// the talk is done (diary_done or memory_done in its answer).
+var OWN_TALKS = {
+  diary: { opening: "I’m sorry something hurts. Tell me what you’re feeling.", hint: "Buddy is writing in your diary" },
+  memory: { opening: "I’d love to hear one of your memories. What would you like to tell me about?", hint: "Buddy is listening for your memory book" },
+};
+var OWN_TALK_IDLE_MS = 10 * 60 * 1000; // a talk left alone for 10 minutes is over
 var TALK_HINT = "Buddy writes down what you say";
-var diaryConversation = "";
-var diaryLastAnswer = 0;
+var ownConversation = "";
+var ownLastAnswer = 0;
 
 // One conversation per day, so each day's talk is kept together.
 function conversationId() {
@@ -106,13 +112,44 @@ function problem(name) {
 }
 
 // From Home or the sidebar: open voice mode and start listening at once.
+// At the start of a conversation (the first talk today, or after two
+// hours), Buddy greets her first ("Good afternoon, Rose! Did Tom make it
+// on Sunday?") and starts listening once it has finished speaking, so the
+// microphone never hears Buddy. Otherwise it listens at once.
 function startTalkFromToday() {
   if (currentScreen() !== "talk") {
     location.hash = "#/talk";
   }
-  if (talkState === "idle") {
-    onTalkTap();
+  if (talkState !== "idle") {
+    return;
   }
+  if (talkMode !== "chat") {
+    onTalkTap();
+    return;
+  }
+  setTalkState("working"); // no double taps while Buddy finds its greeting
+  api("/api/greeting", "POST", { conversation_id: conversationId() })
+    .then(function (answer) { return answer.greeting; })
+    .catch(function () { return ""; }) // no greeting: she just talks
+    .then(function (words) {
+      setTalkState("idle");
+      if (!words) {
+        onTalkTap();
+        return;
+      }
+      moveToEarlier();
+      document.getElementById("you-said").hidden = true;
+      var listen = function () {
+        // Unless she already tapped "Tap to talk" or left voice mode.
+        if (talkState === "idle" && currentScreen() === "talk") {
+          onTalkTap();
+        }
+      };
+      showReply(words, voiceSettings.on ? listen : null);
+      if (!voiceSettings.on) {
+        listen(); // nothing is read aloud, so there is nothing to wait for
+      }
+    });
 }
 
 function onTalkTap() {
@@ -201,9 +238,18 @@ function moveToEarlier() {
 }
 
 // Buddy's reply: streams in big, and is read aloud with reading progress.
-function showReply(text) {
+// afterSpeaking (optional) runs once Buddy has finished saying it.
+function showReply(text, afterSpeaking) {
   say(text);
-  speak(text, { onWord: highlightWord, onEnd: clearHighlight });
+  speak(text, {
+    onWord: highlightWord,
+    onEnd: function () {
+      clearHighlight();
+      if (afterSpeaking) {
+        afterSpeaking();
+      }
+    },
+  });
   lastExchange = { her: lastExchange ? lastExchange.her : "", buddy: text };
 }
 
@@ -225,20 +271,20 @@ function clearHighlight() {
   document.getElementById("message").classList.remove("reading");
 }
 
-// ---------- "Something hurts" ----------
+// ---------- "Something hurts" and "Tell Buddy a memory" ----------
 
-// Start a "Something hurts" talk: Buddy asks what she feels, in voice
-// mode, and the talk button says it is writing in her diary.
-function startDiaryTalk() {
+// Start one of these talks in voice mode: Buddy asks its opening question,
+// and the hint under the talk button says what Buddy is writing.
+function startOwnTalk(mode) {
   // Not while the microphone is open (it would record Buddy's question) or
   // while Buddy is still answering (that answer belongs to the last talk).
   if (talkState !== "idle") {
     return;
   }
-  talkMode = "diary";
-  diaryConversation = conversationId() + "-diary-" + Date.now();
-  diaryLastAnswer = Date.now();
-  document.getElementById("talk-hint").textContent = "Buddy is writing in your diary";
+  talkMode = mode;
+  ownConversation = conversationId() + "-" + mode + "-" + Date.now();
+  ownLastAnswer = Date.now();
+  document.getElementById("talk-hint").textContent = OWN_TALKS[mode].hint;
   if (currentScreen() === "talk") {
     window.scrollTo(0, 0);
   } else {
@@ -248,10 +294,11 @@ function startDiaryTalk() {
   // under Buddy's words (like Call 988) stay.
   moveToEarlier();
   document.getElementById("you-said").hidden = true;
-  showReply(DIARY_OPENING);
+  showReply(OWN_TALKS[mode].opening);
 }
 
-// The end of a "Something hurts" talk or a check-in: ordinary talk again.
+// The end of a "Something hurts" talk, a memory talk, or a check-in:
+// ordinary talk again.
 function backToChat() {
   talkMode = "chat";
   document.getElementById("talk-hint").textContent = TALK_HINT;
@@ -294,18 +341,21 @@ function startCheckIn() {
     });
 }
 
+// The conversation her words belong to right now.
+function currentConversation() {
+  return OWN_TALKS[talkMode] ? ownConversation : talkMode === "check_in" ? checkInConversation() : conversationId();
+}
+
 // Send her words to Buddy. The safety net answers first if it needs to.
 function askBuddy(text) {
-  if (talkMode === "diary" && Date.now() - diaryLastAnswer > DIARY_IDLE_MS) {
+  if (OWN_TALKS[talkMode] && Date.now() - ownLastAnswer > OWN_TALK_IDLE_MS) {
     backToChat(); // left alone too long: this is ordinary talk again
   }
-  diaryLastAnswer = Date.now();
-  var conversation = talkMode === "diary" ? diaryConversation
-    : talkMode === "check_in" ? checkInConversation() : conversationId();
+  ownLastAnswer = Date.now();
   return fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversation_id: conversation, text: text, mode: talkMode }),
+    body: JSON.stringify({ conversation_id: currentConversation(), text: text, mode: talkMode }),
   })
     .catch(function () {
       throw problem("Offline");
@@ -317,10 +367,10 @@ function askBuddy(text) {
       return response.json();
     })
     .then(function (answer) {
-      // A diary talk ends when the server says so (entry saved and Buddy
-      // isn't asking anything more, or her last answer), or after a safety
-      // screen, so she is never stuck in it.
-      if (talkMode !== "chat" && (answer.show || answer.diary_done)) {
+      // A diary or memory talk ends when the server says so (saved and
+      // Buddy isn't asking anything more, or her last answer), or after a
+      // safety screen, so she is never stuck in it.
+      if (talkMode !== "chat" && (answer.show || answer.diary_done || answer.memory_done)) {
         backToChat();
       }
       if (answer.show) {
@@ -329,6 +379,9 @@ function askBuddy(text) {
         showReply(answer.reply);
         if (answer.diary_saved) {
           toast("Saved to diary");
+        }
+        if (answer.memory_saved) {
+          toast("Saved to your memory book");
         }
         showActions(answer.actions || []);
         loadReminders(); // she may have told Buddy she took her pills
@@ -362,6 +415,8 @@ function showActions(actions) {
   actions.forEach(function (action) {
     if (action.type === "add_question") {
       row.appendChild(addQuestionButton(action));
+    } else if (action.type === "memory") {
+      row.appendChild(saveMemoryButton(action));
     } else if (action.type === "open") {
       var open = document.createElement("button");
       open.type = "button";
@@ -402,6 +457,33 @@ function addQuestionButton(action) {
       .catch(function () {
         button.disabled = false;
         say("I couldn’t save that just now. Please tap it again.");
+      });
+  });
+  return button;
+}
+
+// "Save it in my memory book": the memory she just told becomes a page.
+// Buddy writes it and paints its picture in the background.
+function saveMemoryButton(action) {
+  // The talk this button belongs to, kept now: it can still be on screen
+  // after that talk has ended.
+  var talk = { conversation_id: currentConversation(), mode: talkMode === "memory" ? "memory" : "chat" };
+  var button = document.createElement("button");
+  button.type = "button";
+  button.className = "call-pill call-pill--quiet";
+  button.textContent = action.label;
+  button.addEventListener("click", function () {
+    button.disabled = true;
+    api("/api/memories", "POST", talk)
+      .then(function () {
+        toast("Saved to your memory book");
+        showReply("I’m writing it into your memory book, and painting a picture for it.");
+        showActions([{ type: "open", screen: "memories", label: "Open my memory book" }]);
+      })
+      .catch(function (problem) {
+        button.disabled = false;
+        // The server's own kind words when it has them ("Tell Buddy your memory first…").
+        say(typeof problem.detail === "string" ? problem.detail : "I couldn’t save that just now. Please tap it again.");
       });
   });
   return button;
@@ -506,7 +588,10 @@ function startTalking() {
   document.getElementById("safety-again").addEventListener("click", sayAgain);
   document.getElementById("say-again").addEventListener("click", sayAgain);
   document.querySelectorAll("[data-start-diary]").forEach(function (button) {
-    button.addEventListener("click", startDiaryTalk);
+    button.addEventListener("click", function () { startOwnTalk("diary"); });
+  });
+  document.querySelectorAll("[data-start-memory]").forEach(function (button) {
+    button.addEventListener("click", function () { startOwnTalk("memory"); });
   });
   document.querySelectorAll("[data-start-check-in]").forEach(function (button) {
     button.addEventListener("click", startCheckIn);

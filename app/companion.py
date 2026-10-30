@@ -11,17 +11,63 @@
 #    - a diary entry was saved -> Call doctor, Call family
 #    - side effects or a missed dose -> the fixed lines from SAFETY.md
 #    - a crisis in the last day -> Call 988 and Call family stay visible
+#    - a memory talk's last answer -> the memory is saved for the Memory book
 
 import json
+import re
+import threading
+from datetime import date
 
-from app import db, guard, meta_client, prompts, safety, tools
+from app import db, guard, meta_client, prompts, reminders, safety, tools
 
 MAX_TOOL_ROUNDS = 3
 DIARY_MAX_ANSWERS = 4  # her first answer plus up to three follow-ups
+MEMORY_MAX_ANSWERS = 3  # her memory plus one or two follow-ups
+LAST_ANSWER = {"diary": (DIARY_MAX_ANSWERS, prompts.LAST_DIARY_ANSWER),
+               "memory": (MEMORY_MAX_ANSWERS, prompts.LAST_MEMORY_ANSWER)}
 EMPTY_REPLY = "I'm listening. Tell me more whenever you're ready."
 TROUBLE_REPLY = "I'm sorry, I'm having trouble thinking right now. Please try again in a moment."
 # Meta has no tool_choice "none", so words are asked for with this instead.
 WORDS_NOW = "Now answer her in a few warm words. Don't call any tools."
+
+
+# ---------- Spoken words only ----------
+
+EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿️‍]")
+
+
+def spoken(text: str) -> str:
+    """Buddy's reply as plain spoken words: no emoji, list bullets, headings,
+    or markdown stars, which look odd and sound odd read aloud."""
+    text = EMOJI.sub("", text)
+    text = re.sub(r"^\s*(?:[-*•]|\d+[.)]|#+)\s+", "", text, flags=re.MULTILINE)  # a bullet or heading at a line's start
+    text = re.sub(r"[*_`#]+", "", text)
+    return " ".join(text.split())
+
+
+# ---------- What Buddy knows about her, for its instructions ----------
+
+def day_words(day: str) -> str:
+    """ "2026-10-27" -> "Tuesday, October 27" """
+    when = date.fromisoformat(day)
+    return f"{when:%A, %B} {when.day}"
+
+
+def opener(reply: str) -> str:
+    """How a reply began: its first four words ("Oh, that sounds lovely")."""
+    return " ".join(reply.split()[:4]).rstrip(".,!?;:")
+
+
+def memory_for_prompt(connection) -> dict:
+    """Her facts, the last few days' talks, how she likes to talk (once
+    learned), and how Buddy's last reply began (so the next starts differently)."""
+    return {
+        "facts": tools.facts_for_prompt(connection),
+        "summaries": [(day_words(row["day"]), row["summary"]) for row in db.recent_summaries(connection)],
+        "notes": [row["note"] for row in db.style_notes(connection)],
+        "days_learned": db.days_learned(connection),
+        "last_opener": opener(db.buddy_last_reply(connection)),
+    }
 
 
 def words_only(messages: list[dict]) -> str:
@@ -63,20 +109,20 @@ def add_buttons(buttons: list[dict], more: list[dict]) -> None:
 def answer(connection, profile: dict, conversation_id: str, text: str, mode: str) -> dict:
     """Buddy's reply to her words, ready for the screen. Saves it too."""
     crisis = db.crisis_recently(connection)
-    prompt = prompts.companion_prompt(profile, mode, crisis)
-    # A "Something hurts" talk ends at her 4th answer, so Buddy is told
-    # it is the last one: save now if something hurts.
-    answers = len(db.her_recent_words(connection, conversation_id, limit=DIARY_MAX_ANSWERS)) if mode == "diary" else 0
-    last_answer = answers >= DIARY_MAX_ANSWERS
+    prompt = prompts.companion_prompt(profile, mode, crisis, memory_for_prompt(connection))
+    # A "Something hurts" talk ends at her 4th answer and a memory talk at
+    # her 3rd, so Buddy is told it is the last one: save now.
+    limit, last_words = LAST_ANSWER.get(mode, (0, ""))
+    last_answer = bool(limit) and len(db.her_recent_words(connection, conversation_id, limit=limit)) >= limit
     if last_answer:
-        prompt += prompts.LAST_DIARY_ANSWER
+        prompt += last_words
     messages = [{"role": "developer", "content": prompt}]
     messages += db.recent_history(connection, limit=20)
     context = {"connection": connection, "profile": profile, "conversation_id": conversation_id, "mode": mode}
     buttons: list[dict] = []
 
     try:
-        reply = ask_the_ai(messages, context, buttons).strip() or EMPTY_REPLY
+        reply = spoken(ask_the_ai(messages, context, buttons)) or EMPTY_REPLY
     except meta_client.MetaError as problem:
         print(f"Chat failed: {problem}")  # never her words, only what went wrong
         reply = TROUBLE_REPLY
@@ -126,6 +172,16 @@ def answer(connection, profile: dict, conversation_id: str, text: str, mode: str
         (db.talk_has_entry(connection, conversation_id) and not still_asking) or last_answer
     )
 
+    # A memory talk is saved by her last answer, even if the AI forgot, so
+    # her story is never lost. It is done once saved and Buddy isn't asking.
+    if mode == "memory" and last_answer and not context.get("memory_saved"):
+        memory_id, new = tools.save_memory(connection, conversation_id, mode)
+        if new:
+            context["memory_saved"] = memory_id
+        if memory_id:
+            add_buttons(buttons, [tools.OPEN_MEMORY_BOOK])
+    memory_done = mode == "memory" and ((bool(context.get("memory_saved")) and not still_asking) or last_answer)
+
     db.save_message(connection, conversation_id, "assistant", reply)
     connection.commit()
     return {
@@ -134,4 +190,87 @@ def answer(connection, profile: dict, conversation_id: str, text: str, mode: str
         "actions": buttons,
         "diary_saved": context.get("diary_saved", False),  # a diary entry was saved in this reply
         "diary_done": diary_done,
+        # A Memory book page was saved: its id. The route writes and paints it next.
+        "memory_saved": context.get("memory_saved"),
+        "memory_done": memory_done,
     }
+
+
+# ---------- Learning about her, a day at a time ----------
+
+# After her first talk each day, Buddy learns from the days before: a short
+# summary of each (so it remembers what they talked about), and its notes on
+# how she likes to talk, which sharpen day by day. From her third day, Buddy
+# follows those notes (app/prompts.py). Plain code checks every word kept.
+LEARN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "notes": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["summary", "notes"],
+    "additionalProperties": False,
+}
+MAX_SUMMARY = 400
+MAX_NOTES = 8
+MAX_NOTE = 80
+_learning = threading.Lock()  # one learning job at a time
+
+
+def checked_summary(summary) -> str:
+    """The day's summary, or "" if it is long or has anything the advice
+    guard or the safety net would react to."""
+    summary = " ".join(str(summary or "").split())
+    if len(summary) > MAX_SUMMARY or guard.check_reply(summary) is not None or safety.check(summary) is not None:
+        return ""
+    return summary
+
+
+def checked_notes(notes, forgotten: set[str]) -> list[str]:
+    """Her style notes as kept: short, never about health, hard feelings,
+    or her mind (tools.private), never one she asked to forget, at most 8."""
+    kept = []
+    for note in notes if isinstance(notes, list) else []:
+        note = " ".join(str(note).split()).rstrip(".")
+        if note and len(note) <= MAX_NOTE and not tools.private(note) and note.lower() not in forgotten \
+                and note.lower() not in (one.lower() for one in kept):
+            kept.append(note)
+    return kept[:MAX_NOTES]
+
+
+def learn_from_past_days() -> None:
+    """The background job after a chat: learn from each earlier day not yet
+    learned from (the last two weeks, at most 5 at a time), oldest first.
+    Commits after each day and never holds the database while the AI thinks."""
+    if not _learning.acquire(blocking=False):
+        return  # already learning
+    connection = db.get_connection()
+    try:
+        profile = db.get_profile(connection)
+        connection.commit()  # get_profile may write: let go before the AI thinks
+        her = profile["preferred_name"] or profile["name"] or "Her"
+        for day in db.days_to_learn(connection, reminders.current_time().date().isoformat()):
+            notes = [row["note"] for row in db.style_notes(connection)]
+            forgotten = [row["note"] for row in db.style_notes(connection, forgotten=True)]
+            talk = "\n".join(("Buddy" if part["role"] == "assistant" else her) + ": " + part["content"]
+                             for part in db.day_talk(connection, day))
+            messages = [
+                {"role": "developer", "content": prompts.LEARN_DAY.format(her_name=her)},
+                {"role": "user", "content": f"Buddy's notes so far:\n{prompts.bullets(notes) or '(none yet)'}\n\n"
+                                            f"Notes she asked Buddy to forget:\n{prompts.bullets(forgotten) or '(none)'}\n\n"
+                                            f"Their talk on {day_words(day)}:\n{talk}"},
+            ]
+            try:
+                answer = meta_client.structured(messages, "day_learned", LEARN_SCHEMA, reasoning="low")
+            except meta_client.MetaError as problem:
+                print(f"Learning from {day} failed: {problem}")  # never her words; tried again after the next chat
+                break
+            db.save_learned_day(connection, day, checked_summary(answer.get("summary")),
+                                checked_notes(answer.get("notes"), {note.lower() for note in forgotten}))
+            connection.commit()
+    except Exception as problem:  # never break her chat over this
+        print(f"Learning failed: {type(problem).__name__}")
+        connection.rollback()
+    finally:
+        connection.close()
+        _learning.release()

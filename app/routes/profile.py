@@ -17,6 +17,8 @@ MAX_LENGTH = {
     "family_name": 80,
     "family_email": 120,
     "family_phone": 30,
+    "family2_name": 80,
+    "family2_phone": 30,
     "doctor_name": 80,
     "doctor_phone": 30,
 }
@@ -31,6 +33,8 @@ FIELD_WORDS = {
     "family_name": "the family member’s name",
     "family_email": "the family email address",
     "family_phone": "the family phone number",
+    "family2_name": "the second family member’s name",
+    "family2_phone": "the second family member’s phone number",
     "doctor_name": "the doctor’s name",
     "doctor_phone": "the doctor’s phone number",
 }
