@@ -18,6 +18,7 @@ I'm building this for my grandma. She is often lonely, struggles to use her phon
 - **Scam checker.** Reads a suspicious text, email, or photo of one, and explains whether it looks like a scam.
 - **Doctor visit notes.** Turns the week's diary, pills, and mood into one printable page.
 - **Family updates.** A short daily summary for a family member she chooses.
+- **A family page.** The people who help her join with an invite code from her Settings and sign in at `/family` to see her day at a glance: what needs a look (a missed pill, a safety screen), her mood, her pills, her diary, her memory book pages. She chooses what is shared, and safety screens are shown only as a kind and a time, never her words.
 - **Memory book.** She tells Buddy a story from her life; it becomes a page in her own words with a painting, to share with her family.
 - **Find my things.** Can't find her glasses, keys, or TV remote? She says what she's looking for and takes a photo of the room. Buddy circles it with a soft glow and tells her where it is: "Your glasses are on the side table, next to the lamp."
 - **Read it to me.** A letter, a bill, or a form she can't read well? She takes a photo, and Buddy says what it is and what it says ("an electricity bill, $84.20 due by November 15"), or reads it word for word, big on the screen. A letter about her health is never explained, only read to her, and a letter with the signs of a scam says so out loud.

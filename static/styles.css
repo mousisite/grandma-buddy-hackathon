@@ -1758,6 +1758,7 @@ button.check .check-circle {
 input[type="text"],
 input[type="tel"],
 input[type="email"],
+input[type="password"],
 input[type="time"],
 textarea {
   width: 100%;
@@ -2937,6 +2938,28 @@ label.group-row .group-label {
     font-size: var(--t-32);
     line-height: 1.25;
   }
+}
+
+/* Settings, Family accounts: the invite code, big and spaced out, so it is
+   easy to read out loud. */
+.invite {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding: var(--s-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+}
+
+.invite-code {
+  font-size: var(--t-44);
+  font-weight: 650;
+  letter-spacing: 0.18em;
+  font-variant-numeric: tabular-nums;
+}
+
+#family-invite {
+  margin-top: var(--s-4);
 }
 
 /* Under Help: About, Privacy, and Terms (plain links, 44px tall). */

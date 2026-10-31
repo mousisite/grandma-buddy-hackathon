@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<!-- Grandma Buddy: the family page (/family), for the people who help her.
+     Sign in (or join with an invite code from her Settings), then her day
+     as she shares it: alerts, her mood, her pills, her diary, her memory
+     book pages, and whether she talked with Buddy. family.js runs it;
+     family.css lays it out on top of styles.css and landing.css. -->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Family · Grandma Buddy</title>
+  <meta name="theme-color" content="#F7F7F5">
+  <script>
+    (function () {
+      var choice = "auto";
+      try { choice = localStorage.getItem("theme") || "auto"; } catch (e) {}
+      var hour = new Date().getHours();
+      var dark = choice === "dark" || (choice === "auto" && (matchMedia("(prefers-color-scheme: dark)").matches ||
+        (!matchMedia("(prefers-color-scheme: light)").matches && (hour >= 19 || hour < 7))));
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/Figtree.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/static/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/landing.css">
+  <link rel="stylesheet" href="/static/family.css">
+</head>
+<body>
+  <div class="site site--family">
+    <header class="site-top">
+      <a class="brand" href="/about" translate="no"><span class="orb-mark" aria-hidden="true"></span>Grandma Buddy</a>
+      <button id="sign-out" class="pill-button pill-button--quiet" type="button" hidden>Sign out</button>
+    </header>
+
+    <main>
+      <!-- ========== Sign in ========== -->
+      <section id="family-signin" class="family-door" aria-labelledby="signin-title" hidden>
+        <h1 id="signin-title" class="family-title" tabindex="-1">Buddy, for family</h1>
+        <p class="lead">Sign in to see how she’s doing today, as she chooses to share it.</p>
+        <form id="signin-form" class="family-form" novalidate>
+          <div class="field">
+            <label for="signin-email">Email</label>
+            <input id="signin-email" name="email" type="email" autocomplete="email" spellcheck="false" maxlength="120">
+          </div>
+          <div class="field">
+            <label for="signin-password">Password</label>
+            <input id="signin-password" name="password" type="password" autocomplete="current-password" maxlength="200">
+          </div>
+          <p id="signin-status" class="form-status" role="status" aria-live="polite"></p>
+          <button class="pill-button pill-button--ink pill-button--hero" type="submit">Sign in</button>
+        </form>
+        <p class="note family-switch">New here? <button id="show-join" class="text-link" type="button">Join with an invite code</button></p>
+      </section>
+
+      <!-- ========== Join with a code ========== -->
+      <section id="family-join" class="family-door" aria-labelledby="join-title" hidden>
+        <h1 id="join-title" class="family-title" tabindex="-1">Join her family page</h1>
+        <p class="lead">Ask for a code in Buddy’s Settings, under “Family accounts”. It works for 24 hours.</p>
+        <form id="join-form" class="family-form" novalidate>
+          <div class="field">
+            <label for="join-code">Invite code</label>
+            <input id="join-code" name="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" placeholder="Like “KQMWNT”">
+          </div>
+          <div class="field">
+            <label for="join-name">Your name</label>
+            <input id="join-name" name="name" type="text" autocomplete="name" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="join-email">Email</label>
+            <input id="join-email" name="email" type="email" autocomplete="email" spellcheck="false" maxlength="120">
+          </div>
+          <div class="field">
+            <label for="join-password">Password<span class="group-hint">At least 8 letters or numbers.</span></label>
+            <input id="join-password" name="password" type="password" autocomplete="new-password" maxlength="200">
+          </div>
+          <p id="join-status" class="form-status" role="status" aria-live="polite"></p>
+          <button class="pill-button pill-button--ink pill-button--hero" type="submit">Create my account</button>
+        </form>
+        <p class="note family-switch">Already joined? <button id="show-signin" class="text-link" type="button">Sign in</button></p>
+      </section>
+
+      <!-- ========== Her day ========== -->
+      <section id="family-day" class="family-day" aria-labelledby="day-title" hidden>
+        <header class="family-head">
+          <h1 id="day-title" class="family-title" tabindex="-1">Rose’s day</h1>
+          <p id="day-words" class="lead"></p>
+          <div class="segmented" role="radiogroup" aria-label="Which day">
+            <label><input type="radio" name="family-day" value="0" checked><span>Today</span></label>
+            <label><input type="radio" name="family-day" value="1"><span>Yesterday</span></label>
+            <label><input type="radio" name="family-day" value="2"><span>2 days ago</span></label>
+          </div>
+        </header>
+        <p id="day-status" class="empty" role="status" hidden></p>
+
+        <!-- Alerts first: a missed pill, a safety screen. -->
+        <section id="alerts" class="alerts" aria-labelledby="alerts-title" hidden>
+          <h2 id="alerts-title" class="family-heading">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+            Needs a look
+          </h2>
+          <ul id="alerts-list" class="alerts-list" role="list"></ul>
+          <p class="note">Buddy never calls anyone by itself. If something here worries you, call her.</p>
+        </section>
+
+        <ul class="rows family-rows" role="list">
+          <li class="row">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+            <span class="row-text"><span class="row-title">Talked with Buddy</span><span id="talked" class="row-meta"></span></span>
+          </li>
+          <li class="row">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+            <span class="row-text"><span class="row-title">Mood</span><span id="mood" class="row-meta"></span></span>
+          </li>
+          <li class="row">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
+            <span class="row-text"><span class="row-title">Pills</span><span id="pills" class="row-meta"></span><span id="pills-not-taken" class="row-meta"></span></span>
+          </li>
+          <li class="row">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+            <span class="row-text"><span class="row-title">Safety screens</span><span id="safety" class="row-meta"></span></span>
+          </li>
+        </ul>
+
+        <section class="family-part" aria-labelledby="diary-title">
+          <h2 id="diary-title" class="family-heading">Her diary, in her words</h2>
+          <p id="diary-note" class="note"></p>
+          <ol id="diary-list" class="entries" role="list"></ol>
+        </section>
+
+        <section class="family-part" aria-labelledby="memories-title">
+          <h2 id="memories-title" class="family-heading">Memory book</h2>
+          <p id="memories-note" class="note"></p>
+          <ul id="memories-list" class="rows" role="list"></ul>
+        </section>
+
+        <section class="family-part" aria-labelledby="notify-title">
+          <h2 id="notify-title" class="family-heading">Tell me when something needs a look</h2>
+          <div class="group">
+            <label class="group-row">
+              <span class="group-label">Notify me on this device<span class="group-hint">While this page is open: a notification for a missed pill or a safety screen.</span></span>
+              <input id="notify-switch" class="switch" type="checkbox" role="switch">
+            </label>
+          </div>
+          <p id="notify-status" class="note" role="status"></p>
+        </section>
+
+        <p class="note family-shares">She chooses what is shared here, in Buddy’s Settings under “What your family can see”. Safety screens are shown as a time and a kind only, never her words. This page is as private as her computer: it runs there, and anyone using Buddy there can see everything.</p>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <p>Grandma Buddy is an AI helper. It can’t give medical advice. In an emergency, call 911.</p>
+      <nav class="site-links" aria-label="More">
+        <a href="/about">About</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+      </nav>
+    </footer>
+  </div>
+
+  <script src="/static/family.js"></script>
+</body>
+</html>

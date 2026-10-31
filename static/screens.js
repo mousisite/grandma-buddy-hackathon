@@ -217,6 +217,7 @@ function showPillBanner() {
     shownReminders = which;
     window.scrollTo(0, 0);
   }
+  notifyWhenHidden(card, which); // sharing.js: a system notification while Buddy is hidden
   // It counts as read only once the voice really starts (Chrome stays
   // silent until her first tap), so a blocked reminder is tried again.
   var quiet = !buddyMaySpeak() || safetySpeaking || isSpeaking() || pillState.after_poison_control;
@@ -1487,6 +1488,10 @@ function fillSettingsForm() {
   showVoiceChoices();
   form.elements.chime.checked = profile.chime === true;
   form.elements.hands_free.checked = profile.hands_free !== false;
+  // What her family can see (sharing.js), and reminders while Buddy is hidden.
+  ["share_mood", "share_pills", "share_diary", "share_safety", "notify_hidden"].forEach(function (name) {
+    form.elements[name].checked = profile[name] === true;
+  });
   // The closest of Slower, Normal, Faster to the saved speed.
   var rate = Number(profile.voice_rate) || 0.9;
   var closest = VOICE_RATES.reduce(function (best, option) {

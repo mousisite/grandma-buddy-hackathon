@@ -71,6 +71,7 @@ grandma-buddy-hackathon/
     memories.py              the Memory book: write the page (checked: only her names and numbers, no advice), paint it, the picture style
     briefing.py              today's weather, a cheerful local story, or sports, looked up on the web for her town (our code writes the question), checked (no links, no health or advice, 2 sentences), kept 3 hours, 30 searches a day at most
     finder.py                Find my things: what she's looking for as a short noun phrase, SAM's answer line, the surest match, Spark's sentence (checked) or plain words
+    accounts.py              family accounts: invite codes (six letters, 24 hours, one use), scrypt password hashes, session tokens (hashed, 30 days), five tries then 15 minutes
     reader.py                Read it to me: Spark reads a photo of a paper into a strict form; plain code decides what she hears (health papers never explained, every summary sentence checked, printed numbers only, scam signs said, a scam's number never read out)
     voice.py                 Buddy's natural voice: Kokoro (kokoro-onnx) on this computer, the voices on offer, WAV making, a cache of recent words
     notes.py                 Doctor notes: facts straight from the logs (plain code); the AI only groups, checked
@@ -87,6 +88,7 @@ grandma-buddy-hackathon/
       memories.py            /api/memories (the pages, a picture, save, paint again)
       find.py                /api/find (safety net first, then finder.find; the photo is never saved)
       read.py                /api/read (reader.read; the photo and the paper's words are never saved)
+      family_accounts.py     /api/family/invite, accounts (Rose's Settings); /api/family/account, sign-in, sign-out, me, dashboard (the family page)
       briefing.py            /api/briefing/{weather,news,sports} for Home's weather row
       listen.py              /api/listen (WebSocket): hands-free talking, her microphone live to Meta's realtime speech-to-text and her words back; only Buddy's own page, one at a time, 15 minutes at most
       voice.py               /api/voice (is the natural voice here, which voices), /api/speak (words in, WAV out)
@@ -107,6 +109,8 @@ grandma-buddy-hackathon/
     privacy.html, terms.html /privacy and /terms, in plain words
     landing.css              the layout of those three pages (tokens, fonts, buttons, and the orb come from styles.css)
     landing/                 the landing's phone screens: PNGs of the made-up demo week, made by scripts/landing_shots.py
+    family.html, family.js, family.css  the family page (/family): join with a code or sign in, then her day as she shares it, with notifications on that device
+    sharing.js               Settings, "Family accounts": the invite code, who can sign in (Remove), the hidden-reminder switch's permission, and the pill notification while Buddy is hidden
     screens.js               the other screens: diary timeline, pills (ring, round checks) and reminder card, family, Memory book, settings, toasts
     recorder.js              microphone -> 16 kHz mono 16-bit WAV
     speech.js                read-aloud: Buddy's natural voice (/api/speak, one sentence at a time, the next made while one plays, the highlight estimated from how far it has played), else the browser's speechSynthesis (her choice in Settings, else the best English voice); any trouble falls back to the browser voice
@@ -183,6 +187,9 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `facts` | id, created_at, updated_at, kind (`person`, `pet`, `hobby`, `show`, `event`, `other`), fact (her life in plain words, up to 200 characters), follow_up (a question to ask later), follow_up_on (`YYYY-MM-DD`), asked_at, forgotten. The same fact again updates it; never health or feelings (`tools.private`) |
 | `talk_summaries` | day (`YYYY-MM-DD`, one row per earlier day learned from), summary (one or two sentences, "" if a guard dropped it), made_at. The number of rows is how many days Buddy has learned from |
 | `style_notes` | id, created_at, note ("Prefers short replies"), forgotten. Up to 8 at a time, replaced by each day's learning; forgotten ones are never learned again |
+| `family_accounts` | id, created_at, name, email (unique), password_hash (scrypt), salt. Never the password |
+| `family_sessions` | id, account_id, token_hash (the cookie's token is never stored, only its SHA-256), created_at, expires_at (30 days) |
+| `family_invites` | code (six letters), created_at, expires_at (24 hours), used_at (one use) |
 | `memories` (the Memory book) | id, created_at, updated_at, conversation_id, her_words (her own words, joined), talk (JSON: what she and Buddy said), title, story (JSON list of paragraphs), scene (what the picture shows; also its alt text), picture (file name in `data/memories/`), status (`writing`, `painting`, `ready`, `no_picture`). Saving again never paints twice: a memory talk makes one page, and in ordinary talk a new page needs a new memory (10 words or more) since the last one |
 
 ## API routes
@@ -218,7 +225,12 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `WS /api/listen` | 16 kHz 16-bit mono sound, 80 ms at a time (binary) | `{"type": "ready"}` once Meta listens, then `hearing` (she started), `live` (`text`: her words so far), `turn` (`text`: her finished turn), or `unavailable` (tap to talk instead). Refused (1008) from another website, and (1013) while another is open |
 | `GET /api/briefing/{topic}` | | `{"text", "sites"}`: today's weather (or news, sports) for her town, kept 3 hours. Empty (`"text": ""`) when there is nothing to show: no town yet, nothing found, or the search failed with nothing kept from today (normal for Home, so no error status). 404 only for an unknown topic |
 | `GET /api/how` | | `{"models": [{"id", "name", "does"}], "features": [{"name", "what", "models": [ids], "here"}]}`: for Help, the Meta models from the settings and every feature with the models behind it (none: it runs on this computer) |
-| `GET /about`, `/privacy`, `/terms` | | the landing, Privacy, and Terms pages (plain files in `static/`, served like Home, always checked for a newer version) |
+| `GET /about`, `/privacy`, `/terms`, `/family` | | the landing, Privacy, Terms, and the family page (plain files in `static/`, served like Home, always checked for a newer version) |
+| `POST /api/family/invite` | | `{"code", "expires_at"}`: a six-letter invite code from her Settings, good for 24 hours, used once |
+| `GET /api/family/accounts`, `DELETE /api/family/accounts/{id}` | | the family accounts for her Settings (`[{"id", "name", "email", "created_at"}]`); removing one ends its sessions |
+| `POST /api/family/account` | `{"code", "name", "email", "password"}` | joins and signs in (the `buddy_family` cookie: HttpOnly, SameSite=Lax, 30 days). 400 names the entry to fix (`{"field", "message"}`); a wrong code too |
+| `POST /api/family/sign-in`, `/sign-out`; `GET /api/family/me` | `{"email", "password"}` | `{"name", "email"}`; 401 when they don't match; 429 after five wrong tries in 15 minutes |
+| `GET /api/family/dashboard?date=` | a day in the last 30 days (today by default) | her day as she shares it: `{"her_name", "day", "day_words", "shares": {mood, pills, diary, safety}, "mood", "pills": {"taken", "total", "not_taken"}, "diary", "safety" (kind and time as a fixed sentence, never her words), "memories", "talked", "alerts"}`; a part she doesn't share is null. 401 without a session |
 | `GET /api/voice` | | `{"available", "default", "voices": [{"id", "name"}]}`: is Buddy's natural voice set up on this computer, and which voices she can choose (Heart, Bella, Nicole, Emma (British), Michael) |
 | `POST /api/speak` | `{"text", "voice", "speed"}` (a sentence, up to 600 characters; speed 0.6 to 1.4) | the words as a WAV (24 kHz mono). 503 when the natural voice isn't set up or fails: the page then uses the browser voice. The words are in the body, never the address, so they never show in the server log. The same words are made once (a cache of 64), and the model loads in the background when the app starts |
 | `GET/PUT /api/profile` | profile fields | profile |

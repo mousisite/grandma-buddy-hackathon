@@ -30,8 +30,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import db, memories  # noqa: E402
+from app import accounts, db, memories  # noqa: E402
 from app.config import get_settings  # noqa: E402
+
+# Maria's account on the family page (/family). A demo password, made up
+# like everything else here: never a real one.
+FAMILY_ACCOUNT = {"name": "Maria", "email": "maria@example.com", "password": "rose-garden-2026"}
 
 PROFILE = {
     "name": "Rose Demo",
@@ -120,6 +124,9 @@ def seed(connection, now: datetime) -> list[int]:
         "UPDATE profile SET " + ", ".join(f"{field} = ?" for field in PROFILE) + " WHERE id = 1",
         list(PROFILE.values()),
     )
+    # Maria can sign in on the family page, and Rose shares her diary there in the demo.
+    accounts.create_account(connection, **FAMILY_ACCOUNT)
+    connection.execute("UPDATE profile SET share_diary = 1 WHERE id = 1")
     for name, label, times in PILLS:
         pill = connection.execute(
             "INSERT INTO medications (name, label_dose, times, active, created_at) VALUES (?, ?, ?, 1, ?)",
@@ -212,6 +219,8 @@ def main(args: list[str]) -> int:
         connection.close()
     print("Added a made-up week for Rose: 2 pills, 5 check-ins, a knee that comes and goes, 2 questions for Dr. Lee,")
     print("1 checked scam text, 2 Memory book pages, and what Buddy has learned about her.")
+    print(f"Family page: open /family and sign in as {FAMILY_ACCOUNT['email']} with the password "
+          f"{FAMILY_ACCOUNT['password']} (Rose shares her diary in the demo).")
     if "--no-paint" in args or not get_settings().model_api_key:
         print("The Memory book pages have no pictures yet: open a page and tap \"Paint it again\".")
     else:

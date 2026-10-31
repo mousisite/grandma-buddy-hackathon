@@ -1,0 +1,125 @@
+/* Grandma Buddy: the family page (/family), on top of styles.css (tokens,
+   fields, switches, rows, the diary's entries) and landing.css (the top and
+   the foot of the page). Same rules as the app: 17px words, 44px targets. */
+
+.site--family {
+  max-width: calc(680px + 2 * var(--s-5));
+}
+
+/* Sign in, and join: one narrow column. */
+.family-door {
+  max-width: 30rem;
+  padding: var(--s-8) 0 var(--s-12);
+}
+
+.family-title {
+  font-family: var(--font-serif);
+  font-size: var(--t-44);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+.family-door .lead {
+  margin-top: var(--s-4);
+}
+
+.family-form {
+  display: grid;
+  gap: var(--s-5);
+  margin-top: var(--s-8);
+}
+
+.family-form .pill-button {
+  justify-self: start;
+}
+
+.family-switch {
+  margin-top: var(--s-6);
+}
+
+/* "Join with an invite code" inside a sentence: a link that is a button. */
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* Her day. */
+.family-day {
+  display: grid;
+  gap: var(--s-8);
+  padding: var(--s-6) 0 var(--s-12);
+}
+
+.family-head {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-3);
+}
+
+.family-head .segmented {
+  margin-top: var(--s-2);
+}
+
+.family-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-24);
+}
+
+.family-part {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.family-rows .row-meta + .row-meta {
+  margin-top: var(--s-1);
+}
+
+/* What needs a look: the warning color with words and an icon (never red,
+   which is for emergencies on her own screen). */
+.alerts {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  border: 2px solid var(--warning);
+  border-radius: 20px;
+}
+
+.alerts .family-heading {
+  color: var(--warning);
+}
+
+.alerts-list {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alerts-list li {
+  display: flex;
+  gap: var(--s-3);
+}
+
+.alert-time {
+  flex: none;
+  min-width: 5.5em;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.family-shares {
+  max-width: 60ch;
+}

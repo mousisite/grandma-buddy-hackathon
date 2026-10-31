@@ -147,3 +147,100 @@ def summary(connection, day: date) -> dict:
     subject = f"{her + chr(39) + 's' if her else 'Her'} day: {day_words(day)}"
     to = profile["family_email"].strip()
     return {"date": day.isoformat(), "subject": subject, "text": text, "mailto": mailto(to, subject, text), "to": to}
+
+
+# ---------- The family page (app/routes/family_accounts.py) ----------
+
+# A short line under a diary entry, by where it came from (like the Diary screen).
+DIARY_NOTES = {"safety_net": "Buddy showed the emergency screen.", "check_in": "From the daily check-in."}
+
+
+def pills_fact(connection, start: str, day_end: str, now: datetime) -> dict:
+    """That day's reminders: how many taken of all, and each one not taken
+    (the same rows and rules as pills_line, so it says the same as the email)."""
+    if not reminders.active_pills(connection):
+        return {"taken": 0, "total": 0, "not_taken": []}
+    reminders.make_todays_reminders(connection, now)
+    rows = connection.execute(
+        "SELECT e.due_at, e.status, e.snooze_until, m.name FROM med_events e JOIN medications m ON m.id = e.medication_id "
+        "WHERE m.active = 1 AND e.due_at >= ? AND e.due_at <= ? ORDER BY e.due_at, m.name COLLATE NOCASE",
+        (start, day_end),
+    ).fetchall()
+    taken = 0
+    not_taken = []
+    for row in rows:
+        state = reminders.status(dict(row), now)
+        if state == "taken":
+            taken += 1
+        else:
+            not_taken.append({"name": row["name"], "time": notes.time_words(datetime.fromisoformat(row["due_at"])),
+                              "state": NOT_TAKEN_WORDS[state], "at": row["due_at"]})
+    return {"taken": taken, "total": len(rows), "not_taken": not_taken}
+
+
+def day_facts(connection, day: date, profile: dict) -> dict:
+    """Her day for the family page: only what she shares (the profile's
+    share switches, docs/SAFETY.md 9a). A safety screen is a time and a
+    fixed sentence, never her words: safety_events.excerpt and matched are
+    never read here. A part she doesn't share is None."""
+    now = reminders.current_time()
+    start = day.isoformat() + "T00:00:00"
+    end = day.isoformat() + "T23:59:59"
+    shares = {name: bool(profile.get(f"share_{name}", 0)) for name in ("mood", "pills", "diary", "safety")}
+    facts = {
+        "her_name": profile["preferred_name"] or profile["name"] or "She",
+        "day": day.isoformat(),
+        "day_words": day_words(day),
+        "shares": shares,
+        "mood": None, "pills": None, "diary": None, "safety": None,
+        "memories": None,  # her stories are hers, like her diary: shared with it
+        "talked": {"yes": False, "last_time": ""},
+        "alerts": [],
+    }
+    last_talk = connection.execute(
+        "SELECT created_at FROM messages WHERE role = 'user' AND created_at >= ? AND created_at < ? ORDER BY created_at DESC LIMIT 1",
+        (start, end),
+    ).fetchone()
+    if last_talk:
+        facts["talked"] = {"yes": True, "last_time": notes.time_words(datetime.fromisoformat(last_talk["created_at"]))}
+    alerts = []
+    if shares["mood"]:
+        row = connection.execute(
+            "SELECT mood, created_at FROM moods WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC, id DESC LIMIT 1",
+            (start, end),
+        ).fetchone()
+        if row:
+            facts["mood"] = {"words": notes.MOOD_WORDS.get(row["mood"], row["mood"]),
+                             "time": notes.time_words(datetime.fromisoformat(row["created_at"]))}
+    if shares["pills"]:
+        pills = pills_fact(connection, start, end, now)
+        alerts += [{"at": pill["at"], "time": pill["time"], "words": f"Missed: {pill['name']} at {pill['time']}"}
+                   for pill in pills["not_taken"] if pill["state"] == "Missed"]
+        facts["pills"] = {"taken": pills["taken"], "total": pills["total"],
+                          "not_taken": [{"name": p["name"], "time": p["time"], "state": p["state"]} for p in pills["not_taken"]]}
+    if shares["diary"]:
+        # The words that showed an emergency screen are in her diary for her
+        # doctor; on the family page a safety screen is never her words.
+        facts["diary"] = [
+            {"time": notes.time_words(datetime.fromisoformat(row["created_at"])),
+             "words": DIARY_NOTES["safety_net"], "quoted": False, "note": ""}
+            if row["source"] == "safety_net" else
+            {"time": notes.time_words(datetime.fromisoformat(row["created_at"])),
+             "words": row["description"], "quoted": True, "note": DIARY_NOTES.get(row["source"], "")}
+            for row in connection.execute(
+                "SELECT created_at, description, source FROM symptoms WHERE created_at >= ? AND created_at < ? ORDER BY created_at, id",
+                (start, end),
+            )
+        ]
+        facts["memories"] = [row["title"] for row in connection.execute(
+            "SELECT title FROM memories WHERE created_at >= ? AND created_at < ? AND title != '' ORDER BY id", (start, end))]
+    if shares["safety"]:
+        screens = [{"at": row["created_at"], "time": notes.time_words(datetime.fromisoformat(row["created_at"])),
+                    "words": SAFETY_WORDS.get(row["kind"], "Buddy showed a safety screen.")}
+                   for row in connection.execute(
+                       "SELECT created_at, kind FROM safety_events WHERE created_at >= ? AND created_at < ? ORDER BY created_at, id",
+                       (start, end))]
+        facts["safety"] = [{"time": screen["time"], "words": screen["words"]} for screen in screens]
+        alerts += screens
+    facts["alerts"] = [{"time": alert["time"], "words": alert["words"]} for alert in sorted(alerts, key=lambda a: a["at"])]
+    return facts

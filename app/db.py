@@ -154,6 +154,36 @@ def init_db(db_path: str | None = None) -> None:
                 excerpt TEXT NOT NULL DEFAULT ''
             );
 
+            -- Family accounts (app/accounts.py): the people who help her can
+            -- sign in on the family page and see her day as she shares it.
+            -- A password is never kept: only its scrypt hash and salt.
+            CREATE TABLE IF NOT EXISTS family_accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                password_hash BLOB NOT NULL,
+                salt BLOB NOT NULL
+            );
+
+            -- A signed-in family member: the cookie holds a random token,
+            -- and only its hash is kept here.
+            CREATE TABLE IF NOT EXISTS family_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL DEFAULT '',
+                expires_at TEXT NOT NULL DEFAULT ''
+            );
+
+            -- Invite codes from her Settings: six letters, one use, 24 hours.
+            CREATE TABLE IF NOT EXISTS family_invites (
+                code TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL DEFAULT '',
+                expires_at TEXT NOT NULL DEFAULT '',
+                used_at TEXT NOT NULL DEFAULT ''
+            );
+
             -- The Memory book: one page per memory she told Buddy. her_words
             -- and talk are what was said; the AI writes title, story (a JSON
             -- list of paragraphs) and scene (what the picture shows, also its
@@ -246,6 +276,16 @@ def init_db(db_path: str | None = None) -> None:
         add_column(connection, "profile", "city", "TEXT NOT NULL DEFAULT ''")
         # Talk without tapping (hands-free), on unless she turns it off: October 31.
         add_column(connection, "profile", "hands_free", "INTEGER NOT NULL DEFAULT 1")
+        # What her family can see on the family page (docs/SAFETY.md 9a): her
+        # mood, her pills, and safety screens from the start; her diary, in
+        # her own words, only once she turns it on. October 30.
+        add_column(connection, "profile", "share_mood", "INTEGER NOT NULL DEFAULT 1")
+        add_column(connection, "profile", "share_pills", "INTEGER NOT NULL DEFAULT 1")
+        add_column(connection, "profile", "share_diary", "INTEGER NOT NULL DEFAULT 0")
+        add_column(connection, "profile", "share_safety", "INTEGER NOT NULL DEFAULT 1")
+        # A pill reminder as a system notification while Buddy is hidden (off
+        # until she turns it on, which asks the browser's permission). October 30.
+        add_column(connection, "profile", "notify_hidden", "INTEGER NOT NULL DEFAULT 0")
         # WAL mode lets one connection read while another writes. Writers
         # still take turns, so the companion saves after each round of tools
         # (app/companion.py) and never holds the lock while the AI thinks.
@@ -263,12 +303,17 @@ PROFILE_TEXT_FIELDS = [
 ]
 
 
+# The profile's on/off switches (Settings saves them as true or false).
+SWITCHES = ("voice_on", "calm_mode", "chime", "hands_free",
+            "share_mood", "share_pills", "share_diary", "share_safety", "notify_hidden")
+
+
 def get_profile(connection: sqlite3.Connection) -> dict:
     """Her profile as a dictionary. Creates the one empty row the first time."""
     connection.execute("INSERT OR IGNORE INTO profile (id) VALUES (1)")
     row = connection.execute("SELECT * FROM profile WHERE id = 1").fetchone()
     profile = dict(row)
-    for switch in ("voice_on", "calm_mode", "chime", "hands_free"):
+    for switch in SWITCHES:
         profile[switch] = bool(profile[switch])
     return profile
 

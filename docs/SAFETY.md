@@ -202,6 +202,15 @@ How the checker keeps to these rules (`app/scam.py`):
 - Only Buddy's own page can use the app's `/api`. Another website open in her browser can't add, change, or read anything, or make Buddy call the AI (which costs money): such requests are refused by plain code (`app/security.py`), and so is any other host name than this computer's.
 - Demos, tests, and screenshots use made-up data only.
 
+## 9a. The family page (family accounts)
+
+- The people who help her can sign in on the family page (`/family`) and see her day. **She chooses what they see**, with switches in her Settings under "What your family can see": her mood, her pills, her diary in her own words, and safety screens. Her mood, her pills, and safety screens are shared from the start; her diary is not, until she turns it on. A part she doesn't share is simply not sent (`app/family.py` `day_facts`).
+- A safety screen on the family page is its kind and its time with a fixed sentence (`SAFETY_WORDS`), never her words: `safety_events.excerpt` and `matched` are never read for it. The words that showed an emergency screen are in her diary for her doctor; on the family page that entry is the fixed sentence too. Crisis words are never stored anywhere (section 7b), so they can't reach the family either way. Her memory book titles are shared with her diary.
+- The family page is as private as her computer. Buddy runs on it and serves only it (`ALLOWED_HOSTS`), and anyone using Buddy there already sees everything without signing in: the sign-in, the switches, and the lock shape the family page, they don't guard the computer. The Settings copy says so. A hosted copy (the paid plan) must put every one of her own routes behind the owner's sign-in and make the switches the only way in, before it is served to anyone else.
+- Joining takes an invite code made in her Settings: six letters, good for 24 hours, used once. Passwords are never stored: only an scrypt hash with a random salt (`app/accounts.py`), checked in constant time. A session is a random token in a cookie that page scripts can't read (HttpOnly, SameSite); only its hash is stored, and it lasts 30 days or until Sign out. Five wrong passwords in 15 minutes lock that email for 15 minutes. Removing an account in her Settings ends its sessions at once.
+- The family's requests are refused from any other website, like every `/api` request (`app/security.py`), so a stolen link can't read her day. The family page runs where Buddy runs (on her computer); a hosted copy is the paid Family plan's job, behind HTTPS.
+- Notifications are plain words from the app, never the AI: on her side, a pill reminder while Buddy is hidden (off until she turns it on, which asks the browser first); on the family's side, "needs a look" for a missed pill or a safety screen, as the switches allow. Nothing on the family page says what anything means: it records what happened, and says "call her".
+
 ## 10. Test phrases
 
 `tests/test_safety.py` and `/safety-check` must cover at least these. Add more variations as you go.

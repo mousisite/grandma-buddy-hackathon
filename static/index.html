@@ -902,6 +902,15 @@
           </label>
         </div>
 
+        <h2 class="group-title">Reminders</h2>
+        <div class="group">
+          <!-- Turning it on asks the browser's permission (sharing.js). -->
+          <label class="group-row">
+            <span class="group-label">Remind me even when Buddy is hidden<span class="group-hint">A pill reminder pops up on this computer while another window is in front.</span></span>
+            <input class="switch" name="notify_hidden" type="checkbox" role="switch">
+          </label>
+        </div>
+
         <details id="profile-setup" class="for-family">
           <summary class="for-family-summary">
             <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>
@@ -956,6 +965,51 @@
           </div>
         </div>
         <button class="pill-button pill-button--ink" type="submit">Save profile</button>
+          </div>
+        </details>
+
+        <!-- Family accounts (sharing.js, app/accounts.py): who can sign in on
+             the family page, and what she shares there. Folded away, like
+             the names and numbers. -->
+        <details id="family-setup" class="for-family">
+          <summary class="for-family-summary">
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>
+            <span class="row-text">
+              <h2 class="row-title">Family accounts</h2>
+              <span class="row-meta">For a family member</span>
+            </span>
+            <svg class="icon for-family-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+          </summary>
+          <div class="for-family-body">
+            <p class="group-note">The people who help her can sign in at <a href="/family">/family</a> on this computer and see her day, as she shares it here. (These switches shape that page. Anyone using Buddy on this computer can already see everything.)</p>
+            <h3 class="group-title">What your family can see</h3>
+            <div class="group">
+              <label class="group-row">
+                <span class="group-label">Her mood</span>
+                <input class="switch" name="share_mood" type="checkbox" role="switch">
+              </label>
+              <label class="group-row">
+                <span class="group-label">Her pills<span class="group-hint">Taken, missed, and still to come</span></span>
+                <input class="switch" name="share_pills" type="checkbox" role="switch">
+              </label>
+              <label class="group-row">
+                <span class="group-label">Her diary and memory book pages<span class="group-hint">In her own words. An emergency entry shows only that the screen came up.</span></span>
+                <input class="switch" name="share_diary" type="checkbox" role="switch">
+              </label>
+              <label class="group-row">
+                <span class="group-label">Safety screens<span class="group-hint">Only the kind and the time, never her words</span></span>
+                <input class="switch" name="share_safety" type="checkbox" role="switch">
+              </label>
+            </div>
+            <h3 class="group-title">Who can sign in</h3>
+            <div id="family-accounts" class="group" role="list"></div>
+            <p id="family-accounts-status" class="form-status" role="status"></p>
+            <button id="family-invite" class="pill-button pill-button--quiet" type="button">Invite a family member</button>
+            <div id="family-invite-card" class="invite" hidden>
+              <p class="group-note">Give them this code. It works once, for 24 hours.</p>
+              <p id="family-invite-code" class="invite-code" aria-live="polite"></p>
+              <p class="group-note">They open <a href="/family">/family</a> on this computer, choose “Join with an invite code”, and type it.</p>
+            </div>
           </div>
         </details>
         <p id="settings-status" class="form-status" role="status" aria-live="polite"></p>
@@ -1050,6 +1104,7 @@
   <script src="/static/welcome.js"></script>
   <script src="/static/find.js"></script>
   <script src="/static/read.js"></script>
+  <script src="/static/sharing.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

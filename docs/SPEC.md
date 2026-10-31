@@ -175,6 +175,14 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - The pages make no claim the app can't keep, and ask for nothing: no form, no card.
 - Done when: the pages are served and tested (every model name comes from the settings, every picture is in the repository, no form fields), and the browser check covers them at phone and desktop width, light and dark.
 
+### 18. Family accounts, the family page, and notifications (P1)
+
+- In her Settings, under "Family accounts" (for a family member): an invite code (six letters, 24 hours, one use), the list of who can sign in with Remove, and "What your family can see": her mood, her pills, her diary and memory book pages in her own words, and safety screens (mood, pills, and safety on from the start; the diary off until she turns it on). The switches shape the family page; on her own computer, anyone using Buddy already sees everything, and the Settings copy says so.
+- The family page (`/family`): join with the code, a name, an email, and a password (never stored: an scrypt hash), or sign in. Then her day, today or the two days before: what needs a look (a missed pill, a safety screen), whether she talked with Buddy, her mood, her pills (taken of all, and each not taken), her diary in her words, and her memory book pages, each only as she shares it. It asks again every 30 seconds.
+- Notifications, plain words from the app: on her side, a pill reminder as a system notification while Buddy is hidden ("Remind me even when Buddy is hidden" in Settings, which asks the browser first); on the family's side, "Rose needs a look" when something new appears while the page is open ("Notify me on this device").
+- Safety screens reach the family as a kind and a time with a fixed sentence, never her words (docs/SAFETY.md 9a). Five wrong passwords in 15 minutes lock that email for 15 minutes. Another website can't sign in or read her day.
+- Done when: the accounts, sessions, lock, sharing switches, and the day's facts are tested (no Meta involved), `scripts/seed_demo.py` adds Maria's account, and the browser check covers the invite, joining, her day, Yesterday's alert, the switches, sign out and in, both notifications, and Remove.
+
 ## Not building (out of scope)
 
 - Any medical advice: saying how serious a symptom is, what causes it, or what to do about it
@@ -182,8 +190,8 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - Mental-health advice, therapy, or coping techniques
 - Diagnosing anything, prescribing, or suggesting medication or dose changes
 - Calling 911 by itself (it shows a big button that dials; she decides)
-- Storing passwords, bank details, or Social Security numbers
-- Location tracking, logins, or multiple users
+- Storing her passwords, bank details, or Social Security numbers (a family member's sign-in keeps only a salted scrypt hash, never the password)
+- Location tracking (the weather uses only the town a family member typed), or a sign-in for her: she never signs in, pays, or sets anything up; the family does, on the family page
 - A phone app from an app store (it is a web page)
 
 ## Demo story (3 minutes maximum)

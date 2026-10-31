@@ -1026,6 +1026,155 @@ def check_landing(browser) -> None:
     page.close()
 
 
+# A stand-in for the browser's Notification, which a test browser can't show:
+# it writes down each one instead, and always gives permission.
+NOTIFICATION_STUB = """
+  window.notified = [];
+  class FakeNotification {
+    constructor(title, options) {
+      this.title = title;
+      window.notified.push({ title: title, body: (options || {}).body || "" });
+    }
+    addEventListener() {}
+    close() {}
+    static requestPermission() { return Promise.resolve("granted"); }
+    static get permission() { return "granted"; }
+  }
+  window.Notification = FakeNotification;
+"""
+
+
+def check_family_accounts(browser) -> None:
+    """Family accounts on the demo week. Rose's Settings: the seeded Maria,
+    an invite code, her sharing switches. The family page in a second
+    browser (Daniel's own phone): joining with the code, her day as she
+    shares it, Yesterday's missed pill, a notification for a new alert,
+    sign out, a wrong password, sign in. Rose's side: a pill reminder as a
+    notification while Buddy is hidden. Then Remove ends Daniel's session."""
+    rose = browser.new_page(viewport={"width": 390, "height": 844})
+    rose.add_init_script(NOTIFICATION_STUB)
+    visit(rose, "settings")
+    rose.evaluate("document.getElementById('family-setup').open = true")
+    rose.wait_for_selector("#family-accounts .group-row")
+    assert "Maria" in (rose.text_content("#family-accounts") or ""), "the demo week has Maria's account"
+    rose.click("#family-invite")
+    rose.wait_for_selector("#family-invite-card:not([hidden])")
+    code = (rose.text_content("#family-invite-code") or "").strip()
+    assert re.fullmatch(r"[A-HJ-NP-Z]{6}", code), code
+    # She keeps her mood to herself for now (the demo week shares her diary).
+    rose.click("#settings-form label:has-text('Her mood')")
+    rose.wait_for_function("profile.share_mood === false")  # saved (a toast may still be an older one)
+    check_layout(rose, "Settings, Family accounts at 390px")
+    rose.screenshot(path=str(OUT / "settings-family-390.png"), full_page=True)
+
+    daniel = browser.new_page(viewport={"width": 390, "height": 844})  # a new browser: his own phone
+    daniel.add_init_script(NOTIFICATION_STUB)
+    daniel.goto(f"http://localhost:{PORT}/family", wait_until="networkidle")
+    daniel.wait_for_selector("#family-signin:not([hidden])")
+    daniel.click("#show-join")
+    daniel.wait_for_selector("#family-join:not([hidden])")
+    daniel.fill("#join-code", code)
+    daniel.fill("#join-name", "Daniel")
+    daniel.fill("#join-email", "daniel@example.com")
+    daniel.fill("#join-password", "blueberries-1958")
+    daniel.click("#join-form button[type=submit]")
+    daniel.wait_for_selector("#family-day:not([hidden])")
+    daniel.wait_for_function("document.getElementById('day-title').textContent === 'Rose’s day'")
+    assert re.search(r"\d+ of \d+ taken|No pill reminders", daniel.text_content("#pills") or "")
+    assert (daniel.text_content("#mood") or "").startswith("Rose hasn’t shared her mood")
+    daniel.wait_for_selector("#diary-list .entry")
+    assert "My knee feels much better today" in (daniel.text_content("#diary-list") or "")
+    check_layout(daniel, "the family page, today at 390px")
+    daniel.screenshot(path=str(OUT / "family-today-390.png"), full_page=True)
+
+    # Yesterday: the missed Lisinopril needs a look.
+    daniel.click("#family-day label:has-text('Yesterday')")
+    daniel.wait_for_selector("#alerts:not([hidden])")
+    daniel.wait_for_function("document.getElementById('alerts-list').textContent.includes('Lisinopril')")
+    assert "Missed: Lisinopril at 8:00 AM" in (daniel.text_content("#alerts-list") or "")
+    check_layout(daniel, "the family page, yesterday at 390px")
+    daniel.screenshot(path=str(OUT / "family-yesterday-390.png"), full_page=True)
+
+    # A new alert while the page is open: a notification on his device.
+    daniel.click("#family-day label:has-text('Today')")
+    daniel.wait_for_function("document.querySelector('input[name=family-day]:checked').value === '0'")
+    daniel.click("#notify-switch")
+    daniel.wait_for_function("localStorage.getItem('buddy-family-notify') === 'on'")
+
+    def with_a_new_alert(route):
+        body = route.fetch().json()
+        body["alerts"].append({"time": "9:41 PM", "words": "Missed: Metformin at 9:41 PM"})
+        route.fulfill(json=body)
+
+    daniel.route("**/api/family/dashboard*", with_a_new_alert)
+    daniel.evaluate("loadDay()")
+    daniel.wait_for_function("window.notified.length > 0")
+    note = daniel.evaluate("window.notified[0]")
+    assert note["title"] == "Rose needs a look" and "Metformin at 9:41 PM" in note["body"], note
+    daniel.unroute("**/api/family/dashboard*")
+
+    # Sign out; a wrong password is refused kindly; the right one signs in.
+    daniel.click("#sign-out")
+    daniel.wait_for_selector("#family-signin:not([hidden])")
+    daniel.fill("#signin-email", "daniel@example.com")
+    daniel.fill("#signin-password", "not-it")
+    daniel.click("#signin-form button[type=submit]")
+    daniel.wait_for_function("document.getElementById('signin-status').textContent === 'That email and password don’t match.'")
+    daniel.fill("#signin-password", "blueberries-1958")
+    daniel.click("#signin-form button[type=submit]")
+    daniel.wait_for_selector("#family-day:not([hidden])")
+
+    # The sign-in page on a desktop, dark.
+    wide = browser.new_page(viewport={"width": 1440, "height": 900}, color_scheme="dark")
+    wide.goto(f"http://localhost:{PORT}/family", wait_until="networkidle")
+    wide.wait_for_selector("#family-signin:not([hidden])")
+    wide.click("#show-join")
+    check_layout(wide, "the family page, joining at 1440px, dark")
+    wide.screenshot(path=str(OUT / "family-join-1440-dark.png"), full_page=True)
+    wide.close()
+
+    # Rose: a pill reminder as a notification while Buddy is hidden.
+    rose.click("#settings-form label:has-text('Remind me even when Buddy is hidden')")
+    rose.wait_for_function("profile.notify_hidden === true")  # saved once the (stubbed) permission is given
+
+    def due_now(route):
+        body = route.fetch().json()
+        if body["reminders"]:
+            body["reminders"][0]["status"] = "due"
+        else:
+            body["reminders"] = [{"id": 1, "medication_id": 1, "due_at": "2026-10-30T18:00:00", "status": "due",
+                                  "snooze_until": None, "acted_at": None, "name": "Metformin", "label_dose": "500 mg tablet"}]
+        body["due_title"] = "Rose, it’s time for your evening Metformin."
+        body["due_words"] = body["due_title"]
+        body["has_pills"] = True
+        route.fulfill(json=body)
+
+    rose.route("**/api/reminders", due_now)
+    rose.evaluate("Object.defineProperty(document, 'hidden', { get: () => true, configurable: true }); loadReminders()")
+    rose.wait_for_function("window.notified.length > 0")
+    first = rose.evaluate("window.notified[0]")
+    assert first["title"] == "Rose, it’s time for your evening Metformin.", first
+    rose.unroute("**/api/reminders")
+
+    # Remove Daniel's account from her Settings: his session ends at once.
+    rose.reload(wait_until="networkidle")  # a fresh list (Daniel joined after it was drawn)
+    wait_for_screen(rose, "settings")
+    rose.evaluate("document.getElementById('family-setup').open = true")
+    remove = "#family-accounts button[aria-label='Remove Daniel’s account']"
+    rose.wait_for_selector(remove)
+    rose.click(remove)
+    rose.wait_for_selector("#confirm-dialog[open]")
+    rose.click("#confirm-yes")
+    rose.wait_for_function(f"!document.querySelector(\"{remove}\")")
+    daniel.evaluate("loadDay()")
+    daniel.wait_for_selector("#family-signin:not([hidden])")
+    # Her mood is shared again for the checks that follow.
+    rose.click("#settings-form label:has-text('Her mood')")
+    rose.wait_for_function("profile.share_mood === true")
+    daniel.close()
+    rose.close()
+
+
 def seed_demo_week(database: str) -> None:
     """Fill the test server's database with the made-up demo week
     (scripts/seed_demo.py --reset, which keeps a backup first; no paintings)."""
@@ -1701,6 +1850,7 @@ def main() -> int:
                 check_help(browser)
                 check_read(browser)
                 check_landing(browser)
+                check_family_accounts(browser)
                 check_today_rows(browser)
                 check_friend(browser, test_env["DATABASE_PATH"])
                 check_every_screen(browser)
@@ -1727,7 +1877,10 @@ def main() -> int:
             "and date, word for word with Stop, a health letter never explained with the doctor's call first, a "
             "likely scam's warning, Check it for a scam with the words, Back keeps the paper, a photo it can't read, "
             "Meta down), the landing, Privacy, and Terms (every picture loads, the orb alive, questions open, Open "
-            "Buddy, Help's links), the welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
+            "Buddy, Help's links), family accounts (Maria seeded, an invite code, the sharing switches, joining on "
+            "another browser, her day as she shares it, Yesterday's missed pill, a notification for a new alert, sign out "
+            "and in, a wrong password, the pill reminder as a notification while Buddy is hidden, Remove ending the "
+            "session), the welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
             "(sections, Mark as asked and Undo in place, Add a question, 14 days, prints on one page), the family update "
             "(the email holds exactly the words on screen, its pills count matches the Pills ring, Copy, Yesterday), "
             "the demo week's done check-in and the hidden ?demo=reminder card (pops up after the first tap, said with "

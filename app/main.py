@@ -15,7 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from app import db, security
 from app.config import get_settings
 from app import voice
-from app.routes import briefing, checkin, companion, diary, family, find, how, learned, listen, meds, memories, notes, profile, read, scam
+from app.routes import (briefing, checkin, companion, diary, family, family_accounts, find, how, learned, listen, meds,
+                        memories, notes, profile, read, scam)
 from app.routes import voice as voice_routes
 
 # The folder with index.html, styles.css, and app.js.
@@ -68,6 +69,8 @@ app.include_router(briefing.router)
 app.include_router(listen.router)
 # Read it to me: a photo of a letter or bill, in plain words.
 app.include_router(read.router)
+# Family accounts: invite codes, sign-in, and her day as she shares it.
+app.include_router(family_accounts.router)
 
 
 @app.middleware("http")
@@ -86,7 +89,7 @@ async def only_buddys_own_page(request, call_next):
 
 # The pages for the family member who sets Buddy up (docs/SPEC.md feature
 # 17): the landing, Privacy, and Terms. Plain files, served like Home.
-PAGES = {"/about": "about.html", "/privacy": "privacy.html", "/terms": "terms.html"}
+PAGES = {"/about": "about.html", "/privacy": "privacy.html", "/terms": "terms.html", "/family": "family.html"}
 
 
 @app.middleware("http")
@@ -128,6 +131,12 @@ def privacy():
 def terms():
     """What Buddy is and isn't, in plain words."""
     return FileResponse(STATIC_DIR / PAGES["/terms"])
+
+
+@app.get("/family")
+def family_page():
+    """The family page: sign in, and her day as she shares it."""
+    return FileResponse(STATIC_DIR / PAGES["/family"])
 
 
 # Serves styles.css, app.js, and later recorder.js and speech.js.
