@@ -107,7 +107,8 @@ def safety_lines(connection, start: str, end: str) -> list[str]:
 def memory_lines(connection, start: str, end: str) -> list[str]:
     """New Memory book pages that day, by title (only on days with new pages)."""
     rows = connection.execute(
-        "SELECT title FROM memories WHERE created_at >= ? AND created_at < ? ORDER BY id", (start, end)
+        "SELECT title FROM memories WHERE created_at >= ? AND created_at < ? AND status != 'telling' ORDER BY id",
+        (start, end)
     ).fetchall()
     if not rows:
         return []

@@ -68,9 +68,10 @@ FEATURES = [
     },
     {
         "name": "Memory book",
-        "what": "Writes down a story from your life in your words, and paints a picture for it.",
-        "models": ["chat_model", "image_model"],
-        "here": "Your pages stay on this computer.",
+        "what": "Writes down a story from your life in your words, and paints a picture for it. You can start "
+                "from an old photo: Buddy says what it shows and asks about it.",
+        "models": ["chat_model", "image_model", "sam_model"],
+        "here": "Your pages and your photos stay on this computer. A photo with people in it is never repainted.",
     },
     {
         "name": "Find my things",

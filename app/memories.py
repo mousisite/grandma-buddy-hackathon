@@ -9,13 +9,23 @@
 # Plain code checks the AI's page before it is kept: every name and number
 # must come from the talk, and there is no advice. Otherwise the page is
 # simply her own words (docs/SAFETY.md section 8a).
+#
+# A page can also start from an old photo of hers (docs/SAFETY.md 8e): SAM
+# 3.1 checks for people (fail closed: unsure counts as people), Muse Spark
+# says what it shows and asks one question (never who anyone is), and the
+# page waits ("telling") for her story. With people in it, her own photo is
+# the page's picture, kept on this computer and never painted; without, the
+# book's watercolor is painted from the written scene as usual.
 
+import base64
 import json
 import re
+import shutil
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from app import db, family, guard, meta_client, prompts
+from app import briefing, db, family, finder, guard, meta_client, prompts, reader
 from app.config import get_settings
 
 # The one style every picture in the book shares, so the pages belong
@@ -52,7 +62,20 @@ PAGE_SCHEMA = {
 # A picture file starts with its type's own bytes. Anything else is not saved.
 PICTURE_KINDS = {b"RIFF": "webp", b"\x89PNG": "png", b"\xff\xd8\xff": "jpg"}
 MEDIA_TYPES = {"webp": "image/webp", "png": "image/png", "jpg": "image/jpeg"}
-PICTURE_NAME = re.compile(r"^\d+\.(webp|png|jpg)$")
+PICTURE_NAME = re.compile(r"^(photo-)?\d+\.(webp|png|jpg)$")  # a painting, or her own photo
+
+# A page from an old photo: what Spark fills in, and the fixed words used
+# instead when its description breaks a rule or it can't look.
+PHOTO_SCHEMA = {
+    "type": "object",
+    "properties": {"scene": {"type": "string"}, "question": {"type": "string"}},
+    "required": ["scene", "question"],
+    "additionalProperties": False,
+}
+PHOTO_OPENING = "What a lovely photo. What do you remember about that day?"
+MAX_PHOTO_SCENE = 300
+MAX_QUESTION = 160
+UNTOLD_FOR = timedelta(days=1)  # a photo she never told about is forgotten after this
 
 
 def pictures_dir() -> Path:
@@ -113,14 +136,17 @@ def checked(answer: dict, said: str) -> tuple[dict | None, str]:
 
 # ---------- Writing and painting (the background job) ----------
 
-def written_page(talk: list[dict], her_name: str) -> dict | None:
+def written_page(talk: list[dict], her_name: str, photo_scene: str = "") -> dict | None:
     """Ask Muse Spark for the page, and once more if it broke a rule.
-    None when it still did (then the page is her own words)."""
+    None when it still did (then the page is her own words). For a page
+    from her old photo, the writer is told what the photo shows, and those
+    words count as hers."""
     lines = "\n".join(("Buddy" if part["role"] == "assistant" else her_name) + ": " + part["content"] for part in talk)
-    said = " ".join(part["content"] for part in talk)
+    said = " ".join(part["content"] for part in talk) + " " + photo_scene
+    about_photo = f"She started this memory from an old photo of hers. What the photo shows: {photo_scene}\n\n" if photo_scene else ""
     messages = [
         {"role": "developer", "content": prompts.MEMORY_PAGE.format(her_name=her_name)},
-        {"role": "user", "content": "The talk:\n" + lines},
+        {"role": "user", "content": about_photo + "The talk:\n" + lines},
     ]
     for _ in range(2):
         # Room to spare: at 3000 the real AI once used it all thinking.
@@ -142,14 +168,15 @@ def set_status(connection, memory_id: int, status: str, **fields) -> None:
 
 
 def write_page(connection, memory_id: int) -> None:
-    row = connection.execute("SELECT her_words, talk FROM memories WHERE id = ?", (memory_id,)).fetchone()
+    row = connection.execute("SELECT her_words, talk, photo_scene FROM memories WHERE id = ?", (memory_id,)).fetchone()
     profile = db.get_profile(connection)
     # get_profile may write (it makes her profile row the first time), which
     # holds the database's write lock until a commit. Let go of it before
     # the AI thinks, so chat, pill reminders, and this screen never wait.
     connection.commit()
     try:
-        page = written_page(json.loads(row["talk"]), profile["preferred_name"] or profile["name"] or "She")
+        page = written_page(json.loads(row["talk"]), profile["preferred_name"] or profile["name"] or "She",
+                            row["photo_scene"])
     except meta_client.MetaError as problem:
         print(f"Writing memory page {memory_id} failed: {problem}")  # never her words
         page = None
@@ -185,16 +212,21 @@ def make_page(memory_id: int) -> None:
     on the database while Meta works."""
     connection = db.get_connection()
     try:
-        row = connection.execute("SELECT title, status FROM memories WHERE id = ?", (memory_id,)).fetchone()
-        if row is None or row["status"] == "ready":
-            return  # painted already: each page costs one painting
+        row = connection.execute("SELECT title, status, photo, people FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        if row is None or row["status"] in ("ready", "telling"):
+            return  # painted already (each page costs one painting), or her story isn't told yet
         if not row["title"]:
             set_status(connection, memory_id, "writing")
             connection.commit()
             write_page(connection, memory_id)
-        set_status(connection, memory_id, "painting")
-        connection.commit()
-        paint_page(connection, memory_id)
+        if row["people"] and row["photo"]:
+            # People in her photo: it is the page's picture itself, kept here
+            # and never painted, so no likeness is ever made.
+            use_photo_as_picture(connection, memory_id, row["photo"])
+        else:
+            set_status(connection, memory_id, "painting")
+            connection.commit()
+            paint_page(connection, memory_id)
         connection.commit()
     except Exception as problem:  # anything at all: never leave a page "writing" forever
         print(f"Memory page {memory_id} failed: {type(problem).__name__}")
@@ -203,6 +235,101 @@ def make_page(memory_id: int) -> None:
         connection.commit()
     finally:
         connection.close()
+
+
+def use_photo_as_picture(connection, memory_id: int, photo: str) -> None:
+    """Her own photo as the page's picture: a copy under the picture's name."""
+    picture = f"{memory_id}.{photo.rsplit('.', 1)[-1]}"
+    shutil.copyfile(pictures_dir() / photo, pictures_dir() / picture)
+    set_status(connection, memory_id, "ready", picture=picture)
+
+
+# ---------- A page from an old photo ----------
+
+def photo_bytes(image: str) -> tuple[bytes, str]:
+    """The photo's bytes and kind ("jpg") from a data URL. ValueError when it
+    isn't a picture file."""
+    raw = base64.b64decode(image.split(",", 1)[1], validate=True)
+    kind = next((kind for start, kind in PICTURE_KINDS.items() if raw.startswith(start)), None)
+    if kind == "webp" and raw[8:12] != b"WEBP":
+        kind = None
+    if kind is None:
+        raise ValueError("not a picture")
+    return raw, kind
+
+
+def has_people(image: str) -> bool:
+    """Does SAM 3.1 see a person? Unsure (SAM down) counts as yes: a photo
+    that might show someone is never painted."""
+    try:
+        return finder.best_match(finder.parse_matches(meta_client.segment(image, "person"))) is not None
+    except meta_client.MetaError as problem:
+        print(f"The person check couldn't look: {problem}")  # never her photo
+        return True
+
+
+def checked_description(scene: str, question: str) -> bool:
+    """Spark's words about the photo keep to the rules: short, a question,
+    no name or number, no "who", nothing about health, no advice."""
+    both = scene + " " + question
+    return bool(
+        scene and question and len(scene) <= MAX_PHOTO_SCENE and len(question) <= MAX_QUESTION
+        and question.endswith("?") and not re.search(r"\bwho\b", question, re.IGNORECASE)
+        and not invented(both, "") and not briefing.HEALTH.search(both) and not reader.ADVICE.search(both)
+        and guard.check_reply(both) is None
+    )
+
+
+def described(image: str) -> tuple[str, str]:
+    """What the photo shows and one question, from Muse Spark; ("", "")
+    when it can't look or its words break a rule (then PHOTO_OPENING)."""
+    messages = [
+        {"role": "developer", "content": prompts.PHOTO_MEMORY},
+        {"role": "user", "content": [
+            {"type": "text", "text": "Here is her old photo."},
+            {"type": "image_url", "image_url": {"url": image}},
+        ]},
+    ]
+    try:
+        answer = meta_client.structured(messages, "photo_scene", PHOTO_SCHEMA, reasoning="low", max_tokens=1500)
+    except meta_client.MetaError as problem:
+        print(f"Describing her photo failed: {problem}")
+        return "", ""
+    scene = " ".join(str(answer.get("scene", "")).split())
+    question = " ".join(str(answer.get("question", "")).split())
+    return (scene, question) if checked_description(scene, question) else ("", "")
+
+
+def photo_page(connection, image: str) -> dict:
+    """A new page from her old photo, waiting for her story ("telling"):
+    the photo kept on this computer, whether people are in it, and what it
+    shows. Returns what the talk needs: the page's id, its own talk's id,
+    and Buddy's opening words. ValueError when the photo isn't a picture."""
+    raw, kind = photo_bytes(image)
+    people = has_people(image)
+    scene, question = described(image)
+    memory_id = db.add_memory(connection, "", "", [])
+    conversation_id = f"photo-{memory_id}-{int(time.time())}"
+    name = f"photo-{memory_id}.{kind}"
+    pictures_dir().mkdir(parents=True, exist_ok=True)
+    (pictures_dir() / name).write_bytes(raw)
+    set_status(connection, memory_id, "telling", conversation_id=conversation_id, photo=name, people=int(people),
+               photo_scene=scene)
+    return {"id": memory_id, "conversation_id": conversation_id,
+            "opening": f"{scene} {question}" if scene else PHOTO_OPENING}
+
+
+def forget_untold(connection) -> None:
+    """A photo she never told about is forgotten after a day, file and all."""
+    before = (datetime.now() - UNTOLD_FOR).isoformat(timespec="seconds")
+    rows = connection.execute(
+        "SELECT id, photo FROM memories WHERE status = 'telling' AND created_at < ?", (before,)
+    ).fetchall()
+    for row in rows:
+        path = picture_path(row["photo"])
+        if path is not None:
+            path.unlink(missing_ok=True)
+        connection.execute("DELETE FROM memories WHERE id = ?", (row["id"],))
 
 
 def paint_again(connection, memory_id: int) -> None:
@@ -245,6 +372,9 @@ def for_screen(row, profile: dict) -> dict:
         "scene": row["scene"],
         "status": status,
         "picture": f"/api/memories/{row['id']}/picture?v={row['picture']}" if status == "ready" else "",
+        # Her own photo, when the page started from one (the picture itself when people are in it).
+        "photo": f"/api/memories/{row['id']}/photo?v={row['photo']}" if row["photo"] else "",
+        "people": bool(row["people"]),
         "mailto": mailto,
     }
 
@@ -252,7 +382,9 @@ def for_screen(row, profile: dict) -> dict:
 def pages(connection) -> list[dict]:
     """Every page, newest first."""
     profile = db.get_profile(connection)
-    return [for_screen(row, profile) for row in connection.execute("SELECT * FROM memories ORDER BY id DESC")]
+    return [for_screen(row, profile) for row in connection.execute(
+        "SELECT * FROM memories WHERE status != 'telling' ORDER BY id DESC"  # a photo not yet told about isn't a page
+    )]
 
 
 def page(connection, memory_id: int) -> dict | None:

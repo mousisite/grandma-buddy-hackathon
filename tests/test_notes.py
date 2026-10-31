@@ -259,7 +259,7 @@ def test_the_demo_week_fills_every_screen(safe_test_setup):
     assert load_seed_script().main(["--no-paint"]) == 0
     found = counts(safe_test_setup)
     assert found == dict(found, medications=2, moods=5, check_ins=5, symptoms=5, doctor_questions=2, scam_checks=1,
-                         memories=2, style_notes=3, talk_summaries=3)
+                         memories=3, style_notes=3, talk_summaries=3)  # one page from an old photo
     connection = db.get_connection(safe_test_setup)
     taken = connection.execute("SELECT COUNT(*) FROM med_events WHERE status = 'taken'").fetchone()[0]
     moods = {row[0] for row in connection.execute("SELECT mood FROM moods")}
@@ -290,9 +290,9 @@ def test_the_memory_pages_are_painted_unless_told_not_to(safe_test_setup, monkey
     painted = []
     monkeypatch.setattr(meta_client, "paint", lambda prompt: painted.append(prompt) or b"RIFF\x24\x00\x00\x00WEBPVP8 " + b"\x00" * 24)
     assert load_seed_script().main([]) == 0
-    assert len(painted) == 2
+    assert len(painted) == 3  # the third page started from an old photo with no one in it
     connection = db.get_connection(safe_test_setup)
-    assert [row[0] for row in connection.execute("SELECT status FROM memories")] == ["ready", "ready"]
+    assert [row[0] for row in connection.execute("SELECT status FROM memories")] == ["ready", "ready", "ready"]
     connection.close()
 
 

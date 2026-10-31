@@ -146,6 +146,15 @@ def save_memory(connection, conversation_id: str, mode: str) -> tuple[int | None
     - in ordinary talk, a new page needs a new memory since the last one,
       not just "Yes please, save it"."""
     last = db.last_memory(connection, conversation_id)
+    if last is not None and last["status"] == "telling":
+        # A page from her old photo, waiting for this story: fill it in.
+        talk = db.memory_talk(connection, conversation_id, "")
+        her_words = joined([part["content"] for part in talk if part["role"] == "user"])
+        if not her_words:
+            return None, False
+        connection.execute("UPDATE memories SET her_words = ?, talk = ?, status = 'writing', updated_at = ? WHERE id = ?",
+                           (her_words, json.dumps(talk), db.now(), last["id"]))
+        return last["id"], True
     if last is not None and mode == "memory":
         return last["id"], False
     since = (datetime.now() - timedelta(minutes=MEMORY_MINUTES)).isoformat(timespec="seconds")

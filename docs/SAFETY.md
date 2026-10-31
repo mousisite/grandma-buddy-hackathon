@@ -168,6 +168,14 @@ How the checker keeps to these rules (`app/scam.py`):
 - Pictures (Muse Image) always use one fixed watercolor-storybook style. People appear only as small figures seen from behind or far away, with no detailed faces, so a page never looks like a photo of a real person. Muse Image's web and image search are turned off for every picture: her story is never looked up, and the model never matches a real person's likeness.
 - Pages and pictures stay on this computer (`data/`, git-ignored). "Send to {family}" opens her own email app with the story written in, the same as the family update; nothing is sent until she presses Send.
 
+## 8e. A memory page from an old photo
+
+- Her photo stays on this computer (`data/memories/photo-<id>…`, git-ignored). It is shown to Meta twice, to be looked at, never to be changed: SAM 3.1 looks for a person (`store: false`), and Muse Spark says what it shows. It is never sent to be painted or edited, so no likeness of anyone is ever made.
+- **People in the photo: her photo is the page's picture, as it is.** Unsure counts as people (SAM down or unclear), so a photo that might show someone is never painted. Without people, the book's watercolor is painted from the written scene, as for any page, and her photo shows under the story.
+- Spark only describes the scene and asks one question. The `PHOTO_MEMORY` prompt forbids saying who anyone is, names, numbers or dates, reading writing in the photo, and anything about health, age, or looks. Plain code drops the description if it has a name or a number, the word "who", a health word, or advice; Buddy then says the fixed words "What a lovely photo. What do you remember about that day?".
+- The story is still hers: she tells it in an ordinary memory talk (the safety net runs first on every word), and the page is written and checked like any other (section 8a), with the photo's description counting among the words she may use.
+- A photo she never tells about is not a page; it is forgotten after a day, file and all. The family page and the family update never mention it.
+
 ## 8b. Find my things
 
 - What she says or types ("Where are my pills? I think I took them twice") goes through the safety net first (`/api/find`, or `/api/check-words` for "Say it"), before SAM or Spark see anything. A match shows the fixed safety screen and saves the event, like `/api/chat`.

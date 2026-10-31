@@ -91,6 +91,17 @@ PAGES = [
      "An old church hall in spring light with lilacs at the open doors. Small figures dancing far away, "
      "seen from behind."),
 ]
+# A page she started from an old photo: the kitchen painted for Find my
+# things (no one in it), as if it were a photo of her first kitchen.
+PHOTO_PAGE = {
+    "title": "My first kitchen",
+    "paragraphs": ["Our first kitchen was tiny, but the window caught the morning sun. I kept a blue teapot on the table, "
+                   "always warm.",
+                   "Walter built the shelves himself the week we moved in. They were crooked, and I loved them."],
+    "scene": "A small sunny kitchen with a blue teapot on a wooden table and crooked shelves, morning light.",
+    "photo_scene": "A small kitchen with a wooden table, a blue teapot, and shelves by a sunny window.",
+    "photo": Path(__file__).resolve().parent / "find_photos" / "kitchen.webp",
+}
 
 # What Buddy has learned about her (Settings, "What Buddy has learned").
 FACTS = [
@@ -166,6 +177,20 @@ def seed(connection, now: datetime) -> list[int]:
             "VALUES (?, ?, ?, ?, '[]', ?, ?, ?, 'no_picture')",
             (when, when, f"demo-memory-{days_ago}", " ".join(paragraphs), title, json.dumps(paragraphs), scene),
         ).lastrowid)
+    # A third page, started from an old photo (the kitchen painted for Find
+    # my things: no one in it, so the page gets a painting and shows the
+    # photo under the story).
+    when = at(now, 1, "16:00")
+    photo_page = connection.execute(
+        "INSERT INTO memories (created_at, updated_at, conversation_id, her_words, talk, title, story, scene, status, "
+        "people, photo_scene) VALUES (?, ?, 'demo-memory-photo', ?, '[]', ?, ?, ?, 'no_picture', 0, ?)",
+        (when, when, " ".join(PHOTO_PAGE["paragraphs"]), PHOTO_PAGE["title"], json.dumps(PHOTO_PAGE["paragraphs"]),
+         PHOTO_PAGE["scene"], PHOTO_PAGE["photo_scene"]),
+    ).lastrowid
+    memories.pictures_dir().mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(PHOTO_PAGE["photo"], memories.pictures_dir() / f"photo-{photo_page}.webp")
+    connection.execute("UPDATE memories SET photo = ? WHERE id = ?", (f"photo-{photo_page}.webp", photo_page))
+    pages.append(photo_page)
     today = now.date().isoformat()
     for kind, fact, follow_up in FACTS:
         connection.execute("INSERT INTO facts (created_at, updated_at, kind, fact, follow_up, follow_up_on) "
@@ -218,7 +243,7 @@ def main(args: list[str]) -> int:
     finally:
         connection.close()
     print("Added a made-up week for Rose: 2 pills, 5 check-ins, a knee that comes and goes, 2 questions for Dr. Lee,")
-    print("1 checked scam text, 2 Memory book pages, and what Buddy has learned about her.")
+    print("1 checked scam text, 3 Memory book pages (one from an old photo), and what Buddy has learned about her.")
     print(f"Family page: open /family and sign in as {FAMILY_ACCOUNT['email']} with the password "
           f"{FAMILY_ACCOUNT['password']} (Rose shares her diary in the demo).")
     if "--no-paint" in args or not get_settings().model_api_key:

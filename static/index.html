@@ -460,6 +460,14 @@
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
         Tell Buddy a memory
       </button>
+      <!-- An old photo of hers: Buddy says what it shows and asks about it
+           (screens.js, app/memories.py). Her photo stays on this computer. -->
+      <button id="memory-from-photo" class="pill-button pill-button--quiet pill-button--hero memories-start" type="button">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+        Start from an old photo
+      </button>
+      <input id="memory-photo-input" type="file" accept="image/*" hidden>
+      <p id="memories-photo-status" class="note" role="status" aria-live="polite"></p>
       <p id="memories-status" class="empty" role="status" hidden></p>
       <!-- The pages, newest first (screens.js). A card shimmers while
            Buddy writes or paints it, and its picture fades in. -->
@@ -478,6 +486,8 @@
         <h1 id="memory-title" class="memory-title" tabindex="-1">Memory book</h1>
         <p id="memory-date" class="memory-date"></p>
         <div id="memory-story" class="memory-story"></div>
+        <!-- The old photo a page started from, under its painting (screens.js). -->
+        <figure id="memory-photo" class="memory-photo" hidden></figure>
       </article>
       <p id="memory-status" class="empty" role="status" hidden></p>
       <div id="memory-actions" class="form-actions memory-actions">

@@ -815,6 +815,43 @@ def check_find(browser) -> None:
         page.close()
 
 
+def check_photo_memory(browser) -> None:
+    """A Memory book page from an old photo, with Meta faked: the photo goes
+    to /api/memories/photo, Buddy's words about it open a memory talk, and a
+    finished page shows the old photo under its painting."""
+    page = browser.new_page(viewport={"width": 390, "height": 844}, permissions=["microphone"])
+    visit(page, "memories")
+    started = {"id": 7, "conversation_id": "photo-7-1",
+               "opening": "A sunny kitchen with a blue teapot on the table. What do you remember about this kitchen?"}
+    page.route("**/api/memories/photo", lambda route: route.fulfill(json=started))
+    picture = ROOT / "scripts" / "find_photos" / "kitchen.webp"  # painted for this project: no people
+    assert picture.exists()
+    page.set_input_files("#memory-photo-input", str(picture))
+    wait_for_screen(page, "talk")
+    page.wait_for_function("document.getElementById('message').textContent.includes('blue teapot')")
+    assert page.evaluate("talkMode") == "memory" and page.evaluate("ownConversation") == "photo-7-1"
+    assert page.text_content("#talk-hint") == "Buddy is listening for your memory book"
+    page.screenshot(path=str(OUT / "memory-photo-talk-390.png"))
+
+    # A finished page from a photo without people: the painting, then her photo under the story.
+    finished = {"pages": [{"id": 7, "date": "Saturday, October 31", "title": "The kitchen on Elm Street",
+                           "paragraphs": ["We had a blue teapot on the table, always warm."],
+                           "scene": "A sunny kitchen with a blue teapot.", "status": "ready",
+                           "picture": "/api/memories/7/picture?v=7.webp", "photo": "/api/memories/7/photo?v=photo-7.webp",
+                           "people": False, "mailto": "mailto:maria@example.com?subject=A%20memory"}]}
+    page.route("**/api/memories", lambda route: route.fulfill(json=finished))
+    page.route("**/api/memories/7/picture*", lambda route: route.fulfill(path=str(picture), content_type="image/webp"))
+    page.route("**/api/memories/7/photo*", lambda route: route.fulfill(path=str(picture), content_type="image/webp"))
+    page.goto(f"http://localhost:{PORT}/#/memory/7", wait_until="networkidle")
+    wait_for_screen(page, "memory")
+    page.wait_for_selector("#memory-photo:not([hidden]) img")
+    assert page.text_content("#memory-photo figcaption") == "The old photo this page started from"
+    page.wait_for_timeout(700)
+    check_layout(page, "a memory page from a photo at 390px")
+    page.screenshot(path=str(OUT / "memory-photo-page-390.png"), full_page=True)
+    page.close()
+
+
 # Stand-ins for /api/read (no AI here), shaped like app/reader.py's answers,
 # for the made-up papers scripts/check_read.py photographs.
 READ_BILL_SAYS = "This is your electric bill for October. It says you owe $84.20, to be paid by November 15, 2026."
@@ -1777,6 +1814,7 @@ def main() -> int:
                 check_pills(page, problems)
                 check_scam(browser)
                 check_find(browser)
+                check_photo_memory(browser)
 
                 # The safety net, end to end: she says an emergency warning sign
                 # (faked speech-to-text), the real /api/chat answers with no AI,
@@ -1909,7 +1947,8 @@ def main() -> int:
             "work (card, I took it, remind me, ring, round check, change, remove, undo), Check a message (paste, "
             "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), Find my things (chip, \"What "
             "are you looking for?\" first, quick pick, photo, halo and sentence, nothing found, safety net first, the "
-            "Find my glasses button), Read it to me (chip, the orb on the photo while Buddy reads, a bill's amount "
+            "Find my glasses button), a Memory book page from an old photo (Buddy's words about it open the memory talk, the "
+            "photo under the finished page), Read it to me (chip, the orb on the photo while Buddy reads, a bill's amount "
             "and date, word for word with Stop, a health letter never explained with the doctor's call first, a "
             "likely scam's warning, Check it for a scam with the words, Back keeps the paper, a photo it can't read, "
             "Meta down), the landing, Privacy, and Terms (every picture loads, the orb alive, questions open, Open "

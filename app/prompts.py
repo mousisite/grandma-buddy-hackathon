@@ -104,6 +104,14 @@ Rules:
 - Use only what she said. Buddy's questions are there so you understand her answers.
 """
 
+# A Memory book page from an old photo (app/memories.py): Spark only says
+# what the photo shows and asks one question. Plain code drops anything
+# with a name, a number, health, or advice.
+PHOTO_MEMORY = """An older adult who lives alone chose an old photo of hers to start a page in her memory book. Look at it and fill in:
+- scene: one or two short, warm sentences saying what the photo shows: the place, the things in it, the season or the light, and what any people are doing, in general words only ("two people on a bench by the water"). Never say who anyone is or might be, never a name, never a number or a date, never what is written anywhere in it, and never anything about health, age, or how anyone looks.
+- question: one short, gentle question to get her telling the story, like "What do you remember about that day?" Never ask who someone is.
+No advice, no guessing beyond what is plainly there, plain everyday words."""
+
 # Added on her 4th answer in a "Something hurts" talk (app/companion.py).
 LAST_DIARY_ANSWER = (
     "\nThis is her last answer in this talk. If she told you something hurts, call log_symptom now and say "

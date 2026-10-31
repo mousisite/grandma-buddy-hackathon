@@ -1265,7 +1265,8 @@ function memoryPicture(page, onItsPage) {
   picture.setAttribute("data-status", page.status);
   if (page.picture) {
     var image = element("img", "memory-img");
-    image.alt = page.scene ? "Painting: " + page.scene : "A painting for this memory";
+    // With people in her old photo, the photo itself is the picture.
+    image.alt = page.people ? "Her own photo for this memory" : page.scene ? "Painting: " + page.scene : "A painting for this memory";
     image.width = 1536;
     image.height = 1024;
     image.decoding = "async";
@@ -1338,7 +1339,31 @@ function showMemories() {
     });
 }
 
-var memoryOnScreen = null; // the page shown at #/memory/3, for "Read it to me"
+// "Start from an old photo": the photo is shrunk on this device, Buddy looks
+// at it (/api/memories/photo), and a memory talk opens with its words.
+function useMemoryPhoto(event) {
+  var file = event.target.files[0];
+  event.target.value = ""; // so the same photo can be chosen again
+  if (!file) {
+    return;
+  }
+  var status = document.getElementById("memories-photo-status");
+  status.textContent = "Buddy is looking at your photo…";
+  shrinkPhoto(file)
+    .then(function (photo) {
+      return api("/api/memories/photo", "POST", { image: photo });
+    })
+    .then(function (started) {
+      status.textContent = "";
+      startMemoryFromPhoto(started); // talk.js
+    })
+    .catch(function (problem) {
+      status.textContent = typeof problem.detail === "string" ? problem.detail
+        : "I couldn’t look at that photo just now. Please try again in a moment.";
+    });
+}
+
+var memoryOnScreen = null; // the page shown at #/memory/3, for "Read it aloud"
 
 function showMemoryPage() {
   var id = Number(screenDetail());
@@ -1369,6 +1394,19 @@ function showMemoryPage() {
         page.paragraphs.forEach(function (paragraph) {
           story.appendChild(element("p", "", paragraph));
         });
+        // The old photo the page started from, under the painting (when the
+        // photo isn't the picture itself).
+        var photo = document.getElementById("memory-photo");
+        photo.textContent = "";
+        photo.hidden = !(page.photo && !page.people);
+        if (!photo.hidden) {
+          var old = element("img", "memory-photo-img");
+          old.alt = "The old photo this page started from";
+          old.loading = "lazy";
+          old.src = page.photo;
+          photo.appendChild(old);
+          photo.appendChild(element("figcaption", "memory-photo-caption", "The old photo this page started from"));
+        }
       }
       var send = document.getElementById("memory-send");
       send.href = page.mailto;
@@ -1859,6 +1897,10 @@ function startScreens() {
     window.print();
   });
   document.getElementById("memory-read").addEventListener("click", readMemory);
+  document.getElementById("memory-from-photo").addEventListener("click", function () {
+    document.getElementById("memory-photo-input").click();
+  });
+  document.getElementById("memory-photo-input").addEventListener("change", useMemoryPhoto);
 
   // Check a message.
   document.getElementById("scam-check").addEventListener("click", function () { checkMessage("text"); });

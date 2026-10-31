@@ -191,6 +191,13 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - Nothing Buddy does for her is ever behind the plan (a test checks that no file of hers even mentions billing).
 - Done when: the checkout request, the return checks (each way a session can fail to check out), demo mode, cancelling, and the live-key refusal are tested with Stripe faked; `scripts/check_stripe.py` opens one real test-mode session; and the browser check covers demo mode with no card fields.
 
+### 20. A memory page from an old photo (P1)
+
+- In the Memory book, "Start from an old photo": she picks a photo; Buddy says what it shows and asks one question ("A sunny kitchen with a blue teapot on the table. What do you remember about this kitchen?"), and a memory talk begins. She tells the story as usual; the page is written from her words.
+- SAM 3.1 checks the photo for people. With people, her own photo is the page's picture, kept on this computer and never repainted; without, the book's watercolor is painted and her photo shows under the story. Unsure counts as people (docs/SAFETY.md 8e).
+- Buddy never says who anyone is, never reads writing in the photo, and never mentions health, age, or looks; a description that breaks a rule is dropped for fixed words.
+- Done when: the person check (both ways, and SAM down), the description's checks, the page from a photo, and the day-old cleanup are tested with Meta faked; `scripts/check_photo_memory.py` runs the real SAM and Spark on two made-up photos; and the browser check covers the button, the talk's opening, and the finished page.
+
 ## Not building (out of scope)
 
 - Any medical advice: saying how serious a symptom is, what causes it, or what to do about it

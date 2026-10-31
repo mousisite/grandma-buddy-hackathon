@@ -2782,6 +2782,32 @@ label.group-row .group-label {
   }
 }
 
+/* The old photo a memory page started from: small, under the story. */
+.memory-photo {
+  display: grid;
+  gap: var(--s-2);
+  justify-items: start;
+  margin: var(--s-8) 0 0;
+}
+
+.memory-photo-img {
+  display: block;
+  width: min(100%, 320px);
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--tint);
+}
+
+.memory-photo-caption {
+  color: var(--text-2);
+  font-size: var(--t-15);
+}
+
+#memories-photo-status:empty {
+  display: none;
+}
+
 /* ---------- Find my things ---------- */
 
 .find-ask,

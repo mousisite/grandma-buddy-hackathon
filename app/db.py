@@ -303,6 +303,12 @@ def init_db(db_path: str | None = None) -> None:
         # A pill reminder as a system notification while Buddy is hidden (off
         # until she turns it on, which asks the browser's permission). October 30.
         add_column(connection, "profile", "notify_hidden", "INTEGER NOT NULL DEFAULT 0")
+        # A Memory book page started from an old photo of hers (app/memories.py):
+        # the photo's file name, whether people are in it (then it is the
+        # page's picture, never painted), and what Spark saw in it. October 31.
+        add_column(connection, "memories", "photo", "TEXT NOT NULL DEFAULT ''")
+        add_column(connection, "memories", "people", "INTEGER NOT NULL DEFAULT 0")
+        add_column(connection, "memories", "photo_scene", "TEXT NOT NULL DEFAULT ''")
         # WAL mode lets one connection read while another writes. Writers
         # still take turns, so the companion saves after each round of tools
         # (app/companion.py) and never holds the lock while the AI thinks.
@@ -652,9 +658,12 @@ def buddy_last_reply(connection: sqlite3.Connection) -> str:
 
 
 def last_memory(connection: sqlite3.Connection, conversation_id: str) -> sqlite3.Row | None:
-    """The newest Memory book page made from this talk (id and created_at), or None."""
+    """The newest Memory book page made from this talk (id, created_at, and
+    status: "telling" is a page from her old photo still waiting for its
+    story), or None."""
     return connection.execute(
-        "SELECT id, created_at FROM memories WHERE conversation_id = ? ORDER BY id DESC LIMIT 1", (conversation_id,)
+        "SELECT id, created_at, status FROM memories WHERE conversation_id = ? ORDER BY id DESC LIMIT 1",
+        (conversation_id,),
     ).fetchone()
 
 

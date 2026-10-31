@@ -318,6 +318,27 @@ function startOwnTalk(mode) {
   showReply(OWN_TALKS[mode].opening);
 }
 
+// "Start from an old photo" (screens.js): a memory talk that begins with
+// Buddy's words about her photo. Its page is already waiting for her story
+// (app/memories.py), under the talk id the server gave.
+function startMemoryFromPhoto(started) {
+  if (talkState !== "idle") {
+    return;
+  }
+  talkMode = "memory";
+  ownConversation = started.conversation_id;
+  ownLastAnswer = Date.now();
+  document.getElementById("talk-hint").textContent = OWN_TALKS.memory.hint;
+  if (currentScreen() === "talk") {
+    window.scrollTo(0, 0);
+  } else {
+    location.hash = "#/talk";
+  }
+  moveToEarlier();
+  document.getElementById("you-said").hidden = true;
+  showReply(started.opening);
+}
+
 // The end of a "Something hurts" talk, a memory talk, or a check-in:
 // ordinary talk again.
 function backToChat() {
