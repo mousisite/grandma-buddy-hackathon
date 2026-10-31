@@ -135,6 +135,8 @@ function dayDate(back) {
 function showDay() {
   show("family-day");
   loadDay();
+  loadPlan();
+  afterCheckout();
 }
 
 function loadDay() {
@@ -245,6 +247,106 @@ function drawDay(day, today) {
   }
 }
 
+// ---------- The Family plan ----------
+
+// Free, or the Family plan and when it renews (or ends). Stripe's own page
+// takes any payment, in test mode; with no key the demo flow has no card.
+function loadPlan() {
+  var status = document.getElementById("plan-status");
+  api("/api/billing")
+    .then(drawPlan)
+    .catch(function () {
+      status.textContent = "I couldn’t check your plan just now.";
+    });
+}
+
+function drawPlan(plan) {
+  var family = plan.plan === "family";
+  setText(document.getElementById("plan-name"), !family ? "Free plan"
+    : "Family plan" + (plan.demo ? " (demo mode, no real charge)" : ""));
+  var words;
+  if (!family) {
+    words = "Everything Buddy does for her, free. The Family plan is " + plan.price + "." +
+      (plan.mode === "demo" ? " Demo mode: nothing is ever charged." : " Paid through Stripe in test mode: nothing is ever really charged.");
+  } else if (plan.cancel_at_period_end) {
+    words = "It stays on until " + plan.ends_on + ", then ends. Nothing more is charged.";
+  } else {
+    words = "Renews on " + plan.renews_on + ", " + plan.price + ".";
+  }
+  setText(document.getElementById("plan-words"), words);
+  document.getElementById("plan-start").hidden = family;
+  document.getElementById("plan-cancel").hidden = !family || plan.cancel_at_period_end;
+  document.getElementById("plan-cancel-ask").hidden = true;
+  document.getElementById("plan-demo").hidden = true;
+}
+
+// "Start the Family plan": Stripe's page, or the demo box.
+function startPlan() {
+  var status = document.getElementById("plan-status");
+  var button = document.getElementById("plan-start");
+  button.disabled = true;
+  status.textContent = "One moment…";
+  api("/api/billing/checkout", "POST", {})
+    .then(function (answer) {
+      status.textContent = "";
+      if (answer.url) {
+        location.href = answer.url; // Stripe's own page (test mode)
+        return;
+      }
+      var demo = document.getElementById("plan-demo");
+      demo.hidden = false;
+      document.getElementById("plan-demo-start").focus();
+    })
+    .catch(function (problem) {
+      status.textContent = typeof problem.detail === "string" ? problem.detail
+        : "I couldn’t open the payment page just now. Please try again in a moment.";
+    })
+    .then(function () {
+      button.disabled = false;
+    });
+}
+
+function startDemoPlan() {
+  var status = document.getElementById("plan-status");
+  api("/api/billing/demo", "POST", {})
+    .then(function (plan) {
+      drawPlan(plan);
+      status.textContent = "You’re on the Family plan, in demo mode. Nothing was charged.";
+      document.getElementById("plan-cancel").focus();
+    })
+    .catch(function (problem) {
+      status.textContent = typeof problem.detail === "string" ? problem.detail : "I couldn’t start it just now. Please try again.";
+    });
+}
+
+function cancelPlan() {
+  var status = document.getElementById("plan-status");
+  api("/api/billing/cancel", "POST", {})
+    .then(function (plan) {
+      drawPlan(plan);
+      status.textContent = "Cancelled.";
+      document.getElementById("plan-title").focus();
+    })
+    .catch(function (problem) {
+      status.textContent = typeof problem.detail === "string" ? problem.detail : "I couldn’t cancel it just now. Please try again.";
+    });
+}
+
+// Back from Stripe's page (/billing/return sends her to #billing, or to
+// #billing-problem when the payment didn't check out).
+function afterCheckout() {
+  var came = location.hash;
+  if (came !== "#billing" && came !== "#billing-problem") {
+    return;
+  }
+  history.replaceState(null, "", location.pathname);
+  var status = document.getElementById("plan-status");
+  status.textContent = came === "#billing" ? "Welcome to the Family plan. Thank you!"
+    : "That payment didn’t go through, so nothing changed. You can try again.";
+  document.getElementById("billing").scrollIntoView();
+  document.getElementById("plan-title").focus();
+}
+
 // ---------- Notifications on this device ----------
 
 function notifyWanted() {
@@ -308,6 +410,21 @@ function start() {
     choice.addEventListener("change", loadDay);
   });
   document.getElementById("notify-switch").addEventListener("change", changeNotify);
+  document.getElementById("plan-start").addEventListener("click", startPlan);
+  document.getElementById("plan-demo-start").addEventListener("click", startDemoPlan);
+  document.getElementById("plan-demo-no").addEventListener("click", function () {
+    document.getElementById("plan-demo").hidden = true;
+    document.getElementById("plan-start").focus();
+  });
+  document.getElementById("plan-cancel").addEventListener("click", function () {
+    document.getElementById("plan-cancel-ask").hidden = false;
+    document.getElementById("plan-cancel-no").focus();
+  });
+  document.getElementById("plan-cancel-no").addEventListener("click", function () {
+    document.getElementById("plan-cancel-ask").hidden = true;
+    document.getElementById("plan-cancel").focus();
+  });
+  document.getElementById("plan-cancel-yes").addEventListener("click", cancelPlan);
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden && !document.getElementById("family-day").hidden) {
       loadDay(); // back to the page: fresh at once

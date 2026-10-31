@@ -32,6 +32,9 @@ class Settings:
     database_path: str = "data/grandma_buddy.db"  # where the SQLite file lives
     # The names this computer may be reached by (app/security.py).
     allowed_hosts: tuple[str, ...] = ("localhost", "127.0.0.1", "::1")
+    # The Family plan's checkout, in Stripe's TEST mode only (sk_test_…).
+    # Empty means demo mode: no real charge, no card fields.
+    stripe_secret_key: str = ""
 
 
 def get_settings() -> Settings:
@@ -51,7 +54,12 @@ def get_settings() -> Settings:
         allowed_hosts=tuple(
             name.strip().lower() for name in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,::1").split(",") if name.strip()
         ),
+        stripe_secret_key=os.getenv("STRIPE_SECRET_KEY", "").strip(),
     )
+    # Payments only ever run in Stripe's test mode, so nothing is ever really
+    # charged. A live key refuses to start (and is never printed).
+    if settings.stripe_secret_key and not settings.stripe_secret_key.startswith("sk_test_"):
+        raise ValueError("Grandma Buddy takes payments in Stripe's test mode only: STRIPE_SECRET_KEY must start with sk_test_.")
     # Standard models only. In "-contributor" mode Meta may train on what she
     # says, and this app holds her health information, so it refuses to run.
     for model in (settings.chat_model, settings.transcribe_model, settings.image_model, settings.sam_model):

@@ -1175,6 +1175,41 @@ def check_family_accounts(browser) -> None:
     rose.close()
 
 
+def check_billing(browser) -> None:
+    """The Family plan on the family page, in demo mode (the test server has
+    no Stripe key): Maria signs in, sees the Free plan, taps Start, gets the
+    demo box with NO card fields, starts the plan, then cancels it at the
+    end of the period."""
+    maria = browser.new_page(viewport={"width": 390, "height": 844})
+    maria.goto(f"http://localhost:{PORT}/family", wait_until="networkidle")
+    maria.wait_for_selector("#family-signin:not([hidden])")
+    maria.fill("#signin-email", "maria@example.com")
+    maria.fill("#signin-password", "rose-garden-2026")  # the demo week's made-up password
+    maria.click("#signin-form button[type=submit]")
+    maria.wait_for_selector("#family-day:not([hidden])")
+    maria.wait_for_function("document.getElementById('plan-name').textContent === 'Free plan'")
+    assert "Demo mode" in (maria.text_content("#plan-words") or "")
+    maria.click("#plan-start")
+    maria.wait_for_selector("#plan-demo:not([hidden])")
+    assert maria.locator("#billing input").count() == 0, "no card fields, ever"
+    assert maria.text_content("#plan-demo .plan-demo-title") == "Demo mode, no real charge"
+    check_layout(maria, "the Family plan's demo box at 390px")
+    maria.screenshot(path=str(OUT / "family-plan-demo-390.png"), full_page=True)
+    maria.click("#plan-demo-start")
+    maria.wait_for_function("document.getElementById('plan-name').textContent.startsWith('Family plan (demo mode')")
+    assert (maria.text_content("#plan-words") or "").startswith("Renews on ")
+    assert maria.is_visible("#plan-cancel") and maria.is_hidden("#plan-start")
+    maria.click("#plan-cancel")
+    maria.wait_for_selector("#plan-cancel-ask:not([hidden])")
+    maria.click("#plan-cancel-yes")
+    maria.wait_for_function("document.getElementById('plan-words').textContent.startsWith('It stays on until ')")
+    assert maria.text_content("#plan-status") == "Cancelled."
+    assert maria.is_hidden("#plan-cancel")
+    check_layout(maria, "the Family plan, cancelled, at 390px")
+    maria.screenshot(path=str(OUT / "family-plan-390.png"), full_page=True)
+    maria.close()
+
+
 def seed_demo_week(database: str) -> None:
     """Fill the test server's database with the made-up demo week
     (scripts/seed_demo.py --reset, which keeps a backup first; no paintings)."""
@@ -1851,6 +1886,7 @@ def main() -> int:
                 check_read(browser)
                 check_landing(browser)
                 check_family_accounts(browser)
+                check_billing(browser)
                 check_today_rows(browser)
                 check_friend(browser, test_env["DATABASE_PATH"])
                 check_every_screen(browser)
@@ -1880,7 +1916,8 @@ def main() -> int:
             "Buddy, Help's links), family accounts (Maria seeded, an invite code, the sharing switches, joining on "
             "another browser, her day as she shares it, Yesterday's missed pill, a notification for a new alert, sign out "
             "and in, a wrong password, the pill reminder as a notification while Buddy is hidden, Remove ending the "
-            "session), the welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
+            "session), the Family plan in demo mode (no card fields, start, cancel at the end of the period), the "
+            "welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
             "(sections, Mark as asked and Undo in place, Add a question, 14 days, prints on one page), the family update "
             "(the email holds exactly the words on screen, its pills count matches the Pills ring, Copy, Yesterday), "
             "the demo week's done check-in and the hidden ?demo=reminder card (pops up after the first tap, said with "

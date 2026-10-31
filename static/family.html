@@ -145,6 +145,38 @@
           <p id="notify-status" class="note" role="status"></p>
         </section>
 
+        <!-- The Family plan (family.js, app/billing.py): Stripe's own page in
+             test mode, or demo mode with no key. Never a card field here. -->
+        <section id="billing" class="family-part" aria-labelledby="plan-title">
+          <h2 id="plan-title" class="family-heading">Your plan</h2>
+          <div class="plan-card">
+            <p id="plan-name" class="plan-current"></p>
+            <p id="plan-words" class="note"></p>
+            <div class="form-actions">
+              <button id="plan-start" class="pill-button pill-button--ink" type="button" hidden>Start the Family plan</button>
+              <button id="plan-cancel" class="pill-button pill-button--quiet" type="button" hidden>Cancel at the end of the period</button>
+            </div>
+            <div id="plan-cancel-ask" class="plan-ask" hidden>
+              <p>Cancel the Family plan? It stays until the end of the period you paid for.</p>
+              <div class="form-actions">
+                <button id="plan-cancel-yes" class="pill-button pill-button--ink" type="button">Yes, cancel it</button>
+                <button id="plan-cancel-no" class="pill-button pill-button--quiet" type="button">Keep it</button>
+              </div>
+            </div>
+            <!-- Demo mode: no key, no charge, and no card fields at all. -->
+            <div id="plan-demo" class="plan-demo" hidden>
+              <p class="plan-demo-title">Demo mode, no real charge</p>
+              <p class="note">No payment key is set up, so there is no card to type and nothing is charged. The Family plan starts with one tap, for 30 days.</p>
+              <div class="form-actions">
+                <button id="plan-demo-start" class="pill-button pill-button--ink" type="button">Start the Family plan (demo)</button>
+                <button id="plan-demo-no" class="pill-button pill-button--quiet" type="button">Not now</button>
+              </div>
+            </div>
+            <p id="plan-status" class="form-status" role="status" aria-live="polite"></p>
+          </div>
+          <p class="note">The Family plan, $9 a month, will host Buddy for you so this page works from anywhere, with a text or an email when something needs a look (hosting is coming in November). Payments go through Stripe’s own page, in test mode: our app never sees a card number, and nothing is ever really charged. Everything Buddy does for her stays free.</p>
+        </section>
+
         <p class="note family-shares">She chooses what is shared here, in Buddy’s Settings under “What your family can see”. Safety screens are shown as a time and a kind only, never her words. This page is as private as her computer: it runs there, and anyone using Buddy there can see everything.</p>
       </section>
     </main>

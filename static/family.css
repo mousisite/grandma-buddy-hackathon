@@ -123,3 +123,30 @@
 .family-shares {
   max-width: 60ch;
 }
+
+/* The plan: one outlined card, like the landing's plans. */
+.plan-card {
+  display: grid;
+  gap: var(--s-4);
+  padding: var(--s-5);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+}
+
+.plan-current {
+  font-size: var(--t-24);
+  font-weight: 650;
+}
+
+.plan-ask,
+.plan-demo {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border-radius: var(--r-input);
+  background: var(--tint);
+}
+
+.plan-demo-title {
+  font-weight: 650;
+}

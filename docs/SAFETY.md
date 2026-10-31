@@ -211,6 +211,13 @@ How the checker keeps to these rules (`app/scam.py`):
 - The family's requests are refused from any other website, like every `/api` request (`app/security.py`), so a stolen link can't read her day. The family page runs where Buddy runs (on her computer); a hosted copy is the paid Family plan's job, behind HTTPS.
 - Notifications are plain words from the app, never the AI: on her side, a pill reminder while Buddy is hidden (off until she turns it on, which asks the browser first); on the family's side, "needs a look" for a missed pill or a safety screen, as the switches allow. Nothing on the family page says what anything means: it records what happened, and says "call her".
 
+## 9b. The Family plan (payments)
+
+- **Safety is never behind a paywall.** The safety net, pill reminders, talking with Buddy, and every screen of hers are free and never check the plan: no file of hers even imports the billing code (a test keeps it that way). The plan buys the family's conveniences only.
+- **Our app never handles a card.** Payments go through Stripe's own hosted page. The app sends the family member there and, when they come back, asks Stripe whether the session is finished, paid, theirs, a subscription, and the right price before recording anything. There is no card field anywhere in Buddy.
+- **Test mode only.** The key must be a Stripe test key (`sk_test_…`); anything else refuses to start, so nothing is ever really charged. With no key, the family page shows "Demo mode, no real charge" and a one-tap plan with no card fields at all.
+- Only a signed-in family member can see or change the plan. Her own screens never mention it.
+
 ## 10. Test phrases
 
 `tests/test_safety.py` and `/safety-check` must cover at least these. Add more variations as you go.

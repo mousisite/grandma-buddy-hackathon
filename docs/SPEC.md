@@ -183,6 +183,14 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - Safety screens reach the family as a kind and a time with a fixed sentence, never her words (docs/SAFETY.md 9a). Five wrong passwords in 15 minutes lock that email for 15 minutes. Another website can't sign in or read her day.
 - Done when: the accounts, sessions, lock, sharing switches, and the day's facts are tested (no Meta involved), `scripts/seed_demo.py` adds Maria's account, and the browser check covers the invite, joining, her day, Yesterday's alert, the switches, sign out and in, both notifications, and Remove.
 
+### 19. The Family plan: checkout and billing (P1)
+
+- On the family page, "Your plan": the Free plan (everything Buddy does for her), or the Family plan, $9 a month, with when it renews and "Cancel at the end of the period" (it stays until then).
+- Payments go through Stripe's hosted Checkout in TEST MODE only: our app opens a session and sends the family member to Stripe's own page, so it never sees a card number. Back at `/billing/return`, the app asks Stripe about the session (never the address bar) and records the plan only if it is a test-mode session, finished, paid, this family member's, a subscription, and $9. The same session twice records it once. A key that isn't a test key (`sk_test_…`) refuses to start.
+- With no key, demo mode: "Demo mode, no real charge", the plan starts with one tap for 30 days, and there are no card fields anywhere.
+- Nothing Buddy does for her is ever behind the plan (a test checks that no file of hers even mentions billing).
+- Done when: the checkout request, the return checks (each way a session can fail to check out), demo mode, cancelling, and the live-key refusal are tested with Stripe faked; `scripts/check_stripe.py` opens one real test-mode session; and the browser check covers demo mode with no card fields.
+
 ## Not building (out of scope)
 
 - Any medical advice: saying how serious a symptom is, what causes it, or what to do about it

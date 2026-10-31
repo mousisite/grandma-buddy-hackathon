@@ -15,8 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from app import db, security
 from app.config import get_settings
 from app import voice
-from app.routes import (briefing, checkin, companion, diary, family, family_accounts, find, how, learned, listen, meds,
-                        memories, notes, profile, read, scam)
+from app.routes import (billing, briefing, checkin, companion, diary, family, family_accounts, find, how, learned,
+                        listen, meds, memories, notes, profile, read, scam)
 from app.routes import voice as voice_routes
 
 # The folder with index.html, styles.css, and app.js.
@@ -71,6 +71,8 @@ app.include_router(listen.router)
 app.include_router(read.router)
 # Family accounts: invite codes, sign-in, and her day as she shares it.
 app.include_router(family_accounts.router)
+# The Family plan: Stripe's checkout in test mode, or demo mode with no key.
+app.include_router(billing.router)
 
 
 @app.middleware("http")

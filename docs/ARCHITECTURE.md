@@ -71,6 +71,7 @@ grandma-buddy-hackathon/
     memories.py              the Memory book: write the page (checked: only her names and numbers, no advice), paint it, the picture style
     briefing.py              today's weather, a cheerful local story, or sports, looked up on the web for her town (our code writes the question), checked (no links, no health or advice, 2 sentences), kept 3 hours, 30 searches a day at most
     finder.py                Find my things: what she's looking for as a short noun phrase, SAM's answer line, the surest match, Spark's sentence (checked) or plain words
+    billing.py               the Family plan: Stripe's hosted Checkout in test mode only (a session opened, the return checked with Stripe before the plan is recorded, cancel at the end of the period), or demo mode with no key
     accounts.py              family accounts: invite codes (six letters, 24 hours, one use), scrypt password hashes, session tokens (hashed, 30 days), five tries then 15 minutes
     reader.py                Read it to me: Spark reads a photo of a paper into a strict form; plain code decides what she hears (health papers never explained, every summary sentence checked, printed numbers only, scam signs said, a scam's number never read out)
     voice.py                 Buddy's natural voice: Kokoro (kokoro-onnx) on this computer, the voices on offer, WAV making, a cache of recent words
@@ -89,6 +90,7 @@ grandma-buddy-hackathon/
       find.py                /api/find (safety net first, then finder.find; the photo is never saved)
       read.py                /api/read (reader.read; the photo and the paper's words are never saved)
       family_accounts.py     /api/family/invite, accounts (Rose's Settings); /api/family/account, sign-in, sign-out, me, dashboard (the family page)
+      billing.py             /api/billing (the plan), /checkout, /demo, /cancel; GET /billing/return (back from Stripe's page)
       briefing.py            /api/briefing/{weather,news,sports} for Home's weather row
       listen.py              /api/listen (WebSocket): hands-free talking, her microphone live to Meta's realtime speech-to-text and her words back; only Buddy's own page, one at a time, 15 minutes at most
       voice.py               /api/voice (is the natural voice here, which voices), /api/speak (words in, WAV out)
@@ -190,6 +192,7 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `family_accounts` | id, created_at, name, email (unique), password_hash (scrypt), salt. Never the password |
 | `family_sessions` | id, account_id, token_hash (the cookie's token is never stored, only its SHA-256), created_at, expires_at (30 days) |
 | `family_invites` | code (six letters), created_at, expires_at (24 hours), used_at (one use) |
+| `subscriptions` | id, account_id, plan (`family`), demo (1 in demo mode), checkout_session_id (unique: the same checkout twice records once), stripe_subscription_id, stripe_customer_id, current_period_end, cancel_at_period_end, created_at, updated_at. Never a card number |
 | `memories` (the Memory book) | id, created_at, updated_at, conversation_id, her_words (her own words, joined), talk (JSON: what she and Buddy said), title, story (JSON list of paragraphs), scene (what the picture shows; also its alt text), picture (file name in `data/memories/`), status (`writing`, `painting`, `ready`, `no_picture`). Saving again never paints twice: a memory talk makes one page, and in ordinary talk a new page needs a new memory (10 words or more) since the last one |
 
 ## API routes
@@ -230,6 +233,10 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `GET /api/family/accounts`, `DELETE /api/family/accounts/{id}` | | the family accounts for her Settings (`[{"id", "name", "email", "created_at"}]`); removing one ends its sessions |
 | `POST /api/family/account` | `{"code", "name", "email", "password"}` | joins and signs in (the `buddy_family` cookie: HttpOnly, SameSite=Lax, 30 days). 400 names the entry to fix (`{"field", "message"}`); a wrong code too |
 | `POST /api/family/sign-in`, `/sign-out`; `GET /api/family/me` | `{"email", "password"}` | `{"name", "email"}`; 401 when they don't match; 429 after five wrong tries in 15 minutes |
+| `GET /api/billing` | | the signed-in family member's plan: `{"mode": "test" or "demo", "plan": "free"}` or `{…, "plan": "family", "demo", "renews_on", "cancel_at_period_end", "ends_on"}` |
+| `POST /api/billing/checkout` | | `{"url"}` of Stripe's test-mode Checkout page ($9 a month, subscription, this family member's id as the reference), or `{"demo": true}` with no key; 503 with a kind sentence when Stripe can't be reached |
+| `POST /api/billing/demo`, `POST /api/billing/cancel` | | demo mode only: the plan with one tap (400 with a real key); cancel at the end of the period (Stripe is told in test mode) |
+| `GET /billing/return?session_id=` | Stripe's redirect | asks Stripe about the session; records the plan only if it is test-mode, complete, paid, this family member's, a subscription, and $9; then 303 to `/family#billing` (or `#billing-problem`, nothing recorded; `/family` when not signed in) |
 | `GET /api/family/dashboard?date=` | a day in the last 30 days (today by default) | her day as she shares it: `{"her_name", "day", "day_words", "shares": {mood, pills, diary, safety}, "mood", "pills": {"taken", "total", "not_taken"}, "diary", "safety" (kind and time as a fixed sentence, never her words), "memories", "talked", "alerts"}`; a part she doesn't share is null. 401 without a session |
 | `GET /api/voice` | | `{"available", "default", "voices": [{"id", "name"}]}`: is Buddy's natural voice set up on this computer, and which voices she can choose (Heart, Bella, Nicole, Emma (British), Michael) |
 | `POST /api/speak` | `{"text", "voice", "speed"}` (a sentence, up to 600 characters; speed 0.6 to 1.4) | the words as a WAV (24 kHz mono). 503 when the natural voice isn't set up or fails: the page then uses the browser voice. The words are in the body, never the address, so they never show in the server log. The same words are made once (a cache of 64), and the model loads in the background when the app starts |

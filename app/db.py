@@ -184,6 +184,23 @@ def init_db(db_path: str | None = None) -> None:
                 used_at TEXT NOT NULL DEFAULT ''
             );
 
+            -- The Family plan, one row per family account (the latest checkout
+            -- wins): Stripe's ids in test mode, or a demo plan with no charge.
+            -- Never a card number: Stripe's own page takes those.
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL,
+                plan TEXT NOT NULL DEFAULT 'family',
+                demo INTEGER NOT NULL DEFAULT 0,
+                checkout_session_id TEXT NOT NULL UNIQUE,
+                stripe_subscription_id TEXT NOT NULL DEFAULT '',
+                stripe_customer_id TEXT NOT NULL DEFAULT '',
+                current_period_end TEXT NOT NULL DEFAULT '',
+                cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT ''
+            );
+
             -- The Memory book: one page per memory she told Buddy. her_words
             -- and talk are what was said; the AI writes title, story (a JSON
             -- list of paragraphs) and scene (what the picture shows, also its
