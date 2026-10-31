@@ -31,10 +31,18 @@
   <link rel="preload" href="/static/fonts/Figtree.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="/static/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="/static/styles.css">
+  <!-- Installable: an icon on her home screen or desktop, opening full screen
+       (static/manifest.webmanifest; the icons are Buddy's own orb). -->
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/buddy-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Buddy">
 </head>
 <body>
   <!-- For keyboard users: the first Tab stop jumps to the screen's heading. -->
   <button id="skip-link" class="skip-link" type="button">Skip to the page</button>
+  <!-- No internet (app.js): what still works, and what doesn't. -->
+  <p id="offline-note" class="offline-note" role="status" hidden>No internet right now. Your pill reminders and the safety net still work. Talking with Buddy needs the internet.</p>
 
   <!-- Desktop (768px and up): a slim glass sidebar. -->
   <aside class="sidebar" aria-label="Buddy">
@@ -1046,6 +1054,27 @@
           <p id="learned-undo" class="form-status" role="status"></p>
         </div>
       </details>
+
+      <!-- Her data (herdata.js, app/her_data.py): one zip of everything, or
+           everything gone. Folded away, for a family member. -->
+      <details id="data-setup" class="for-family">
+        <summary class="for-family-summary">
+          <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path></svg>
+          <span class="row-text">
+            <h2 class="row-title">Her data</h2>
+            <span class="row-meta">For a family member</span>
+          </span>
+          <svg class="icon for-family-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+        </summary>
+        <div class="for-family-body">
+          <p class="group-note">Everything Buddy writes down lives in one file on this computer. You can take a copy of it all, or wipe it all.</p>
+          <div class="form-actions">
+            <a id="data-export" class="pill-button pill-button--quiet" href="/api/data/export" download>Export everything</a>
+            <button id="data-delete" class="pill-button pill-button--quiet" type="button">Delete everything</button>
+          </div>
+          <p class="group-note">Export makes one zip file: her database and her memory book pictures. Delete empties Buddy as on its first day. It can’t be undone, so export first.</p>
+        </div>
+      </details>
     </section>
 
     <!-- The honest note, on every screen. "call 911" is always one tap away. -->
@@ -1094,6 +1123,21 @@
     </div>
   </dialog>
 
+  <!-- "Delete everything?": a sheet that asks for the word DELETE (herdata.js). -->
+  <dialog id="delete-dialog" class="sheet" aria-labelledby="delete-title" aria-describedby="delete-text">
+    <h2 id="delete-title" class="sheet-title">Delete everything?</h2>
+    <p id="delete-text">Her diary, pills, check-ins, doctor notes, memory book, photos, family accounts, and everything Buddy has learned will be gone. This can’t be undone. To go on, type DELETE below.</p>
+    <div class="field">
+      <label for="delete-word">Type DELETE</label>
+      <input id="delete-word" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="10">
+    </div>
+    <div class="form-actions">
+      <button id="delete-yes" class="pill-button pill-button--ink" type="button" disabled>Yes, delete everything</button>
+      <button id="delete-no" class="pill-button pill-button--quiet" type="button" autofocus>Keep it</button>
+    </div>
+    <p id="delete-status" class="form-status" role="status" aria-live="polite"></p>
+  </dialog>
+
   <!-- "Are you sure?" before removing something: a bottom sheet (screens.js). -->
   <dialog id="confirm-dialog" class="sheet" aria-labelledby="confirm-title" aria-describedby="confirm-text">
     <h2 id="confirm-title" class="sheet-title">Remove this pill?</h2>
@@ -1115,6 +1159,7 @@
   <script src="/static/find.js"></script>
   <script src="/static/read.js"></script>
   <script src="/static/sharing.js"></script>
+  <script src="/static/herdata.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

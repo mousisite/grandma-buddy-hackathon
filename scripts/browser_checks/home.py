@@ -1247,6 +1247,83 @@ def check_billing(browser) -> None:
     maria.close()
 
 
+def without_service_workers(browser) -> None:
+    """Every page the checks open gets a browser context with service workers
+    blocked: Playwright's page.route (the fakes for Meta) can't intercept a
+    request once a service worker controls the page, even one the worker
+    only passes through. check_installable opens its own context, where the
+    worker is allowed."""
+    def new_page(**options):
+        return browser.new_context(service_workers="block", **options).new_page()
+
+    browser.new_page = new_page
+
+
+def check_installable(browser) -> None:
+    """The installable app: the service worker keeps the app shell on this
+    device (never anything under /api), the manifest and icons are there,
+    and with no internet the note at the top says what still works."""
+    page = browser.new_context(viewport={"width": 390, "height": 844}).new_page()  # the worker allowed here
+    visit(page, "today")
+    assert page.evaluate("document.querySelector('link[rel=manifest]').href.endsWith('/static/manifest.webmanifest')")
+    assert page.evaluate("navigator.serviceWorker.ready.then(r => !!r.active)"), "the service worker is on duty"
+    page.wait_for_function("caches.keys().then(names => names.includes('buddy-shell-v1'))")
+    kept = page.evaluate("caches.open('buddy-shell-v1').then(c => c.keys()).then(keys => keys.map(k => new URL(k.url).pathname))")
+    assert "/" in kept and "/static/styles.css" in kept and "/static/offline.html" in kept, kept
+    assert not any(path.startswith("/api/") for path in kept), "her data is never kept in the shell"
+    # No internet: the note, then gone again.
+    page.context.set_offline(True)
+    page.wait_for_selector("#offline-note:not([hidden])")
+    check_layout(page, "the offline note at 390px")
+    page.screenshot(path=str(OUT / "offline-note-390.png"))
+    page.context.set_offline(False)
+    page.wait_for_selector("#offline-note[hidden]", state="attached")
+    page.close()
+
+
+def check_her_data(browser, database: str) -> None:
+    """Her data, in Settings: Export everything downloads one zip with her
+    database and pictures; Delete everything asks for the word DELETE, then
+    Buddy is as on its first day (the welcome). Runs LAST: it wipes the
+    demo week."""
+    import zipfile
+
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    visit(page, "settings")
+    page.evaluate("document.getElementById('data-setup').open = true")
+    with page.expect_download() as downloading:
+        page.click("#data-export")
+    download = downloading.value
+    assert re.fullmatch(r"grandma-buddy-\d{4}-\d{2}-\d{2}\.zip", download.suggested_filename), download.suggested_filename
+    saved = OUT / download.suggested_filename
+    download.save_as(str(saved))
+    with zipfile.ZipFile(saved) as packed:
+        names = packed.namelist()
+        assert "grandma-buddy.db" in names and "README.txt" in names
+        assert any(name.startswith("memories/photo-") for name in names), "her photo is in the export"
+    check_layout(page, "Settings, Her data at 390px")
+    page.screenshot(path=str(OUT / "settings-her-data-390.png"), full_page=True)
+
+    page.click("#data-delete")
+    page.wait_for_selector("#delete-dialog[open]")
+    assert page.is_disabled("#delete-yes")
+    page.fill("#delete-word", "delete")
+    assert page.is_disabled("#delete-yes"), "only the word DELETE, exactly"
+    page.fill("#delete-word", "DELETE")
+    assert page.is_enabled("#delete-yes")
+    check_layout(page, "the delete sheet at 390px")
+    page.screenshot(path=str(OUT / "delete-sheet-390.png"))
+    page.click("#delete-yes")
+    wait_for_screen(page, "welcome")  # no name any more: the first day
+    import sqlite3
+
+    connection = sqlite3.connect(database)
+    assert connection.execute("SELECT COUNT(*) FROM symptoms").fetchone()[0] == 0
+    assert connection.execute("SELECT COUNT(*) FROM memories").fetchone()[0] == 0
+    connection.close()
+    page.close()
+
+
 def seed_demo_week(database: str) -> None:
     """Fill the test server's database with the made-up demo week
     (scripts/seed_demo.py --reset, which keeps a backup first; no paintings)."""
@@ -1779,6 +1856,7 @@ def main() -> int:
             browser = playwright.chromium.launch(
                 args=["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"]
             )
+            without_service_workers(browser)
             try:
                 check_welcome(browser)  # first, while the test database has no name
                 page = browser.new_page(viewport={"width": 1280, "height": 900}, permissions=["microphone"])
@@ -1929,6 +2007,8 @@ def main() -> int:
                 check_friend(browser, test_env["DATABASE_PATH"])
                 check_every_screen(browser)
                 check_buddy_states(browser)
+                check_installable(browser)
+                check_her_data(browser, test_env["DATABASE_PATH"])  # last: it wipes the demo week
             finally:
                 browser.close()
 
@@ -1966,7 +2046,9 @@ def main() -> int:
             "turn to the chat, only silence while Buddy speaks, listens again, Pause, tap-to-talk without it), the "
             "emergency screen never "
             "moves, Auto theme follows the computer and the evening, every screen at 390/768/1440px in light and "
-            "dark, the orb's states and reduced motion look right, no layout problems. Screenshots in test-output/."
+            "dark, the orb's states and reduced motion look right, the app is installable (the shell kept on the device, "
+            "never /api, the offline note), Her data (one zip export with her photo, Delete everything with the word "
+            "DELETE, then the welcome), no layout problems. Screenshots in test-output/."
         )
         return 0
     finally:

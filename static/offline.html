@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<!-- Grandma Buddy: shown by the service worker (sw.js) when the app's own
+     server isn't answering and the page itself isn't kept yet. Plain words,
+     big, with nothing to tap but the call note. -->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buddy isn’t running · Grandma Buddy</title>
+  <meta name="theme-color" content="#F7F7F5">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    body { display: grid; place-items: center; min-height: 100dvh; padding: 24px; font-family: Figtree, system-ui, sans-serif; background: #F7F7F5; color: #1C1B19; }
+    .quiet { display: grid; gap: 16px; max-width: 32rem; text-align: center; justify-items: center; }
+    .quiet h1 { font-size: 2rem; font-weight: 650; letter-spacing: -0.02em; }
+    .quiet p { font-size: 1.25rem; line-height: 1.5; }
+    .quiet a { color: inherit; font-weight: 600; text-underline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <main class="quiet">
+    <div class="orb-mark" aria-hidden="true" style="width: 96px; height: 96px;"></div>
+    <h1>Buddy isn’t running right now</h1>
+    <p>Buddy runs on this computer, and it looks like it’s stopped. Ask a family member to start it, then open Buddy again.</p>
+    <p>Your pill times and everything Buddy wrote down are safe. In an emergency, <a href="tel:911">call 911</a>.</p>
+  </main>
+</body>
+</html>

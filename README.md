@@ -26,6 +26,8 @@ I'm building this for my grandma. She is often lonely, struggles to use her phon
 - **Today's weather and news.** "What's the weather today?" or "Anything happening in town?": Buddy looks it up on the web near her town and says it in a sentence or two, showing where it read it. Home starts its Today list with the weather. Never anything about health.
 - **Help and how Buddy works.** Shows every feature with the Meta model behind it (read from the app's own settings), what Buddy never does, privacy in plain words, and common questions.
 - **Safety net.** If she mentions emergency warning signs, crisis words, or a medication mix-up, a fixed screen with big Call 911, Call 988, or Call Poison Control buttons appears.
+- **Installs like an app.** "Install app" in Chrome or Edge puts Buddy's orb on her home screen or desktop, opening full screen. The app shell is kept on the device (never her data), so Buddy opens even when its server is stopped and says so. With no internet, a line at the top says what still works.
+- **Her data is hers.** In Settings, a family member can export everything as one zip (the database and her pictures) or delete everything, after typing DELETE.
 
 ## It never gives medical advice
 
@@ -68,7 +70,7 @@ python -m venv .venv                                     # once: the project's P
 .venv\Scripts\python -m uvicorn app.main:app --reload    # start the app
 ```
 
-Before the first start, copy `.env.example` to `.env` and put your key on its `MODEL_API_KEY=` line. (Optional: a Stripe *test* key on the `STRIPE_SECRET_KEY=` line turns the family page's demo-mode plan into a real test-mode checkout; a live key refuses to start.) Then open http://localhost:8000 in Chrome or Edge and allow the microphone. http://localhost:8000/about is the landing page, for the family member setting Buddy up, with Privacy and Terms in plain words. Without the natural voice, Buddy speaks with the browser's own voice (Edge has the warmest ones).
+Before the first start, copy `.env.example` to `.env` and put your key on its `MODEL_API_KEY=` line. (Optional: a Stripe *test* key on the `STRIPE_SECRET_KEY=` line turns the family page's demo-mode plan into a real test-mode checkout; a live key refuses to start.) Then open http://localhost:8000 in Chrome or Edge and allow the microphone. To put Buddy on the desktop like an app, use the browser's **Install app** (the icon at the right end of the address bar, or the browser menu). http://localhost:8000/about is the landing page, for the family member setting Buddy up, with Privacy and Terms in plain words. Without the natural voice, Buddy speaks with the browser's own voice (Edge has the warmest ones).
 
 Checks: `.venv\Scripts\python -m pytest` runs the tests (Meta is always faked), and `.venv\Scripts\python scripts\browser_checks\home.py` clicks through every screen in a real browser (no key needed). The `scripts\check_*.py` scripts each make a few real Meta calls by hand, and say what they cost.
 

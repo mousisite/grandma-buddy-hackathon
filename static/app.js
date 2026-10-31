@@ -320,7 +320,28 @@ function endPress() {
   });
 }
 
+// ---------- Installed, and offline ----------
+
+// The app shell is kept on this device by a service worker (sw.js), so
+// Buddy opens from its icon even when its server is stopped, and says so.
+function keepTheShell() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(function () {
+      // Not allowed here (an old browser, or not localhost): Buddy works as before.
+    });
+  }
+}
+
+// No internet: the note at the top says what still works.
+function showOnline() {
+  document.getElementById("offline-note").hidden = navigator.onLine !== false;
+}
+
 function start() {
+  keepTheShell();
+  showOnline();
+  window.addEventListener("online", showOnline);
+  window.addEventListener("offline", showOnline);
   applyTheme();
   applyCalm();
   computerWantsLessMotion.addEventListener("change", applyCalm);

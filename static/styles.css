@@ -2966,6 +2966,22 @@ label.group-row .group-label {
   }
 }
 
+/* No internet: one calm line across the top, in words (never color alone). */
+.offline-note {
+  margin: 0;
+  padding: var(--s-3) var(--s-5);
+  background: var(--tint);
+  color: var(--text);
+  font-size: var(--t-15);
+  text-align: center;
+}
+
+/* "Type DELETE": the one box on the delete sheet. */
+#delete-word {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 /* Settings, Family accounts: the invite code, big and spaced out, so it is
    easy to read out loud. */
 .invite {

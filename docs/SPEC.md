@@ -198,6 +198,13 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - Buddy never says who anyone is, never reads writing in the photo, and never mentions health, age, or looks; a description that breaks a rule is dropped for fixed words.
 - Done when: the person check (both ways, and SAM down), the description's checks, the page from a photo, and the day-old cleanup are tested with Meta faked; `scripts/check_photo_memory.py` runs the real SAM and Spark on two made-up photos; and the browser check covers the button, the talk's opening, and the finished page.
 
+### 21. An installable app, offline states, and her data (P1)
+
+- Buddy installs like an app: a manifest with icons drawn from Buddy's own orb, opening full screen from her home screen or desktop ("Install app" in Chrome or Edge). A service worker keeps the app shell (the page, styles, scripts, fonts, icons) on the device, network first, so a change arrives at once; it never keeps anything under `/api/`. When the app's own server isn't running, a plain page says so ("Buddy isn't running right now") with the 911 note.
+- No internet: a calm line at the top says what still works (pill reminders, the safety net) and what doesn't (talking with Buddy). Each feature keeps its own kind words when the internet or the AI is down.
+- "Her data" in Settings, for a family member: **Export everything** (one zip: a whole copy of the database, her memory book pictures and photos, and a README; never `.env`, never backups) and **Delete everything** (a sheet that asks for the word DELETE, typed; then every table emptied, ids from 1 again, the file shrunk, pictures, photos, and old backups gone, this device's remembered choices cleared, and Buddy opens on the welcome).
+- Done when: export and delete are tested (the zip's contents, the exact word, the empty tables and the shrunk file, another website refused), the manifest's icons exist and the service worker never caches `/api`, and the browser check covers the worker on duty with the shell kept, the offline note, a real download, and the delete sheet ending on the welcome.
+
 ## Not building (out of scope)
 
 - Any medical advice: saying how serious a symptom is, what causes it, or what to do about it

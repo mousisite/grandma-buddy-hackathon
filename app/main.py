@@ -15,8 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from app import db, security
 from app.config import get_settings
 from app import voice
-from app.routes import (billing, briefing, checkin, companion, diary, family, family_accounts, find, how, learned,
-                        listen, meds, memories, notes, profile, read, scam)
+from app.routes import (billing, briefing, checkin, companion, data, diary, family, family_accounts, find, how,
+                        learned, listen, meds, memories, notes, profile, read, scam)
 from app.routes import voice as voice_routes
 
 # The folder with index.html, styles.css, and app.js.
@@ -73,6 +73,8 @@ app.include_router(read.router)
 app.include_router(family_accounts.router)
 # The Family plan: Stripe's checkout in test mode, or demo mode with no key.
 app.include_router(billing.router)
+# Her data: export everything as one zip, or delete everything.
+app.include_router(data.router)
 
 
 @app.middleware("http")
@@ -100,7 +102,7 @@ async def always_check_for_updates(request, call_next):
     ("no-cache"), so a browser never keeps running an old copy after the app
     changes. Unchanged files just get a quick "not modified" answer."""
     response = await call_next(request)
-    if request.url.path == "/" or request.url.path in PAGES or request.url.path.startswith("/static/"):
+    if request.url.path in ("/", "/sw.js") or request.url.path in PAGES or request.url.path.startswith("/static/"):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
@@ -139,6 +141,13 @@ def terms():
 def family_page():
     """The family page: sign in, and her day as she shares it."""
     return FileResponse(STATIC_DIR / PAGES["/family"])
+
+
+@app.get("/sw.js")
+def service_worker():
+    """The service worker that keeps the app shell on her device (static/sw.js).
+    Served from the root, so it may look after every page of the app."""
+    return FileResponse(STATIC_DIR / "sw.js", media_type="text/javascript")
 
 
 # Serves styles.css, app.js, and later recorder.js and speech.js.

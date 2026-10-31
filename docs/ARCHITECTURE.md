@@ -71,6 +71,7 @@ grandma-buddy-hackathon/
     memories.py              the Memory book: write the page (checked: only her names and numbers, no advice), paint it, the picture style
     briefing.py              today's weather, a cheerful local story, or sports, looked up on the web for her town (our code writes the question), checked (no links, no health or advice, 2 sentences), kept 3 hours, 30 searches a day at most
     finder.py                Find my things: what she's looking for as a short noun phrase, SAM's answer line, the surest match, Spark's sentence (checked) or plain words
+    her_data.py              export everything (a whole copy of the database by SQLite's own backup, her pictures, a README) and delete everything (tables emptied, VACUUM, pictures, backups, the voice's cache)
     billing.py               the Family plan: Stripe's hosted Checkout in test mode only (a session opened, the return checked with Stripe before the plan is recorded, cancel at the end of the period), or demo mode with no key
     accounts.py              family accounts: invite codes (six letters, 24 hours, one use), scrypt password hashes, session tokens (hashed, 30 days), five tries then 15 minutes
     reader.py                Read it to me: Spark reads a photo of a paper into a strict form; plain code decides what she hears (health papers never explained, every summary sentence checked, printed numbers only, scam signs said, a scam's number never read out)
@@ -91,6 +92,7 @@ grandma-buddy-hackathon/
       read.py                /api/read (reader.read; the photo and the paper's words are never saved)
       family_accounts.py     /api/family/invite, accounts (Rose's Settings); /api/family/account, sign-in, sign-out, me, dashboard (the family page)
       billing.py             /api/billing (the plan), /checkout, /demo, /cancel; GET /billing/return (back from Stripe's page)
+      data.py                /api/data/export (one zip of everything), /api/data/delete (with the word DELETE)
       briefing.py            /api/briefing/{weather,news,sports} for Home's weather row
       listen.py              /api/listen (WebSocket): hands-free talking, her microphone live to Meta's realtime speech-to-text and her words back; only Buddy's own page, one at a time, 15 minutes at most
       voice.py               /api/voice (is the natural voice here, which voices), /api/speak (words in, WAV out)
@@ -112,6 +114,10 @@ grandma-buddy-hackathon/
     landing.css              the layout of those three pages (tokens, fonts, buttons, and the orb come from styles.css)
     landing/                 the landing's phone screens: PNGs of the made-up demo week, made by scripts/landing_shots.py
     family.html, family.js, family.css  the family page (/family): join with a code or sign in, then her day as she shares it, with notifications on that device
+    herdata.js               Settings, "Her data": the delete sheet that asks for the word DELETE (export is a plain link)
+    sw.js                    the service worker (served at /sw.js): the app shell kept on the device, network first, never /api; the "Buddy isn't running" page when the server is down
+    offline.html             that page
+    manifest.webmanifest, icons/  the installable app's name and icons (Buddy's orb, drawn by scripts/make_icons.py)
     sharing.js               Settings, "Family accounts": the invite code, who can sign in (Remove), the hidden-reminder switch's permission, and the pill notification while Buddy is hidden
     screens.js               the other screens: diary timeline, pills (ring, round checks) and reminder card, family, Memory book, settings, toasts
     recorder.js              microphone -> 16 kHz mono 16-bit WAV
@@ -239,6 +245,9 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `POST /api/billing/checkout` | | `{"url"}` of Stripe's test-mode Checkout page ($9 a month, subscription, this family member's id as the reference), or `{"demo": true}` with no key; 503 with a kind sentence when Stripe can't be reached |
 | `POST /api/billing/demo`, `POST /api/billing/cancel` | | demo mode only: the plan with one tap (400 with a real key); cancel at the end of the period (Stripe is told in test mode) |
 | `GET /billing/return?session_id=` | Stripe's redirect | asks Stripe about the session; records the plan only if it is test-mode, complete, paid, this family member's, a subscription, and $9; then 303 to `/family#billing` (or `#billing-problem`, nothing recorded; `/family` when not signed in) |
+| `GET /api/data/export` | | one zip (`grandma-buddy-<date>.zip`): `grandma-buddy.db` (a whole copy), `memories/…` (paintings and her photos), `README.txt`. Never `.env`, never backups |
+| `POST /api/data/delete` | `{"confirm": "DELETE"}` | everything gone, as on the first day (400 unless the word is exactly DELETE) |
+| `GET /sw.js` | | the service worker, from the root so it may look after every page; always checked for a newer version |
 | `GET /api/family/dashboard?date=` | a day in the last 30 days (today by default) | her day as she shares it: `{"her_name", "day", "day_words", "shares": {mood, pills, diary, safety}, "mood", "pills": {"taken", "total", "not_taken"}, "diary", "safety" (kind and time as a fixed sentence, never her words), "memories", "talked", "alerts"}`; a part she doesn't share is null. 401 without a session |
 | `GET /api/voice` | | `{"available", "default", "voices": [{"id", "name"}]}`: is Buddy's natural voice set up on this computer, and which voices she can choose (Heart, Bella, Nicole, Emma (British), Michael) |
 | `POST /api/speak` | `{"text", "voice", "speed"}` (a sentence, up to 600 characters; speed 0.6 to 1.4) | the words as a WAV (24 kHz mono). 503 when the natural voice isn't set up or fails: the page then uses the browser voice. The words are in the body, never the address, so they never show in the server log. The same words are made once (a cache of 64), and the model loads in the background when the app starts |
