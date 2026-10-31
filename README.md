@@ -10,7 +10,7 @@ I'm building this for my grandma. She is often lonely, struggles to use her phon
 
 ## What it does
 
-- **Talks with her.** She taps one big button and speaks. It answers in a warm voice and in big text.
+- **Talks with her, hands-free.** She taps one big button once and just talks: her words appear as she says them, Buddy answers when she stops (in a warm voice and big text), then listens again. Buddy never listens while it is talking itself, and she can pause any time.
 - **Daily check-in.** Asks how she feels, whether anything hurts, and whether she took her pills.
 - **Symptom diary.** She describes what she's feeling, and it writes it down in her own words for her doctor and family.
 - **Pill reminders.** Spoken reminders with "I took it" and "Remind me in 10 minutes".
@@ -30,7 +30,7 @@ The AI listens, writes things down, reminds, and connects her to real people: fa
 
 ## How it uses Meta's models
 
-- **Muse Voice Transcribe** turns her speech into text, with keyword biasing so her medication and family names come out right.
+- **Muse Voice Transcribe** turns her speech into text, with keyword biasing so her medication and family names come out right. Live, over Meta's realtime WebSocket in ENDPOINTING mode: her words stream back as she speaks, and Meta hears when she has finished her turn, so she never has to tap. The key stays on our server, which relays her microphone.
 - **Muse Spark 1.3** runs the conversation, calls tools to write diary entries, track pills, save doctor questions, remember her life, and open Find my things (function calling), returns scam verdicts, doctor notes, and Memory book pages as structured JSON, and looks at photos: messages she wants checked, and the room where she lost something, to say where it is in plain words.
 - **SAM 3.1** (Segment Anything) finds the thing she lost in her photo from a short text prompt ("glasses"), so Buddy can draw a glowing halo in its own orb colors right around it. Her photo is sent with `store=false` and is never saved.
 - **Muse Image** paints one soft watercolor picture for each Memory book page.

@@ -69,7 +69,7 @@ function showVoiceLevel() {
     page.style.setProperty("--level", "0");
     return;
   }
-  shownLevel = shownLevel * 0.85 + voiceLevel() * 0.15;
+  shownLevel = shownLevel * 0.85 + (handsFreeOn() ? handsFree.level : voiceLevel()) * 0.15;
   page.style.setProperty("--level", shownLevel.toFixed(3));
   requestAnimationFrame(showVoiceLevel);
 }
@@ -153,23 +153,44 @@ function startTalkFromToday() {
 }
 
 function onTalkTap() {
+  if (handsFreeOn()) {
+    handsFreeTap(); // listen.js: stop Buddy so she can talk, or pause
+    return;
+  }
   if (talkState === "idle") {
     // Stop Buddy talking first, so the microphone never hears Buddy's voice.
     stopSpeaking();
-    setTalkState("working"); // ignore extra taps while the microphone opens
-    startRecording()
-      .then(function () {
-        setTalkState("listening");
-        talkTimer = setTimeout(finishTalking, TALK_LIMIT_MS);
-      })
-      .catch(function (reason) {
-        talkProblem(reason);
-        setTalkState("idle");
+    if (handsFreeWanted()) {
+      // Talk without tapping (listen.js). Where live speech-to-text can't
+      // be used, tap to talk instead.
+      startHandsFree().catch(function (reason) {
+        if (reason.name === "NoLiveSound") {
+          startRecordingTalk();
+        } else if (reason.name !== "Stopped") {
+          talkProblem(reason);
+        }
       });
+      return;
+    }
+    startRecordingTalk();
   } else if (talkState === "listening") {
     finishTalking();
   }
   // While "working", extra taps do nothing.
+}
+
+// Tap to talk: record until she taps "I'm done".
+function startRecordingTalk() {
+  setTalkState("working"); // ignore extra taps while the microphone opens
+  startRecording()
+    .then(function () {
+      setTalkState("listening");
+      talkTimer = setTimeout(finishTalking, TALK_LIMIT_MS);
+    })
+    .catch(function (reason) {
+      talkProblem(reason);
+      setTalkState("idle");
+    });
 }
 
 function finishTalking() {
@@ -532,6 +553,7 @@ var SAFETY_TITLES = {
 // A full-screen message with big call buttons, read aloud. It appears at
 // once, with no movement, and stays until she taps "Go back".
 function openSafetyScreen(kind, message, actions) {
+  stopHandsFree(); // the microphone goes off: she has someone to call
   var screen = document.getElementById("safety-screen");
   screen.setAttribute("data-kind", kind);
   document.getElementById("safety-title").textContent = SAFETY_TITLES[kind] || "Help";
@@ -585,7 +607,9 @@ function talkProblem(reason) {
 // otherwise it closes voice mode, like Done. While Buddy is thinking,
 // taps do nothing.
 function onOrbTap() {
-  if (talkState === "listening") {
+  if (handsFreeOn()) {
+    handsFreeTap();
+  } else if (talkState === "listening") {
     finishTalking();
   } else if (talkState === "idle") {
     location.hash = "#/";
@@ -593,6 +617,7 @@ function onOrbTap() {
 }
 
 function startTalking() {
+  startHandsFreeListening(); // listen.js
   document.getElementById("talk-button").addEventListener("click", onTalkTap);
   document.querySelectorAll("[data-talk-start]").forEach(function (button) {
     button.addEventListener("click", startTalkFromToday);

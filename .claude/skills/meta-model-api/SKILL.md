@@ -175,7 +175,7 @@ def transcribe(wav_bytes: bytes, keywords: list[str]) -> str:
 - Errors: 400 (not a supported WAV, longer than 10 minutes, or not multipart), 406 (unsupported `Accept`), 413 (over 32 MB), 429 (too many at once; wait and retry with backoff), 500 (failed; show a friendly "please try again").
 - Supported languages (25): Arabic, Bengali, Dutch, English, French, German, Hebrew, Hindi, Indonesian, Italian, Japanese, Kannada, Korean, Malay, Mandarin Chinese, Marathi, Polish, Portuguese, Spanish, Tagalog, Tamil, Telugu, Thai, Turkish, Vietnamese.
 - `languageBias` and `keywords` are hints. Recognition is biased toward them, not forced.
-- A realtime WebSocket endpoint (`wss://api.meta.ai/v1/asr/realtime`) exists for live streaming. Tap-to-talk does not need it.
+- A realtime WebSocket endpoint (`wss://api.meta.ai/v1/asr/realtime`) streams live: see "Live speech-to-text" below (hands-free talking uses it; tap-to-talk does not).
 
 ## Browser side: making the WAV (`static/recorder.js`)
 
@@ -216,6 +216,30 @@ line = response.output_text  # "" when nothing matched
 - No threshold or "max objects" input exists: every match comes back, so filter by `c` in our code (`finder.best_match`, at least 0.5).
 - The mask's base85 encoding isn't documented, and Meta's `meta-sam-parser` has no published license, so we don't use masks: the page draws a halo around the box.
 - $0.0025 per image. Retries on 429 like chat.
+
+## Live speech-to-text: realtime WebSocket (`meta_client.open_listening`)
+
+Checked against Meta's realtime docs and with real calls (`scripts/check_realtime.py`, also `--relay` through our `/api/listen`), October 31, 2026.
+
+```python
+socket = await websockets.asyncio.client.connect("wss://api.meta.ai/v1/asr/realtime", open_timeout=10)
+await socket.send(json.dumps({
+    "authorization": {"accessToken": f"Bearer {key}"},   # in the first message: Meta reads no HTTP header here
+    "audioEncoding": "PCM_16KHZ",                        # or PCM_24KHZ (native); no default
+    "model": "muse-voice-transcribe-1.0",
+    "mode": "ENDPOINTING",                               # it hears where each turn starts and ends
+    "partialMode": "CUMULATIVE",                         # each live update is the whole turn so far
+    "emitAudioProgress": False,
+    "languageBias": ["English"], "keywords": [...],
+}))
+answer = json.loads(await socket.recv())  # {"sessionId": ...}: the ONLY message with no "type"
+```
+
+- Within 10 seconds of opening. An error event also carries a `sessionId` (empty), so "ready" means no `type` and a real `sessionId`.
+- Then binary frames of raw 16-bit little-endian mono PCM, about real time (80 ms each works). Meta needs sound all the time: send silence (zeros), not nothing, while Buddy speaks, or it closes the stream. Never more than 5 seconds ahead.
+- Events (JSON text): `speechStart` (`turnId`), `transcript` (`transcript`, `final`; partials, no `turnId`), `speechEnd`, `speechComplete` (`turnId`, `transcript`: the turn's final words), `error` (just before a close). Many turns per session. `{"type": "endStream"}` ends the session (Meta closes with 1000). Close codes: 1008 bad request or pacing, 1011 server (or 60 minutes), 1013 rate limited.
+- Real timing: connecting and the handshake took about 4 seconds (open it when the talk screen opens, before she speaks); live words every 0.3 seconds; each turn's `speechComplete` about 1 second after she stopped talking.
+- The key would be exposed in a browser, so the page talks to our relay and the relay to Meta. $0.18 per hour of sound.
 
 ## Web search grounding: Responses API `web_search` (`meta_client.search`)
 

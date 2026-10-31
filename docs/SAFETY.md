@@ -108,6 +108,14 @@ After a crisis response, keep the conversation open and gentle. Never end it abr
 - **Always the same rules:** the prompt keeps every rule above word for word, and the advice guard still checks every reply. The guard also replaces "I'm all you need", "you only need me", and "you don't need anyone" with the fixed gentle reply.
 - **When she sounds lonely or sad, Buddy listens first:** in its first reply it only asks a gentle question. It then suggests one real connection once. If she says no or doesn't want to bother them, it doesn't suggest that person again or show their call button in that talk; it may mention a friend, a neighbor, or a senior center once. Checked with the real AI in `scripts/try_companion.py`.
 
+## 7d. Talking without tapping (hands-free)
+
+- Her finished words go to `/api/chat` like any others, so the safety net checks every turn before any AI. The live words she sees while talking are only shown on her screen: never saved, never sent to the AI.
+- A short pause in the middle of her sentence doesn't split it: after Meta ends a turn, Buddy waits 0.8 seconds, and if she goes on, the parts are joined, so the safety net sees the whole sentence ("my chest" … "hurts a lot"). Words that still arrive while Buddy is thinking are sent right after its answer, never dropped. (Found by `/safety-check`; checked in a real browser.)
+- Buddy never listens while it is speaking or thinking: only silence is sent then, so Buddy's own voice (a safety message, a pill reminder) can never be heard as her words. When a safety screen opens, the microphone goes off.
+- It listens only while the talk screen is open and the page is in front, stops after a minute of quiet or when she taps Pause, and a session lasts 15 minutes at most. The sound goes to Meta's realtime speech-to-text through our server (`/api/listen`), which passes it on as it is and never saves or prints it. Only Buddy's own page can open it.
+- Anywhere it can't work (no key, Meta down, an older browser), she taps to talk as before.
+
 ## 7a. The advice guard (`app/guard.py`)
 
 Every AI reply is checked by plain rules after it is written and before she sees or hears it. Dose amounts, instructions near a health action ("you should rest", "try ice", "have you tried resting it?"), guesses at a cause or condition ("could be a sprain", "caused by", "probably nothing"), and medicines or remedies that aren't her own pills are replaced with the fixed reply from section 2. Whenever she asks for advice herself ("should I…", "can I take…", "is it OK to…"), Call {doctor_name}, Call {family_name}, and "Add to doctor notes" are always shown. Side effects and missed doses always add the fixed lines from section 5. `scripts/check_advice.py` (run by hand) sends the section 10 phrases to the real model to confirm.

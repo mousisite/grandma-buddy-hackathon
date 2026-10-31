@@ -142,6 +142,17 @@ def close_ups(browser) -> list[str]:
         page.wait_for_timeout(600)
         saved.append(close_up(page, "[data-screen='talk']", f"demo-fix-sources-{width}.png"))
 
+        # Talking without tapping: her words as she says them (made up: no
+        # microphone here), "Pause" on the button, the orb listening.
+        page.goto(f"http://localhost:{PORT}/#/talk", wait_until="load")
+        wait_for_screen(page, "talk")
+        page.add_style_tag(content=".pill-banner { display: none !important; }")
+        page.evaluate("showActions([]); setTalkState('listening'); showLiveWords('Do you know what the weather is like');"
+                      "document.getElementById('talk-label').textContent = 'Pause';"
+                      "document.getElementById('talk-button').setAttribute('data-hands-free', 'her')")
+        page.wait_for_timeout(600)
+        saved.append(close_up(page, "[data-screen='talk']", f"demo-fix-handsfree-{width}.png"))
+
         page.goto(f"http://localhost:{PORT}/#/family", wait_until="networkidle")
         wait_for_screen(page, "family")
         page.wait_for_function("document.getElementById('update-text').textContent.includes('Pills: ')")

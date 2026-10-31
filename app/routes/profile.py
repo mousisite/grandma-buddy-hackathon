@@ -75,7 +75,7 @@ def update_profile(changes: dict = Body(...)):
             if field == "family_email" and not EMAIL.match(value):
                 refuse(field, "It looks like name@example.com.")
             clean[field] = value
-        elif field in ("voice_on", "calm_mode", "chime"):  # on/off switches
+        elif field in ("voice_on", "calm_mode", "chime", "hands_free"):  # on/off switches
             if not isinstance(value, bool):
                 refuse(field)
             clean[field] = int(value)

@@ -234,7 +234,9 @@
       </div>
       <div class="voice-controls">
         <button id="talk-button" class="pill-button pill-button--ink pill-button--hero" type="button" data-state="idle">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+          <svg class="icon talk-icon-mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+          <!-- Hands-free, while Buddy listens: "Pause". -->
+          <svg class="icon talk-icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect></svg>
           <span class="talk-text">
             <span id="talk-label">Tap to talk</span>
             <span id="talk-hint" class="talk-hint">Buddy writes down what you say</span>
@@ -603,7 +605,7 @@
           </details>
           <details class="faq-item">
             <summary class="faq-question">Does Buddy listen all the time?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
-            <p class="faq-answer">No. Buddy listens only after you tap Talk to Buddy, and stops when you are done.</p>
+            <p class="faq-answer">No. Buddy listens only while the talk screen is open, and never while it is talking itself. It stops when you tap Pause or leave the talk screen, and after a minute of quiet.</p>
           </details>
           <details class="faq-item">
             <summary class="faq-question">Who can see my diary?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
@@ -764,6 +766,11 @@
           <label class="group-row">
             <span class="group-label">Read replies aloud</span>
             <input class="switch" name="voice_on" type="checkbox" role="switch">
+          </label>
+          <!-- listen.js: Buddy listens until she stops talking, then answers. -->
+          <label class="group-row">
+            <span class="group-label">Talk without tapping<span class="group-hint">Buddy listens until you stop talking, then answers. Turn it off to tap each time.</span></span>
+            <input class="switch" name="hands_free" type="checkbox" role="switch">
           </label>
           <!-- Buddy's voice: every English voice this browser has, best first
                (speech.js, screens.js). Kept on this device. -->
@@ -939,6 +946,7 @@
   <script src="/static/buddy.js"></script>
   <script src="/static/speech.js"></script>
   <script src="/static/talk.js"></script>
+  <script src="/static/listen.js"></script>
   <script src="/static/screens.js"></script>
   <script src="/static/sayit.js"></script>
   <script src="/static/welcome.js"></script>

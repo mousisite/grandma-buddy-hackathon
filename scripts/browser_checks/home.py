@@ -6,6 +6,7 @@
 # Needs no API key and never calls Meta: the speech-to-text answer is faked.
 # It starts its own test server on port 8001.
 
+import json
 import os
 import re
 import struct
@@ -1091,6 +1092,144 @@ def check_today_rows(browser) -> None:
     page.close()
 
 
+def check_hands_free(browser) -> None:
+    """Hands-free talking, with the relay to Meta faked (Playwright stands in
+    for /api/listen): Talk to Buddy opens the microphone and the relay; her
+    words show live as she talks; her finished turn goes to /api/chat (the
+    safety net first) and Buddy answers; while Buddy speaks, only silence is
+    sent (the microphone never hears Buddy); then it listens again; Pause
+    stops it. Without live speech-to-text, it falls back to tap-to-talk."""
+    page = browser.new_page(viewport={"width": 390, "height": 844}, permissions=["microphone"])
+    chats = []
+
+    def fake_chat(route):
+        chats.append(route.request.post_data_json)
+        route.fulfill(json={"reply": "It's sunny today, with a high of 62.", "show": None, "actions": []})
+
+    page.route("**/api/chat", fake_chat)
+    page.route("**/api/greeting", lambda route: route.fulfill(json={"greeting": ""}))
+    frames = {"her": 0, "silence": 0}
+    relay = {}
+
+    def fake_relay(socket):
+        relay["socket"] = socket
+        socket.send(json.dumps({"type": "ready"}))
+
+        def heard(message):
+            if isinstance(message, bytes):
+                frames["her" if any(message) else "silence"] += 1  # all zeros is silence
+
+        socket.on_message(heard)
+
+    page.route_web_socket("**/api/listen", fake_relay)
+    page.goto(f"http://localhost:{PORT}/", wait_until="networkidle")
+    # Buddy's voice, faked: 1.5 seconds of "speaking" for each reply.
+    page.evaluate(
+        "window.fakeSpeaking = false;"
+        "window.isSpeaking = function () { return fakeSpeaking; };"
+        "window.speak = function (text, options) {"
+        "  fakeSpeaking = true;"
+        "  setTimeout(function () { fakeSpeaking = false; if (options && options.onEnd) { options.onEnd(); } }, 1500);"
+        "}; 0")
+    page.click("#start-talk")
+    page.wait_for_function("handsFreeOn() && talkState === 'listening'", timeout=15000)
+    assert page.text_content("#talk-label") == "Pause"
+    # The fake microphone beeps about once a second (silent between beeps).
+    def her_sound_after(count: int) -> bool:
+        for _ in range(50):
+            if frames["her"] > count:
+                return True
+            page.wait_for_timeout(100)
+        return False
+
+    assert her_sound_after(0), f"her sound should go to the relay: {frames}"
+
+    # She talks: her words show live, then her finished turn goes to Buddy.
+    relay["socket"].send(json.dumps({"type": "hearing"}))
+    relay["socket"].send(json.dumps({"type": "live", "text": "What is the weather"}))
+    page.wait_for_function("document.getElementById('you-said-text').textContent === 'What is the weather'")
+    assert "live" in (page.get_attribute("#you-said", "class") or "")
+    page.screenshot(path=str(OUT / "hands-free-live-390.png"))
+    relay["socket"].send(json.dumps({"type": "turn", "text": "What is the weather today?"}))
+    page.wait_for_function("document.getElementById('message').textContent.includes('sunny')")
+    assert chats[-1]["text"] == "What is the weather today?", chats[-1]
+    # While Buddy speaks, only silence goes out.
+    page.wait_for_function("fakeSpeaking === true")
+    before = dict(frames)
+    page.wait_for_timeout(700)
+    assert frames["her"] == before["her"] and frames["silence"] > before["silence"], (before, frames)
+    assert page.text_content("#talk-label") == "Stop and talk"
+    # Then it listens again by itself.
+    page.wait_for_function("talkState === 'listening' && !fakeSpeaking", timeout=10000)
+    assert her_sound_after(before["her"]), "listening again after Buddy spoke"
+    check_layout(page, "hands-free listening at 390px")
+    # A pause in the middle of a sentence: Meta may end her turn at the
+    # pause. The two parts reach Buddy together, so the safety net sees the
+    # whole sentence ("my chest" … "hurts a lot").
+    relay["socket"].send(json.dumps({"type": "turn", "text": "My knee"}))
+    page.wait_for_timeout(300)
+    relay["socket"].send(json.dumps({"type": "hearing"}))
+    relay["socket"].send(json.dumps({"type": "turn", "text": "hurts when I walk"}))
+    page.wait_for_function(f"document.getElementById('message').textContent.includes('sunny')")
+    page.wait_for_timeout(1200)
+    assert chats[-1]["text"] == "My knee hurts when I walk", chats[-1]
+    # A turn that arrives while Buddy is thinking waits its turn: never lost.
+    # (The chat holds each request until the check answers it.)
+    page.wait_for_function("talkState === 'listening' && !fakeSpeaking", timeout=10000)
+    held = []
+    page.unroute("**/api/chat")
+    page.route("**/api/chat", lambda route: held.append(route))
+
+    def held_count(count: int) -> None:
+        for _ in range(100):
+            if len(held) >= count:
+                return
+            page.wait_for_timeout(100)
+        raise AssertionError(f"expected {count} chat requests, got {len(held)}")
+
+    relay["socket"].send(json.dumps({"type": "turn", "text": "What day is it?"}))
+    held_count(1)
+    assert page.evaluate("talkState") == "working"
+    relay["socket"].send(json.dumps({"type": "turn", "text": "And is it raining?"}))
+    page.wait_for_timeout(300)
+    held[0].fulfill(json={"reply": "It's Friday.", "show": None, "actions": []})
+    held_count(2)
+    assert [route.request.post_data_json["text"] for route in held] == ["What day is it?", "And is it raining?"]
+    held[1].fulfill(json={"reply": "No rain today.", "show": None, "actions": []})
+    page.unroute("**/api/chat")
+    page.route("**/api/chat", fake_chat)
+
+    # Pause: the microphone goes off, and "Tap to talk" is back.
+    page.wait_for_function("talkState === 'listening'", timeout=15000)
+    page.click("#talk-button")
+    page.wait_for_function("!handsFreeOn() && talkState === 'idle'")
+    assert page.text_content("#talk-label") == "Tap to talk"
+
+    # A turn that needs the emergency screen: the screen opens, and the
+    # microphone goes off (she has a call to make).
+    page.unroute("**/api/chat")
+    page.route("**/api/chat", lambda route: route.fulfill(json={
+        "reply": "This could be an emergency. If it is, please call 911 right now.", "show": "emergency",
+        "actions": [{"label": "Call 911", "href": "tel:911"}]}))
+    page.click("#talk-button")
+    page.wait_for_function("handsFreeOn() && talkState === 'listening'", timeout=15000)
+    relay["socket"].send(json.dumps({"type": "turn", "text": "my chest feels really tight"}))
+    page.wait_for_selector("#safety-screen[open][data-kind='emergency']")
+    page.wait_for_function("!handsFreeOn()")
+    page.close()
+
+    # Where live speech-to-text can't be used, she simply taps to talk.
+    tap = browser.new_page(viewport={"width": 390, "height": 844}, permissions=["microphone"])
+    tap.route("**/api/greeting", lambda route: route.fulfill(json={"greeting": ""}))
+    tap.route_web_socket("**/api/listen", lambda socket: socket.send(json.dumps({"type": "unavailable"})))
+    tap.goto(f"http://localhost:{PORT}/", wait_until="networkidle")
+    tap.click("#start-talk")
+    tap.wait_for_selector("#talk-button[data-state='listening']")
+    assert not tap.evaluate("handsFreeOn()")
+    assert tap.text_content("#talk-label") == "I’m done"
+    tap.close()
+
+
 def check_help(browser) -> None:
     """Help on the demo week: opened from Settings on a phone (the tab bar
     keeps Settings lit), the 4 Meta models from the app's settings, every
@@ -1201,6 +1340,7 @@ def main() -> int:
                 check_layout(page, "desktop")
                 check_home_hero(browser)
                 check_check_in(browser)
+                check_hands_free(browser)
 
                 # Talk: speech-to-text and Buddy's AI reply are faked, so Meta
                 # is never called.
@@ -1357,7 +1497,9 @@ def main() -> int:
             "the demo week's done check-in and the hidden ?demo=reminder card (pops up after the first tap, said with "
             "her name, saves nothing), Help (from Settings and the sidebar, the 4 Meta models, "
             "every feature with its models or No AI, questions open, Call Maria), Home's weather row (read aloud by "
-            "a tap anywhere on it) and whole-row taps, a reply's web sources, the emergency screen never "
+            "a tap anywhere on it) and whole-row taps, a reply's web sources, hands-free talking (live words, her "
+            "turn to the chat, only silence while Buddy speaks, listens again, Pause, tap-to-talk without it), the "
+            "emergency screen never "
             "moves, Auto theme follows the computer and the evening, every screen at 390/768/1440px in light and "
             "dark, the orb's states and reduced motion look right, no layout problems. Screenshots in test-output/."
         )

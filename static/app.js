@@ -224,6 +224,10 @@ function showScreen(moveFocus) {
   if (name !== "talk" && talkState === "listening") {
     finishTalking();
   }
+  // Leaving voice mode stops hands-free listening (the microphone goes off).
+  if (name !== "talk") {
+    stopHandsFree();
+  }
   // Leaving voice mode ends a "Something hurts" talk or the check-in
   // (unless her last words are still on their way, which belong to it).
   if (name !== "talk" && talkMode !== "chat" && talkState === "idle") {

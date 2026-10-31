@@ -72,6 +72,14 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
 
+- Oct 31: **Talking without tapping** (feature 15), with **Meta's realtime speech-to-text** (a WebSocket in ENDPOINTING mode), a Meta capability the app didn't use yet.
+  - A 2-hour trial first (`scripts/check_realtime.py`): a clip in Buddy's own voice streamed to Meta came back live word by word, and each turn ended about 1 second after the talking stopped, word-perfect. Go.
+  - `/api/listen` relays her microphone to Meta (the key stays on the server; only Buddy's own page; one at a time; 15 minutes at most) and sends back live words and finished turns. Real check through the relay (`--relay`): both turns, word-perfect.
+  - The page (`static/listen.js`, `static/pcm-worklet.js`): 16 kHz sound from an AudioWorklet; live words under the orb; each turn to `/api/chat` (safety net first); only silence while Buddy thinks or speaks, so it never hears itself; listens again by itself; Pause, Stop and talk, a minute of quiet, leaving the screen, the page in the background, or a safety screen stop it. Without it, tap to talk as before. Settings: "Talk without tapping" (on).
+  - The voice screen: Buddy's short words in two lines on desktop (they were measured in the page's small letters), and the swelling glow no longer makes the phone screen scroll sideways (found by the new check).
+  - `/safety-check` found a gap: a pause mid-sentence could end her turn, and the rest arrived while Buddy was thinking and was dropped. Now the parts are joined (0.8 seconds), and words that arrive while Buddy thinks are sent next. The microphone also goes off when a safety screen opens. All checked in a real browser.
+  - Tests first: 7 new (handshake, a refused start, live words and a turn, other websites refused, the fallback, one at a time, the setting); browser check with the relay faked; Help's answer to "Does Buddy listen all the time?" updated.
+
 - Oct 31: **Today's weather, news, and sports** (feature 14), with **Meta's web search** (Responses API `web_search`), a Meta capability the app didn't use yet.
   - "What's the weather?", "Anything happening in town?", "How did the Blazers do?": a `look_up_today` tool (weather, news, or sports only; our code writes the question), answers checked by plain code (`app/briefing.py`: found on today's web, no links, no health or advice, 2 sentences), "From the web: …" under Buddy's words. Kept 3 hours, 30 searches a day at most; if a new look fails, today's last one is kept.
   - Home: the weather is the first Today row (tap anywhere on it to hear it), and every Today row is tappable as a whole, with chevrons (a design upgrade from the review). Her town is a new profile field in Settings; the demo week has Portland, Oregon.

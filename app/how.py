@@ -13,7 +13,7 @@ MODELS = [
     ("chat_model", "Thinks and talks: Buddy's words, check-in questions, doctor-note topics, scam checks, "
                    "Memory book pages, and where your things are. It also looks up today's weather and news "
                    "with Meta's web search."),
-    ("transcribe_model", "Hears you: turns what you say into words."),
+    ("transcribe_model", "Hears you: turns what you say into words, live, and hears when you've finished."),
     ("image_model", "Paints the pictures in your Memory book."),
     ("sam_model", "Finds your glasses or keys in a photo of the room."),
 ]
@@ -26,6 +26,13 @@ FEATURES = [
         "what": "You talk, and Buddy answers like a kind friend. It remembers what you share about your life.",
         "models": ["transcribe_model", "chat_model"],
         "here": "Buddy's natural voice speaks on this computer.",
+    },
+    {
+        "name": "Talking without tapping",
+        "what": "Buddy listens until you stop talking, then answers, and shows your words as you say them. "
+                "Tap Pause any time.",
+        "models": ["transcribe_model"],
+        "here": "Live speech-to-text from Meta. Buddy never listens while it is talking itself.",
     },
     {
         "name": "The safety net",

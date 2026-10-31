@@ -244,6 +244,8 @@ def init_db(db_path: str | None = None) -> None:
         add_column(connection, "doctor_questions", "asked_at", "TEXT NOT NULL DEFAULT ''")
         # Her town, for the weather and what's happening nearby: October 31.
         add_column(connection, "profile", "city", "TEXT NOT NULL DEFAULT ''")
+        # Talk without tapping (hands-free), on unless she turns it off: October 31.
+        add_column(connection, "profile", "hands_free", "INTEGER NOT NULL DEFAULT 1")
         # WAL mode lets one connection read while another writes. Writers
         # still take turns, so the companion saves after each round of tools
         # (app/companion.py) and never holds the lock while the AI thinks.
@@ -266,7 +268,7 @@ def get_profile(connection: sqlite3.Connection) -> dict:
     connection.execute("INSERT OR IGNORE INTO profile (id) VALUES (1)")
     row = connection.execute("SELECT * FROM profile WHERE id = 1").fetchone()
     profile = dict(row)
-    for switch in ("voice_on", "calm_mode", "chime"):
+    for switch in ("voice_on", "calm_mode", "chime", "hands_free"):
         profile[switch] = bool(profile[switch])
     return profile
 

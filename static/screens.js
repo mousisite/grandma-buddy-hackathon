@@ -212,13 +212,13 @@ function showPillBanner() {
   // someone is typing in a box. The banner is the first thing on the page,
   // so going to the top shows all of it (even while it is still easing in).
   var typing = document.activeElement && document.activeElement.matches("input, textarea, select");
-  if (which !== shownReminders && talkState === "idle" && !typing) {
+  if (which !== shownReminders && buddyMaySpeak() && !typing) {
     shownReminders = which;
     window.scrollTo(0, 0);
   }
   // It counts as read only once the voice really starts (Chrome stays
   // silent until her first tap), so a blocked reminder is tried again.
-  var quiet = talkState !== "idle" || safetySpeaking || isSpeaking() || pillState.after_poison_control;
+  var quiet = !buddyMaySpeak() || safetySpeaking || isSpeaking() || pillState.after_poison_control;
   if (which !== spokenReminders && !quiet) {
     speak(card.words, { onStart: function () { spokenReminders = which; } });
   }
@@ -247,8 +247,8 @@ function thankForAnswer(answer) {
   if (currentScreen() === "talk") {
     say(REMINDER_THANKS[answer]);
   }
-  if (talkState === "idle") {
-    speak(REMINDER_THANKS[answer]); // never into an open microphone
+  if (buddyMaySpeak()) {
+    speak(REMINDER_THANKS[answer]); // never into an open microphone (hands-free sends silence meanwhile)
   }
 }
 
@@ -1472,6 +1472,7 @@ function fillSettingsForm() {
   form.elements.calm_mode.checked = profile.calm_mode === true;
   showVoiceChoices();
   form.elements.chime.checked = profile.chime === true;
+  form.elements.hands_free.checked = profile.hands_free !== false;
   // The closest of Slower, Normal, Faster to the saved speed.
   var rate = Number(profile.voice_rate) || 0.9;
   var closest = VOICE_RATES.reduce(function (best, option) {
@@ -1780,14 +1781,14 @@ function startScreens() {
   document.getElementById("pill-snooze").addEventListener("click", function () { answerReminder("snooze"); });
   document.getElementById("pill-again").addEventListener("click", function () {
     var card = cardReminder();
-    if (card && talkState === "idle") {
+    if (card && buddyMaySpeak()) {
       speak(card.words); // never into an open microphone
     }
   });
   document.addEventListener("click", readWaitingReminder, true);
   document.querySelector(".today").addEventListener("click", tapWholeRow);
   document.getElementById("today-weather-say").addEventListener("click", function () {
-    if (todayWeather && talkState === "idle") {
+    if (todayWeather && buddyMaySpeak()) {
       speak(todayWeather);
     }
   });

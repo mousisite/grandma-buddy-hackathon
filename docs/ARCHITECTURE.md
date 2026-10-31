@@ -62,7 +62,7 @@ grandma-buddy-hackathon/
     security.py              only Buddy's own page may use /api: requests another website sends (Sec-Fetch-Site, Origin) and other host names are refused
     how.py                   "How Buddy works" for Help: every feature, the Meta models behind it (from the settings), what runs on this computer
     db.py                    SQLite connection, creates tables, small query helpers
-    meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), paint() (Muse Image), segment() (SAM 3.1), search() (Muse Spark with Meta's web search), transcribe()
+    meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), paint() (Muse Image), segment() (SAM 3.1), search() (Muse Spark with Meta's web search), transcribe(), open_listening() (live speech-to-text over a WebSocket)
     safety.py                emergency, crisis, and medication mix-up rules with fixed messages
     prompts.py               system prompts for companion, diary, scam, notes, family
     family.py                the family update: one day in plain words (plain code, no AI) and its mailto: link
@@ -84,6 +84,7 @@ grandma-buddy-hackathon/
       memories.py            /api/memories (the pages, a picture, save, paint again)
       find.py                /api/find (safety net first, then finder.find; the photo is never saved)
       briefing.py            /api/briefing/{weather,news,sports} for Home's weather row
+      listen.py              /api/listen (WebSocket): hands-free talking, her microphone live to Meta's realtime speech-to-text and her words back; only Buddy's own page, one at a time, 15 minutes at most
       voice.py               /api/voice (is the natural voice here, which voices), /api/speak (words in, WAV out)
       learned.py             /api/learned: what Buddy remembers and learned about her (Settings), forget, undo
       profile.py             /api/profile
@@ -111,6 +112,7 @@ grandma-buddy-hackathon/
     check_scam.py            hand-run: the SAFETY.md scam messages and one photo through the real AI (right verdicts?)
     check_notes.py           hand-run: the demo week's doctor notes grouped by the real AI (labels in her words?)
     check_memory.py          hand-run: two made-up memories written and painted by the real AI (about 3 cents), then screenshots
+    check_realtime.py        hand-run: a spoken clip in Buddy's own voice streamed to Meta's realtime speech-to-text (live words, end of each turn); `--relay` goes through our /api/listen (about $0.0005)
     check_briefing.py        hand-run: 3 real web searches (weather, local news, sports) for the demo town, Meta's answers and what Buddy would say after its checks (about 1 cent)
     check_find.py            hand-run: Find my things end to end in a browser with the real SAM 3.1 and Muse Spark on 4 test photos (about 2 cents; 4 more the first time, to paint them), then screenshots; `--only desk-glasses` runs one look
     find_photos/             the 4 test photos for check_find.py, painted with Muse Image for this project (rooms and a desk only, no people)
@@ -199,6 +201,7 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `POST /api/greeting` | `{"conversation_id"}` | `{"greeting"}`: at the start of a conversation (no talk in the last 2 hours), "Good afternoon, Rose!" plus a follow-up that's due (asked once) or a warm opener; plain words, no AI; saved in the conversation. Otherwise `""` |
 | `GET /api/learned` | | `{"facts": [{"id", "kind", "fact", "follow_up"}], "notes": [{"id", "note"}], "days_learned"}` for Settings |
 | `POST /api/learned/{facts or notes}/{id}/forget` and `/restore` | | "Forget this" and Undo |
+| `WS /api/listen` | 16 kHz 16-bit mono sound, 80 ms at a time (binary) | `{"type": "ready"}` once Meta listens, then `hearing` (she started), `live` (`text`: her words so far), `turn` (`text`: her finished turn), or `unavailable` (tap to talk instead). Refused (1008) from another website, and (1013) while another is open |
 | `GET /api/briefing/{topic}` | | `{"text", "sites"}`: today's weather (or news, sports) for her town, kept 3 hours. Empty (`"text": ""`) when there is nothing to show: no town yet, nothing found, or the search failed with nothing kept from today (normal for Home, so no error status). 404 only for an unknown topic |
 | `GET /api/how` | | `{"models": [{"id", "name", "does"}], "features": [{"name", "what", "models": [ids], "here"}]}`: for Help, the Meta models from the settings and every feature with the models behind it (none: it runs on this computer) |
 | `GET /api/voice` | | `{"available", "default", "voices": [{"id", "name"}]}`: is Buddy's natural voice set up on this computer, and which voices she can choose (Heart, Bella, Nicole, Emma (British), Michael) |

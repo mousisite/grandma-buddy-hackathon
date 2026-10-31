@@ -3,17 +3,21 @@
 # talks to api.meta.ai, and the browser never does, so the API key stays here.
 # Never print or log the API key.
 
+import asyncio
 import base64
 import json
 import time
 
 import openai
 import requests
+import websockets
 from openai import OpenAI
+from websockets.asyncio.client import connect as ws_connect  # tests replace this
 
 from app.config import get_settings
 
 BASE_URL = "https://api.meta.ai/v1"
+REALTIME_URL = "wss://api.meta.ai/v1/asr/realtime"  # live speech-to-text (hands-free talking)
 TIMEOUT_SECONDS = 60
 RETRIES = 3  # extra tries when Meta says it is too busy (HTTP 429)
 PAINT_TIMEOUT_SECONDS = 180  # painting takes longer than talking
@@ -302,3 +306,41 @@ def transcribe(wav_bytes: bytes, keywords: list[str]) -> str:
     if response.status_code != 200:
         raise MetaError(f"transcribe failed with HTTP {response.status_code}")
     return response.json().get("transcript", "").strip()
+
+
+async def open_listening(keywords: list[str]):
+    """Open Meta's realtime speech-to-text for hands-free talking: Muse Voice
+    Transcribe in ENDPOINTING mode, which hears where each of her turns
+    starts and ends. Returns the open connection, its handshake done: send it
+    16 kHz 16-bit mono sound, about in real time, and read its events
+    (live words, each turn's start and end, each turn's final words).
+
+    The key travels in the first message (Meta reads no header here), which
+    is why the page talks to our relay (app/routes/listen.py), never to Meta.
+    Costs $0.18 an hour of sound.
+    """
+    settings = get_settings()
+    if not settings.model_api_key:
+        raise MetaError("no API key is set up in .env")
+    handshake = {
+        "authorization": {"accessToken": f"Bearer {settings.model_api_key}"},
+        "audioEncoding": "PCM_16KHZ",
+        "model": settings.transcribe_model,
+        "mode": "ENDPOINTING",
+        "partialMode": "CUMULATIVE",  # each live update is the whole turn so far
+        "emitAudioProgress": False,
+        "languageBias": [settings.language],
+        "keywords": keywords,  # names she is likely to say (family, doctor, pills)
+    }
+    try:
+        socket = await ws_connect(REALTIME_URL, open_timeout=10, max_size=2**20)
+        await socket.send(json.dumps(handshake))
+        answer = json.loads(await asyncio.wait_for(socket.recv(), timeout=10))
+    except (OSError, asyncio.TimeoutError, ValueError, websockets.exceptions.WebSocketException) as problem:
+        raise MetaError(f"live speech-to-text failed: {type(problem).__name__}")
+    # Meta's "ready" answer is its only message with no "type": an error
+    # event carries a sessionId too (an empty one).
+    if not isinstance(answer, dict) or "type" in answer or not answer.get("sessionId"):
+        await socket.close()
+        raise MetaError("live speech-to-text refused to start")
+    return socket

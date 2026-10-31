@@ -135,6 +135,13 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - The safety net runs first on what she said. Her photo is never saved (and is sent to Meta with `store=false`). Buddy never reads labels, never says anything about medicines or health, and never describes people.
 - Done when: it works on 3 made-up test photos with the real SAM 3.1 (`scripts/check_find.py`), every Meta call has a mocked test, and the result screen is checked in a browser.
 
+### 15. Talking without tapping (P1)
+
+- In voice mode Buddy listens on its own: her words show live under the orb as she says them; when she stops talking (Meta's realtime speech-to-text hears the end of her turn), Buddy answers, then listens again. No tapping between turns.
+- Buddy and she never talk at once: while Buddy thinks or speaks, only silence is sent. The talk button says what a tap does now: "Pause" while Buddy listens, "Stop and talk" while Buddy speaks (Buddy stops and listens).
+- It stops after a minute of quiet, when she taps Pause, leaves the talk screen, puts the page in the background, or a safety screen opens. Settings has "Talk without tapping" (on); turned off, or where it can't work, it is tap to talk as before.
+- Done when: the relay is tested with a fake Meta, `scripts/check_realtime.py --relay` hears two real turns through our relay, and the browser check covers live words, a turn, silence while Buddy speaks, listening again, Pause, and the fallback.
+
 ### 14. Today's weather, news, and sports (P1)
 
 - "What's the weather today?", "Anything happening in town?", "How did the Blazers do?": Buddy looks it up on the web with Meta's web search (the Responses API's `web_search` tool) near her town, and says it in one or two warm sentences, with where it read it under its words ("From the web: weather.gov").
