@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<!-- Grandma Buddy: the landing page (/about), for the family member who
+     sets Buddy up. The same design system as the app (styles.css: tokens,
+     fonts, buttons, the orb) and its own layout (landing.css). The phone
+     screens are real screenshots of the made-up demo week
+     (scripts/landing_shots.py). Every claim here is true of the app today. -->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Grandma Buddy: a voice companion for someone you love</title>
+  <meta name="description" content="Grandma Buddy is a voice companion for an older adult who lives alone. She talks; Buddy listens, reminds her about her pills, keeps a diary for her doctor, and keeps her family in the loop. It never gives medical advice.">
+  <meta name="theme-color" content="#F7F7F5">
+  <!-- The theme before the first paint, like the app (index.html). -->
+  <script>
+    (function () {
+      var choice = "auto";
+      try { choice = localStorage.getItem("theme") || "auto"; } catch (e) {}
+      var hour = new Date().getHours();
+      var dark = choice === "dark" || (choice === "auto" && (matchMedia("(prefers-color-scheme: dark)").matches ||
+        (!matchMedia("(prefers-color-scheme: light)").matches && (hour >= 19 || hour < 7))));
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        document.documentElement.setAttribute("data-calm", ""); // the orb stands still
+      }
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/Figtree.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/static/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/landing.css">
+</head>
+<body>
+  <div class="site">
+    <header class="site-top">
+      <a class="brand" href="/about" translate="no"><span class="orb-mark" aria-hidden="true"></span>Grandma Buddy</a>
+      <a class="pill-button pill-button--ink" href="/">Open Buddy</a>
+    </header>
+
+    <main>
+      <!-- ========== The hero ========== -->
+      <section class="hero-split" aria-labelledby="hero-title">
+        <div>
+          <h1 id="hero-title" class="hero-title">Someone kind to talk to, every day.</h1>
+          <p class="hero-lead">Grandma Buddy is a voice companion for an older adult who lives alone. She just talks. Buddy listens, reminds her about her pills, writes down how she feels for her doctor, and sends you a short note about her day.</p>
+          <p class="hero-promise">It never gives medical advice. It records, reminds, and connects her to real people: you, her doctor, and emergency services.</p>
+          <div class="hero-actions">
+            <a class="pill-button pill-button--ink pill-button--hero" href="/">Open Buddy</a>
+            <a class="pill-button pill-button--quiet pill-button--hero" href="#how">See what it does</a>
+          </div>
+          <p class="hero-note">Free to run on her own computer. Built with Meta’s Muse models for the Meta Global AI Developer Hackathon, October 2026.</p>
+        </div>
+        <figure class="phone">
+          <img src="/static/landing/home.png" width="390" height="844" alt="Buddy’s Home screen on a phone: “Good evening, Rose”, the glowing orb, a Talk to Buddy button, tiles for Something hurts and Read it to me, and today’s list with the weather, her check-in, and her pills.">
+          <figcaption>Home, on the made-up demo week.</figcaption>
+        </figure>
+      </section>
+
+      <!-- ========== What Buddy does ========== -->
+      <section id="how" class="part" aria-labelledby="how-title">
+        <h2 id="how-title" class="part-title">What Buddy does</h2>
+        <p class="part-lead">One big button to talk. Everything else, she can also just say: “Buddy, where are my glasses?”, “Read this letter to me”, “What’s the weather?”.</p>
+        <ul class="features" role="list">
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+            <div><p class="feature-name">Talks with her, hands-free</p><p class="feature-what">She taps once and just talks. Her words appear as she says them; Buddy answers in a warm voice and big text, then listens again. It never listens while it is talking itself.</p></div>
+          </li>
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+            <div><p class="feature-name">A safety net, before any AI</p><p class="feature-what">Plain rules check every word she says first. A warning sign like chest pain, a pill mix-up, or words of despair shows a fixed screen with big Call 911, Poison Control, or 988 buttons. It works without the internet.</p></div>
+          </li>
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
+            <div><p class="feature-name">Pill reminders</p><p class="feature-what">You type each label exactly as it is on the bottle. At each pill’s time Buddy says her name and reads the label word for word, with “I took it” and “Remind me in 10 minutes”.</p></div>
+          </li>
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path></svg>
+            <div><p class="feature-name">A daily check-in and a diary</p><p class="feature-what">Buddy asks how she feels and whether anything hurts, and writes it down in her own words, never its own. One page of doctor notes prints for her next visit.</p></div>
+          </li>
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path><rect x="2" y="4" width="20" height="16" rx="2"></rect></svg>
+            <div><p class="feature-name">A short update for you</p><p class="feature-what">Her mood, her pills, what she noted, and any safety screen, in plain words written by the app, not the AI. It opens in her email, and nothing is sent until she presses Send.</p></div>
+          </li>
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 15h.01"></path><path d="M12 7v4"></path></svg>
+            <div><p class="feature-name">Check a message</p><p class="feature-what">A strange text, email, or letter? She pastes it, reads it out loud, or takes a photo. Buddy names the warning signs of a scam and always says: don’t click, don’t pay, call someone you know.</p></div>
+          </li>
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
+            <div><p class="feature-name">Read it to me</p><p class="feature-what">A letter, a bill, or a form she can’t read well. She takes a photo, and Buddy says what it is and what it says, or reads it word for word. A letter about her health is only read to her, never explained.</p></div>
+          </li>
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"></path><path d="M16 8.2A2.22 2.22 0 0 0 13.8 6c-.8 0-1.4.3-1.8.9-.4-.6-1-.9-1.8-.9A2.22 2.22 0 0 0 8 8.2c0 .6.3 1.2.7 1.6A226.652 226.652 0 0 0 12 13a404 404 0 0 0 3.3-3.1 2.413 2.413 0 0 0 .7-1.7"></path></svg>
+            <div><p class="feature-name">A memory book</p><p class="feature-what">She tells Buddy a story from her life. It becomes a page in her own words, with a painting, to send to the family or print.</p></div>
+          </li>
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><circle cx="12" cy="12" r="3"></circle><path d="m16 16-1.9-1.9"></path></svg>
+            <div><p class="feature-name">Find my things</p><p class="feature-what">Glasses, keys, the remote. She takes a photo of the room, and Buddy circles the thing with a soft glow and tells her where it is.</p></div>
+          </li>
+          <li class="feature">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="M20 12h2"></path><path d="m19.07 4.93-1.41 1.41"></path><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"></path><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"></path></svg>
+            <div><p class="feature-name">Today’s weather and news</p><p class="feature-what">“What’s the weather?” or “Anything happening in town?” Buddy looks it up on the web near her town and says where it read it. Never anything about health.</p></div>
+          </li>
+        </ul>
+
+        <div class="shots">
+          <figure class="phone">
+            <img src="/static/landing/talk.png" width="390" height="844" alt="Talking with Buddy: the orb, Buddy’s reply in big words, and a Call Maria button." loading="lazy">
+            <figcaption>Talking with Buddy</figcaption>
+          </figure>
+          <figure class="phone">
+            <img src="/static/landing/pills.png" width="390" height="844" alt="My pills: a ring showing 2 of 3 taken, and today’s pills with their labels." loading="lazy">
+            <figcaption>Her pills, as on the bottle</figcaption>
+          </figure>
+          <figure class="phone">
+            <img src="/static/landing/memory.png" width="390" height="844" alt="A memory book page: a painting of a farm, the title Summers at aunt Lucy’s farm, and her story in her own words." loading="lazy">
+            <figcaption>A memory book page</figcaption>
+          </figure>
+          <figure class="phone">
+            <img src="/static/landing/read.png" width="390" height="844" alt="Read it to me: a bill from Riverside Power and Light, what it says in plain words, the amount due, and Read it word for word." loading="lazy">
+            <figcaption>A bill, read to her</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- ========== Meta's models ========== -->
+      <section class="part" aria-labelledby="models-title">
+        <h2 id="models-title" class="part-title">Built on Meta’s models</h2>
+        <p class="part-lead">Four models through Meta’s Model API, each doing the job it is best at. Plain rules check her words before any of them, and Buddy’s words after.</p>
+        <ul class="models" role="list">
+          <li class="model"><p class="model-name">Muse Spark 1.3</p><p class="model-does">Thinks and talks: Buddy’s words, the check-in, scam checks, doctor-note topics, memory book pages, what a letter says, where her things are, and today’s weather with Meta’s web search.</p></li>
+          <li class="model"><p class="model-name">Muse Voice Transcribe 1.0</p><p class="model-does">Hears her: live, over Meta’s realtime speech-to-text, which also hears when she has finished talking, so she never taps between turns.</p></li>
+          <li class="model"><p class="model-name">Muse Image 1.0</p><p class="model-does">Paints one soft watercolor picture for each memory book page.</p></li>
+          <li class="model"><p class="model-name">SAM 3.1</p><p class="model-does">Finds her glasses or keys in a photo of the room, so Buddy can circle them.</p></li>
+        </ul>
+      </section>
+
+      <!-- ========== The safety promise ========== -->
+      <section class="part" aria-labelledby="promise-title">
+        <h2 id="promise-title" class="part-title">The promise</h2>
+        <div class="promise">
+          <div>
+            <h3>It never gives medical advice</h3>
+            <p>Not what a symptom means, not what to take, not what to eat. If she asks, Buddy says kindly that her doctor is the right person, and offers to call them or write the question down. A second set of plain rules checks every reply before she hears it.</p>
+          </div>
+          <div>
+            <h3>Real people come first</h3>
+            <p>Emergency screens use fixed words and big call buttons, chosen by plain rules, never by the AI. When she is lonely, Buddy suggests calling you. It says it is an AI helper when asked, and never pretends otherwise.</p>
+          </div>
+          <div>
+            <h3>Her data stays with her</h3>
+            <p>Her diary, pills, and memory book live in a file on her own computer. Meta’s standard models answer her, and don’t learn from what she says. Photos she shows Buddy are never saved. You see only the update she chooses to send.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== Plans ========== -->
+      <section id="plans" class="part" aria-labelledby="plans-title">
+        <h2 id="plans-title" class="part-title">Plans</h2>
+        <p class="part-lead">Buddy itself is free, and the safety net and pill reminders will never be behind a paywall.</p>
+        <div class="plans">
+          <div class="plan">
+            <h3 class="plan-name">Buddy, on her computer</h3>
+            <p class="plan-price">Free</p>
+            <ul>
+              <li>Everything on this page, today</li>
+              <li>Her data on her own computer</li>
+              <li>You add your own Meta API key; Meta bills you for what she uses (a long chat costs a few cents)</li>
+            </ul>
+            <a class="pill-button pill-button--ink" href="/">Open Buddy</a>
+          </div>
+          <div class="plan">
+            <h3 class="plan-name">Family</h3>
+            <p class="plan-price">$9 <small>a month</small></p>
+            <ul>
+              <li>A family page with her day at a glance</li>
+              <li>A note when a pill is missed or a safety screen came up</li>
+              <li>Sign-in for the people who help her</li>
+              <li>Her updates sent for her</li>
+            </ul>
+            <span class="plan-soon">Coming in November</span>
+          </div>
+        </div>
+        <p class="plans-note">This is a hackathon build. Payments will run in Stripe’s test mode, and nothing is ever really charged.</p>
+      </section>
+
+      <!-- ========== Questions ========== -->
+      <section class="part" aria-labelledby="faq-title">
+        <h2 id="faq-title" class="part-title">Questions</h2>
+        <div class="rows faq">
+          <details class="faq-item">
+            <summary class="faq-question">Is Buddy a doctor, or a nurse?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">No. Buddy is an AI helper. It writes down how she feels, in her words, so her real doctor has a clear picture at the next visit. It never says what something means or what to do about it.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">What happens in an emergency?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">If she says something like “my chest feels tight”, a red screen with a big Call 911 button appears at once, before any AI is asked. Buddy never calls by itself: she decides. The same goes for a pill mix-up (Poison Control) and for words of despair (the 988 Lifeline, in calm words).</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">What does it cost to run?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">The app is free and open source. It talks to Meta’s models with your own API key, and Meta bills you for what she uses: a long chat costs a few cents, an hour of hands-free listening about 18 cents, and a memory book painting a cent.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Does it need the internet?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">Talking with Buddy does. The safety net and the pill reminders work on her computer without it.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Who is it for?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">An older adult who lives alone and would rather talk than type, and the family who look out for her. Big words, big buttons, everything read aloud, and a Text size setting with three sizes.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Can I see what Buddy remembers about her?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">Yes. Settings has “What Buddy has learned”: the people, pets, and plans she mentioned, and how she likes to talk. Any of it can be forgotten with one tap. Nothing there is about her health.</p>
+          </details>
+        </div>
+      </section>
+
+      <!-- ========== The end ========== -->
+      <section class="closing" aria-labelledby="closing-title">
+        <div class="orb" aria-hidden="true"></div>
+        <h2 id="closing-title" class="closing-title">Buddy is ready to say hello.</h2>
+        <a class="pill-button pill-button--ink pill-button--hero" href="/">Open Buddy</a>
+        <p class="hero-note">Grandma Buddy is an AI helper. It can’t give medical advice. In an emergency, call 911.</p>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <p>Grandma Buddy, built for the Meta Global AI Developer Hackathon, October 2026. Open source, MIT license.</p>
+      <nav class="site-links" aria-label="More">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/">Open Buddy</a>
+      </nav>
+    </footer>
+  </div>
+
+  <!-- Buddy's orb, alive at the end of the page (buddy.js, as in the app). -->
+  <script src="/static/buddy.js"></script>
+  <script>startBuddy();</script>
+</body>
+</html>

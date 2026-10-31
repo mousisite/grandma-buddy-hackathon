@@ -72,6 +72,11 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
 
+- Oct 30, night: **The landing, Privacy, and Terms** (feature 17): `/about`, `/privacy`, and `/terms`, for the family member who sets Buddy up.
+  - `static/about.html` with `landing.css`: the app's own design system (Figtree, a Newsreader headline, hairlines, one ink accent, light and dark), her phone with a real screen of the demo week, ten feature rows, four more screens, the four Meta models, the promise in a tinted band, two plans (free; Family $9 a month, "Coming in November", Stripe's test mode only, no form and no card), the app's FAQ rows, and Buddy's orb alive at the end. Privacy and Terms are documents in plain words, true of the app as built. Help links to all three.
+  - `scripts/landing_shots.py` makes the five screens from a freshly seeded demo week (never her real data), the memory page painted with the real Muse Image (about 3 cents). They are committed in `static/landing/`, with a note in `THIRD_PARTY_NOTICES.md`.
+  - Tests (`tests/test_landing.py`, 10): served like Home with no-cache; every model name comes from the settings; the safety promise and 911 are on the page; no `<form>` or `<input>` anywhere; links to the app, Privacy, and Terms; every picture is in the repository and has alt text; Help links to the pages. The browser check covers the three pages at 390 and 1440px, light and dark: every picture loads, the orb is alive, questions open, Open Buddy, and no layout problems.
+
 - Oct 30, night: **A fresh-eyes pass over the whole app** (code, screens, docs), after switching models.
   - Home's doctor-notes row now says "2 questions to ask" or "No questions yet" (`GET /api/doctor-questions`, tested), so the Today list is alive on every row.
   - Read it to me: the words now appear under the button she tapped, and the page no longer scrolls, so "Stop reading" stays under her finger (the browser check measures it). Leaving the screen stops the reading. The card is named for screen readers even when a photo couldn't be read.

@@ -2939,6 +2939,24 @@ label.group-row .group-label {
   }
 }
 
+/* Under Help: About, Privacy, and Terms (plain links, 44px tall). */
+.help-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-3);
+  margin-top: var(--s-10);
+  color: var(--text-2);
+  font-size: var(--t-15);
+}
+
+.help-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  padding: 0 var(--s-2);
+  text-underline-offset: 3px;
+}
+
 /* ---------- Read it to me ---------- */
 
 .read-start,

@@ -1,0 +1,438 @@
+/* Grandma Buddy: the landing (/about), Privacy, and Terms.
+   These pages are for the family member who sets Buddy up. The tokens,
+   fonts, buttons, the FAQ rows, and the orb come from styles.css; this file
+   only lays the pages out. Same rules as the app: 17px words or more, 44px
+   targets, hairlines, one ink accent, light and dark (docs/DESIGN.md). */
+
+/* From 768px the app lays the body out as a sidebar and a page (styles.css).
+   These pages have no sidebar: one column, as on a phone. */
+@media (min-width: 768px) {
+  body {
+    display: block;
+  }
+}
+
+/* ---------- The top of every page ---------- */
+
+.site {
+  width: 100%;
+  max-width: calc(1120px + 2 * var(--s-5));
+  margin: 0 auto;
+  padding: 0 var(--s-5) var(--s-16);
+}
+
+.site-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-4) 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--target);
+  font-family: var(--font-serif);
+  font-size: var(--t-24);
+  text-decoration: none;
+}
+
+/* ---------- The landing ---------- */
+
+/* The hero: the words, and her phone. Side by side from 900px. */
+.hero-split {
+  display: grid;
+  gap: var(--s-10);
+  align-items: center;
+  padding: var(--s-8) 0 var(--s-16);
+}
+
+@media (min-width: 900px) {
+  .hero-split {
+    grid-template-columns: 1.1fr 0.9fr;
+    padding: var(--s-16) 0;
+  }
+}
+
+.hero-title {
+  font-family: var(--font-serif);
+  font-size: var(--t-44);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 768px) {
+  .hero-title {
+    font-size: var(--t-56);
+  }
+}
+
+.hero-lead {
+  max-width: 46ch;
+  margin-top: var(--s-5);
+  color: var(--text-2);
+  font-size: var(--t-20);
+}
+
+.hero-promise {
+  max-width: 44ch;
+  margin-top: var(--s-5);
+  font-weight: 600;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-top: var(--s-8);
+}
+
+.hero-note {
+  margin-top: var(--s-4);
+  color: var(--text-2);
+  font-size: var(--t-15);
+}
+
+/* Her phone: a dark bezel around a real screen of the demo week. */
+.phone {
+  width: min(100%, 320px);
+  margin: 0 auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 44px;
+  background: #1C1B19;
+  box-shadow: var(--shadow-raised);
+}
+
+.phone img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 32px;
+  background: var(--bg);
+}
+
+.phone figcaption {
+  margin-top: var(--s-3);
+  color: var(--text-2);
+  font-size: var(--t-15);
+  text-align: center;
+}
+
+/* Each part of the page: a heading, one line, then its content. */
+.part {
+  padding: var(--s-12) 0;
+  border-top: 1px solid var(--border);
+}
+
+.part-title {
+  font-size: var(--t-32);
+}
+
+.part-lead {
+  max-width: 56ch;
+  margin-top: var(--s-3);
+  color: var(--text-2);
+  font-size: var(--t-20);
+}
+
+/* More screens: a row she can slide on a phone, four across from 900px. */
+.shots {
+  display: flex;
+  gap: var(--s-5);
+  margin: var(--s-8) calc(-1 * var(--s-5)) 0;
+  padding: var(--s-2) var(--s-5) var(--s-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.shots .phone {
+  flex: 0 0 min(72%, 280px);
+  margin: 0;
+  scroll-snap-align: start;
+}
+
+@media (min-width: 900px) {
+  .shots {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow: visible;
+  }
+
+  .shots .phone {
+    width: 100%;
+  }
+}
+
+/* What Buddy does: rows with hairlines, two columns from 720px. */
+.features {
+  display: grid;
+  margin-top: var(--s-6);
+}
+
+@media (min-width: 720px) {
+  .features {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--s-10);
+  }
+}
+
+.feature {
+  display: flex;
+  gap: var(--s-4);
+  padding: var(--s-5) 0;
+  border-top: 1px solid var(--border);
+}
+
+.feature .icon {
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  color: var(--text-2);
+}
+
+.feature-name {
+  font-weight: 600;
+}
+
+.feature-what {
+  margin-top: var(--s-1);
+  color: var(--text-2);
+}
+
+/* Meta's models: four plain columns. */
+.models {
+  display: grid;
+  gap: var(--s-6);
+  margin-top: var(--s-8);
+}
+
+@media (min-width: 720px) {
+  .models {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1040px) {
+  .models {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.model {
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border-strong);
+}
+
+.model-name {
+  font-size: var(--t-20);
+  font-weight: 650;
+}
+
+.model-does {
+  margin-top: var(--s-2);
+  color: var(--text-2);
+}
+
+/* The safety promise: one tinted band (the page's one block of color). */
+.promise {
+  display: grid;
+  gap: var(--s-8);
+  margin-top: var(--s-8);
+  padding: var(--s-8) var(--s-6);
+  border-radius: 24px;
+  background: var(--tint);
+}
+
+@media (min-width: 900px) {
+  .promise {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: var(--s-10);
+  }
+}
+
+.promise h3 {
+  font-size: var(--t-20);
+}
+
+.promise p {
+  margin-top: var(--s-2);
+}
+
+/* Plans: two outlined columns; the one she can use today has the ink button. */
+.plans {
+  display: grid;
+  gap: var(--s-5);
+  margin-top: var(--s-8);
+}
+
+@media (min-width: 720px) {
+  .plans {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.plan {
+  display: grid;
+  align-content: start;
+  gap: var(--s-4);
+  padding: var(--s-6);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+}
+
+.plan-name {
+  font-size: var(--t-24);
+}
+
+.plan-price {
+  font-family: var(--font-serif);
+  font-size: var(--t-44);
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.plan-price small {
+  font-family: var(--font);
+  font-size: var(--t-17);
+  color: var(--text-2);
+}
+
+.plan ul {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.plan .pill-button {
+  justify-self: start;
+}
+
+/* "Coming in November": said plainly, not a button that does nothing. */
+.plan-soon {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--s-5);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.plans-note {
+  margin-top: var(--s-4);
+  color: var(--text-2);
+  font-size: var(--t-15);
+}
+
+/* The questions reuse the app's FAQ rows (styles.css). */
+.part .faq {
+  margin-top: var(--s-6);
+}
+
+/* The end: Buddy, alive, and one button. The page's one moving thing. */
+.closing {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-5);
+  padding: var(--s-16) 0 var(--s-10);
+  text-align: center;
+}
+
+.closing .orb {
+  --orb-size: 160px;
+  margin-bottom: var(--s-4);
+}
+
+.closing-title {
+  font-family: var(--font-serif);
+  font-size: var(--t-32);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 768px) {
+  .closing-title {
+    font-size: var(--t-44);
+  }
+}
+
+/* The foot of every page. */
+.site-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-6);
+  padding-top: var(--s-6);
+  border-top: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: var(--t-15);
+}
+
+.site-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-3);
+}
+
+.site-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  padding: 0 var(--s-2);
+  text-underline-offset: 3px;
+}
+
+/* ---------- Privacy and Terms: a document ---------- */
+
+.doc-page {
+  max-width: 68ch;
+  padding: var(--s-6) 0 var(--s-16);
+}
+
+.doc-page-title {
+  font-family: var(--font-serif);
+  font-size: var(--t-44);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+.doc-page .lead {
+  margin-top: var(--s-4);
+  font-size: var(--t-20);
+}
+
+.doc-page h2 {
+  margin-top: var(--s-10);
+  font-size: var(--t-24);
+}
+
+.doc-page p,
+.doc-page ul {
+  margin-top: var(--s-3);
+}
+
+.doc-page ul {
+  display: grid;
+  gap: var(--s-2);
+  padding-left: 1.2em;
+}
+
+.doc-page a {
+  text-underline-offset: 3px;
+}
+
+.doc-updated {
+  margin-top: var(--s-10);
+  color: var(--text-2);
+  font-size: var(--t-15);
+}

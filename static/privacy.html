@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!-- Grandma Buddy: Privacy (/privacy), in plain words. Everything here is
+     true of the app as built; keep it in step with docs/SAFETY.md section 9
+     and the Help screen's "Your privacy, in short". -->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Privacy · Grandma Buddy</title>
+  <meta name="theme-color" content="#F7F7F5">
+  <script>
+    (function () {
+      var choice = "auto";
+      try { choice = localStorage.getItem("theme") || "auto"; } catch (e) {}
+      var hour = new Date().getHours();
+      var dark = choice === "dark" || (choice === "auto" && (matchMedia("(prefers-color-scheme: dark)").matches ||
+        (!matchMedia("(prefers-color-scheme: light)").matches && (hour >= 19 || hour < 7))));
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/Figtree.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/static/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/landing.css">
+</head>
+<body>
+  <div class="site">
+    <header class="site-top">
+      <a class="brand" href="/about" translate="no"><span class="orb-mark" aria-hidden="true"></span>Grandma Buddy</a>
+      <a class="pill-button pill-button--ink" href="/">Open Buddy</a>
+    </header>
+
+    <main class="doc-page">
+      <h1 class="doc-page-title">Privacy, in plain words</h1>
+      <p class="lead">Grandma Buddy handles things that matter: how she feels, her pills, her stories. This page says what the app keeps, where, and what leaves her computer. It is written by the builder, not a lawyer, and it describes the app as it is built.</p>
+
+      <h2>What stays on her computer</h2>
+      <p>Everything Buddy writes down lives in one database file on her own computer, in the app’s <code>data</code> folder: her name and the names and numbers she gave; her diary, in her own words; her pills and when she took them; her check-ins and moods; her doctor questions; her memory book pages and their paintings; what Buddy has learned about her life; and the time and kind of every safety screen. Nothing is uploaded to the builder or to any server of ours. There is no account and no cloud copy.</p>
+      <p>Her browser remembers three small choices on that device only: the theme, the text size, and the voice she picked.</p>
+
+      <h2>What goes to Meta, and why</h2>
+      <p>Buddy thinks and hears with Meta’s models, through Meta’s Model API, using the API key you added. To do that, the app sends Meta:</p>
+      <ul>
+        <li>what she says to Buddy (her voice, to be turned into words, and the words, to be answered), along with Buddy’s recent replies and the facts Buddy remembers about her life, so it can answer like a friend;</li>
+        <li>a message or a photo she asks Buddy to check for a scam, a photo of a letter she asks Buddy to read, or a photo of the room where she lost something, while it is being looked at;</li>
+        <li>the story she tells for her memory book, and a description of the scene to paint;</li>
+        <li>her town (typed by a family member), for today’s weather and local news. Never her name, her address, or her location.</li>
+      </ul>
+      <p>The app uses Meta’s standard models only, which Meta doesn’t use to train its AI. It refuses to start with any other kind. Photos are never saved by the app, and the photo of a room is sent with a setting that asks Meta not to keep it either. The pill labels your family typed are never sent to the AI at all: Buddy reads them word for word from its own file.</p>
+      <p>What Meta does with what it receives is covered by Meta’s own terms for its Model API.</p>
+
+      <h2>What is never kept</h2>
+      <ul>
+        <li>Words that showed the crisis screen (the 988 Lifeline). The app keeps only that the screen was shown, and when. It never keeps the words, not even in Buddy’s memory of the talk.</li>
+        <li>Passwords, bank numbers, or Social Security numbers. Buddy never asks for them. If a message she checks contains a long number, only a short excerpt is kept, with the number removed.</li>
+        <li>Anything from a letter she has Buddy read. Nothing from the paper is saved.</li>
+        <li>Anything about her health in what Buddy remembers about her. Her health goes in her diary, in her words, and nowhere else.</li>
+      </ul>
+
+      <h2>What her family sees</h2>
+      <p>Only what she chooses to send. The family update is written by the app from her day, in plain words. “Send” opens her own email app with the update filled in, and nothing goes anywhere until she presses Send there. The same is true of a memory book page. The app stores no email password. The doctor notes print on paper; they are not sent anywhere.</p>
+      <p>A safety screen is named in the update with a fixed sentence and its time, never with her words.</p>
+
+      <h2>Who can use the app</h2>
+      <p>Only the app’s own page, on her computer, can ask it to do anything. A request from another website open in her browser is refused, so no other site can read her diary or make Buddy spend your API credit.</p>
+
+      <h2>Seeing and deleting her data</h2>
+      <p>Settings shows what Buddy has learned about her, and each item can be forgotten with one tap. Her diary, pills, doctor notes, and memory book are all on their own screens. To delete everything, delete the app’s <code>data</code> folder: there is no copy anywhere else. A screen for exporting and deleting her data in one tap is being built.</p>
+
+      <h2>Questions</h2>
+      <p>This is an open-source project built during a hackathon. Its code, and these words, are on its public repository, where anyone can read exactly what it does.</p>
+
+      <p class="doc-updated">Last updated October 30, 2026.</p>
+    </main>
+
+    <footer class="site-foot">
+      <p>Grandma Buddy is an AI helper. It can’t give medical advice. In an emergency, call 911.</p>
+      <nav class="site-links" aria-label="More">
+        <a href="/about">About</a>
+        <a href="/terms">Terms</a>
+        <a href="/">Open Buddy</a>
+      </nav>
+    </footer>
+  </div>
+</body>
+</html>

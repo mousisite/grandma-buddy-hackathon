@@ -103,6 +103,10 @@ grandma-buddy-hackathon/
     sayit.js                 "Say it" buttons for forms (the welcome, Find my things): record, write down, the safety net first (/api/check-words), then fill the form
     find.js                  Find my things: what she's looking for (quick picks, "Say it"), the photo, the halo (an SVG in the photo's own pixels) and Buddy's sentence
     read.js                  Read it to me: the photo, the orb while Buddy reads it, the card (what it is, Buddy's words, amount and date, scam signs), word for word with Stop, Check it for a scam, call buttons
+    about.html               the landing page (/about), for the family member who sets Buddy up: what it does, Meta's models, the promise, plans, questions
+    privacy.html, terms.html /privacy and /terms, in plain words
+    landing.css              the layout of those three pages (tokens, fonts, buttons, and the orb come from styles.css)
+    landing/                 the landing's phone screens: PNGs of the made-up demo week, made by scripts/landing_shots.py
     screens.js               the other screens: diary timeline, pills (ring, round checks) and reminder card, family, Memory book, settings, toasts
     recorder.js              microphone -> 16 kHz mono 16-bit WAV
     speech.js                read-aloud: Buddy's natural voice (/api/speak, one sentence at a time, the next made while one plays, the highlight estimated from how far it has played), else the browser's speechSynthesis (her choice in Settings, else the best English voice); any trouble falls back to the browser voice
@@ -121,6 +125,7 @@ grandma-buddy-hackathon/
     check_briefing.py        hand-run: 3 real web searches (weather, local news, sports) for the demo town, Meta's answers and what Buddy would say after its checks (about 1 cent)
     check_find.py            hand-run: Find my things end to end in a browser with the real SAM 3.1 and Muse Spark on 4 test photos (about 2 cents; 4 more the first time, to paint them), then screenshots; `--only desk-glasses` runs one look
     find_photos/             the 4 test photos for check_find.py, painted with Muse Image for this project (rooms and a desk only, no people)
+    landing_shots.py         the landing's phone screens, from a fresh seeded demo week (the memory page painted with the real Muse Image when a key is set, about 3 cents; faked otherwise)
     check_read.py            hand-run: Read it to me with the real Muse Spark on 3 made-up papers (a bill, a clinic letter, a prize scam), what Buddy would say after its checks, saved next to each photo for the demo screenshots (about 1 cent); `--only scam` reads one
     read_docs/               the 3 made-up papers as photos (made by check_read.py from small web pages, no AI) and the real answers
     demo_screenshots.py      hand-run, free: every screen with the demo week at 390 and 1440px, on a COPY of the app's database (no AI), plus the welcome's 3 steps
@@ -213,6 +218,7 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `WS /api/listen` | 16 kHz 16-bit mono sound, 80 ms at a time (binary) | `{"type": "ready"}` once Meta listens, then `hearing` (she started), `live` (`text`: her words so far), `turn` (`text`: her finished turn), or `unavailable` (tap to talk instead). Refused (1008) from another website, and (1013) while another is open |
 | `GET /api/briefing/{topic}` | | `{"text", "sites"}`: today's weather (or news, sports) for her town, kept 3 hours. Empty (`"text": ""`) when there is nothing to show: no town yet, nothing found, or the search failed with nothing kept from today (normal for Home, so no error status). 404 only for an unknown topic |
 | `GET /api/how` | | `{"models": [{"id", "name", "does"}], "features": [{"name", "what", "models": [ids], "here"}]}`: for Help, the Meta models from the settings and every feature with the models behind it (none: it runs on this computer) |
+| `GET /about`, `/privacy`, `/terms` | | the landing, Privacy, and Terms pages (plain files in `static/`, served like Home, always checked for a newer version) |
 | `GET /api/voice` | | `{"available", "default", "voices": [{"id", "name"}]}`: is Buddy's natural voice set up on this computer, and which voices she can choose (Heart, Bella, Nicole, Emma (British), Michael) |
 | `POST /api/speak` | `{"text", "voice", "speed"}` (a sentence, up to 600 characters; speed 0.6 to 1.4) | the words as a WAV (24 kHz mono). 503 when the natural voice isn't set up or fails: the page then uses the browser voice. The words are in the body, never the address, so they never show in the server log. The same words are made once (a cache of 64), and the model loads in the background when the app starts |
 | `GET/PUT /api/profile` | profile fields | profile |

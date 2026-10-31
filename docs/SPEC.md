@@ -168,6 +168,13 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - Her photo is never saved, and nothing from the paper is kept. The last paper stays on the screen until she taps "Read another paper".
 - Done when: the checks are tested with a fake Meta, `scripts/check_read.py` reads three made-up papers right with the real model (a bill, a clinic letter, a prize scam), and the browser check covers the screen at every width.
 
+### 17. The landing, Privacy, and Terms (P1)
+
+- `/about` is for the family member who sets Buddy up: what Buddy does (with real screens of the made-up demo week), the four Meta models behind it, the promise (no medical advice, real people first, her data stays with her), two plans (Buddy on her computer, free; Family, $9 a month, coming in November, in Stripe's test mode only), questions, and Open Buddy. The app's own design system, with Buddy's orb alive at the end.
+- `/privacy` and `/terms`, in plain words: what the app keeps and where, what goes to Meta and why, what is never kept, what her family sees, and what Buddy is not (a doctor, an emergency service). Help links to all three.
+- The pages make no claim the app can't keep, and ask for nothing: no form, no card.
+- Done when: the pages are served and tested (every model name comes from the settings, every picture is in the repository, no form fields), and the browser check covers them at phone and desktop width, light and dark.
+
 ## Not building (out of scope)
 
 - Any medical advice: saying how serious a symptom is, what causes it, or what to do about it

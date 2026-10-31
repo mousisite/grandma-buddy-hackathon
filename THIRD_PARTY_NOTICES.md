@@ -30,6 +30,8 @@ Meta has no text-to-speech model, so Buddy speaks with an open voice model that 
 
 `scripts/find_photos/` holds 4 photos (a living room, a kitchen counter, a sofa, and a writing desk) that `scripts/check_find.py` uses to try Find my things with the real SAM 3.1. They were painted with Meta's Muse Image for this project during the hackathon, from prompts in that script: rooms and a desk only, with no people and no writing. They are not photos of any real home.
 
+`static/landing/` holds 5 screenshots of the app on the landing page, taken by `scripts/landing_shots.py` from a freshly seeded demo week (`scripts/seed_demo.py`): made-up people, pills, and stories only. The painting on the memory page screen was made with Meta's Muse Image for this project, from the seed's made-up story. `scripts/read_docs/` holds 3 made-up papers (a bill, a clinic letter, a prize letter) drawn by `scripts/check_read.py` as small web pages: the companies, the people, and the numbers are invented.
+
 ## Fonts used by the app
 
 | Font | Source | License | Changes |

@@ -84,13 +84,18 @@ async def only_buddys_own_page(request, call_next):
     return await call_next(request)
 
 
+# The pages for the family member who sets Buddy up (docs/SPEC.md feature
+# 17): the landing, Privacy, and Terms. Plain files, served like Home.
+PAGES = {"/about": "about.html", "/privacy": "privacy.html", "/terms": "terms.html"}
+
+
 @app.middleware("http")
 async def always_check_for_updates(request, call_next):
-    """The page and its files are always checked for a newer version
+    """The pages and their files are always checked for a newer version
     ("no-cache"), so a browser never keeps running an old copy after the app
     changes. Unchanged files just get a quick "not modified" answer."""
     response = await call_next(request)
-    if request.url.path == "/" or request.url.path.startswith("/static/"):
+    if request.url.path == "/" or request.url.path in PAGES or request.url.path.startswith("/static/"):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
@@ -105,6 +110,24 @@ def ping():
 def home():
     """The home screen."""
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/about")
+def about():
+    """The landing page: what Buddy is, for the family member who sets it up."""
+    return FileResponse(STATIC_DIR / PAGES["/about"])
+
+
+@app.get("/privacy")
+def privacy():
+    """Where her data lives and what Meta gets, in plain words."""
+    return FileResponse(STATIC_DIR / PAGES["/privacy"])
+
+
+@app.get("/terms")
+def terms():
+    """What Buddy is and isn't, in plain words."""
+    return FileResponse(STATIC_DIR / PAGES["/terms"])
 
 
 # Serves styles.css, app.js, and later recorder.js and speech.js.

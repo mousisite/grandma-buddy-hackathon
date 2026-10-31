@@ -987,6 +987,45 @@ def check_read(browser) -> None:
         page.close()
 
 
+def check_landing(browser) -> None:
+    """The landing (/about), Privacy, and Terms, for the family member who
+    sets Buddy up: at phone and desktop width, light and dark, every picture
+    loads, the questions open, Open Buddy goes to the app, and no layout
+    problems (the same 44px targets and no sideways scrolling as the app)."""
+    for theme, width, height in [("light", 390, 844), ("dark", 1440, 900)]:
+        page = browser.new_page(viewport={"width": width, "height": height}, color_scheme=theme)
+        page.goto(f"http://localhost:{PORT}/about", wait_until="networkidle")
+        assert page.title().startswith("Grandma Buddy")
+        assert page.get_attribute("html", "data-theme") == theme
+        # The lower screens load as she scrolls (and sideways, on a phone):
+        # ask for all of them now, then every picture must be there.
+        page.evaluate("[...document.images].forEach(i => { i.loading = 'eager'; })")
+        page.wait_for_function("[...document.images].every(i => i.complete)")
+        broken = page.evaluate("[...document.images].filter(i => !i.naturalWidth).map(i => i.src)")
+        assert not broken, f"pictures that didn't load: {broken}"
+        assert page.locator(".closing .orb .orb-core").count() == 1, "Buddy's orb should be alive at the end"
+        first = page.locator(".faq-item").first
+        first.locator("summary").click()
+        assert first.locator(".faq-answer").is_visible()
+        assert page.locator("a.pill-button[href='/']").first.text_content().strip() == "Open Buddy"
+        check_layout(page, f"the landing at {width}px, {theme}")
+        page.screenshot(path=str(OUT / f"landing-{width}-{theme}.png"), full_page=True)
+        for name in ("privacy", "terms"):
+            page.goto(f"http://localhost:{PORT}/{name}", wait_until="networkidle")
+            assert page.locator("h1").text_content().startswith(name.capitalize())
+            check_layout(page, f"{name} at {width}px, {theme}")
+            page.screenshot(path=str(OUT / f"{name}-{width}-{theme}.png"), full_page=True)
+        page.close()
+
+    # From the app: Help links to the three pages.
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    visit(page, "help")
+    assert page.eval_on_selector_all(".help-links a", "links => links.map(l => l.getAttribute('href'))") == \
+        ["/about", "/privacy", "/terms"]
+    check_layout(page, "Help's links at 390px")
+    page.close()
+
+
 def seed_demo_week(database: str) -> None:
     """Fill the test server's database with the made-up demo week
     (scripts/seed_demo.py --reset, which keeps a backup first; no paintings)."""
@@ -1661,6 +1700,7 @@ def main() -> int:
                 check_demo_reminder(browser)
                 check_help(browser)
                 check_read(browser)
+                check_landing(browser)
                 check_today_rows(browser)
                 check_friend(browser, test_env["DATABASE_PATH"])
                 check_every_screen(browser)
@@ -1686,7 +1726,8 @@ def main() -> int:
             "Find my glasses button), Read it to me (chip, the orb on the photo while Buddy reads, a bill's amount "
             "and date, word for word with Stop, a health letter never explained with the doctor's call first, a "
             "likely scam's warning, Check it for a scam with the words, Back keeps the paper, a photo it can't read, "
-            "Meta down), the welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
+            "Meta down), the landing, Privacy, and Terms (every picture loads, the orb alive, questions open, Open "
+            "Buddy, Help's links), the welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
             "(sections, Mark as asked and Undo in place, Add a question, 14 days, prints on one page), the family update "
             "(the email holds exactly the words on screen, its pills count matches the Pills ring, Copy, Yesterday), "
             "the demo week's done check-in and the hidden ?demo=reminder card (pops up after the first tap, said with "

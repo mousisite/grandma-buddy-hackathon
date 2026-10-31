@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<!-- Grandma Buddy: Terms (/terms), in plain words. What Buddy is and isn't,
+     in step with docs/SAFETY.md. -->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Terms · Grandma Buddy</title>
+  <meta name="theme-color" content="#F7F7F5">
+  <script>
+    (function () {
+      var choice = "auto";
+      try { choice = localStorage.getItem("theme") || "auto"; } catch (e) {}
+      var hour = new Date().getHours();
+      var dark = choice === "dark" || (choice === "auto" && (matchMedia("(prefers-color-scheme: dark)").matches ||
+        (!matchMedia("(prefers-color-scheme: light)").matches && (hour >= 19 || hour < 7))));
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/Figtree.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/static/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/landing.css">
+</head>
+<body>
+  <div class="site">
+    <header class="site-top">
+      <a class="brand" href="/about" translate="no"><span class="orb-mark" aria-hidden="true"></span>Grandma Buddy</a>
+      <a class="pill-button pill-button--ink" href="/">Open Buddy</a>
+    </header>
+
+    <main class="doc-page">
+      <h1 class="doc-page-title">Terms, in plain words</h1>
+      <p class="lead">Grandma Buddy is free, open-source software built during the Meta Global AI Developer Hackathon in October 2026. These are the plain terms for using it. They are written by the builder, not a lawyer.</p>
+
+      <h2>Buddy is a helper, not a doctor</h2>
+      <p>Buddy is an AI helper. What it says is not medical advice, and it is built not to give any: not what a symptom means, not what to take, not what to eat, not how to feel better. It writes things down, reminds, and points to real people. Decisions about her health belong to her and her doctor.</p>
+
+      <h2>Not for emergencies</h2>
+      <p>Buddy is not an emergency service and cannot call anyone by itself. When it notices a warning sign it shows a screen with big call buttons, and she decides. In an emergency, call 911. If she might hurt herself, call or text 988. For a medicine mix-up, call Poison Control at 1-800-222-1222. The safety net uses plain rules and can miss things; it is a net, not a guarantee.</p>
+
+      <h2>Pill reminders</h2>
+      <p>Buddy reminds her of the pills, times, and labels that a family member typed in, and reads the label word for word. It never decides doses, never changes them, and never knows what a pill is for. Check what you type against the bottle. A missed reminder is a note for the family, not a medical judgement.</p>
+
+      <h2>Your Meta API key</h2>
+      <p>Buddy talks to Meta’s models with the API key you add. That key, the costs Meta bills for it, and your agreement to Meta’s terms for its Model API are yours. Keep the key in the app’s <code>.env</code> file and nowhere else. The app sends it only to Meta, never to the browser or anyone else.</p>
+
+      <h2>Her consent</h2>
+      <p>Set Buddy up with her, not for her. She should know that Buddy is an AI, that what she says goes to Meta’s models to be answered, and that she chooses what her family receives. Buddy says it is an AI helper whenever she asks.</p>
+
+      <h2>Plans and payments</h2>
+      <p>Buddy itself is free, and the safety net and pill reminders will never be behind a paywall. A paid Family plan is being built; in this hackathon build, any payment runs in Stripe’s test mode and nothing is ever really charged.</p>
+
+      <h2>The software</h2>
+      <p>Grandma Buddy is provided as it is, under the MIT license, without any warranty. The builder is not liable for what happens from using it. It is a personal project by one developer, made with care, for a real grandmother.</p>
+
+      <h2>Changes</h2>
+      <p>These words may change as the app grows. The current version is always at this address and in the app’s public repository.</p>
+
+      <p class="doc-updated">Last updated October 30, 2026.</p>
+    </main>
+
+    <footer class="site-foot">
+      <p>Grandma Buddy is an AI helper. It can’t give medical advice. In an emergency, call 911.</p>
+      <nav class="site-links" aria-label="More">
+        <a href="/about">About</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/">Open Buddy</a>
+      </nav>
+    </footer>
+  </div>
+</body>
+</html>
