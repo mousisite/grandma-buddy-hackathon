@@ -22,7 +22,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 ROOT = Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "test-output"
 PORT = 8001
-SCREENS = ["today", "talk", "diary", "pills", "notes", "scam", "find", "family", "memories", "settings", "help"]
+SCREENS = ["today", "talk", "diary", "pills", "notes", "scam", "find", "read", "family", "memories", "settings", "help"]
 SIZES = [(390, 844), (768, 1024), (1440, 900)]  # phone, tablet, desktop
 
 
@@ -800,6 +800,174 @@ def check_find(browser) -> None:
         page.close()
 
 
+# Stand-ins for /api/read (no AI here), shaped like app/reader.py's answers,
+# for the made-up papers scripts/check_read.py photographs.
+READ_BILL_SAYS = "This is your electric bill for October. It says you owe $84.20, to be paid by November 15, 2026."
+READ_BILL = {
+    "kind": "bill", "title": "A bill from Riverside Power & Light", "summary": READ_BILL_SAYS, "note": "",
+    "facts": [{"label": "Amount due", "value": "$84.20"}, {"label": "Pay by", "value": "November 15, 2026"}],
+    "words": "Riverside Power & Light\nPO Box 4410, Portland, OR\nRose Demo\nAccount number a long number\n"
+             "Statement date October 28, 2026\nElectricity used in October 612 kWh\nAmount due $84.20\n"
+             "Please pay by November 15, 2026\nPay online at riversidepower.example/pay-your-bill-online-with-autopay, "
+             "by phone, or by mail. Thank you for being our customer.",
+    "spoken": READ_BILL_SAYS, "scam": None,
+}
+READ_CLINIC_NOTE = ("This looks like a letter about your health from Riverside Family Clinic. I can read it to you "
+                    "word for word. If you have questions about it, Dr. Lee is the right person to ask.")
+READ_CLINIC = {
+    "kind": "medical", "title": "A letter about your health from Riverside Family Clinic", "summary": "",
+    "note": READ_CLINIC_NOTE, "facts": [],
+    "words": "Riverside Family Clinic. Dr. Lee. Dear Rose Demo, Your lab results from October 20 are ready. "
+             "Total cholesterol: 212 mg/dL. LDL: 141 mg/dL. Please call our office to talk about these results at "
+             "your next visit on November 3 at 2 PM. Sincerely, Riverside Family Clinic.",
+    "spoken": READ_CLINIC_NOTE, "scam": None,
+}
+READ_SCAM_SAYS = ("It says you won $5,000 and asks you to send a $50 processing fee in gift cards within 24 hours, "
+                  "and to call the number.")
+READ_SCAM = {
+    "kind": "letter", "title": "A letter from National Prize Center", "summary": READ_SCAM_SAYS, "note": "",
+    "facts": [],  # a likely scam's "fee" is never shown as an amount due
+    "words": "NATIONAL PRIZE CENTER. Official Winner Notice. CONGRATULATIONS! YOU HAVE WON $5,000! To claim your "
+             "prize, send a $50 processing fee in gift cards within 24 hours. Call the number now. Do not tell "
+             "anyone until your prize arrives.",
+    "spoken": READ_SCAM_SAYS + " It has signs of a scam.",
+    "scam": {"verdict": "likely_scam", "flags": ["Asks to be paid with gift cards", "Asks you to keep it secret",
+                                                  "Pushes you to act right now", "Says you won a prize"]},
+}
+READ_UNREADABLE = {
+    "kind": "unreadable", "title": "", "summary": "", "facts": [], "words": "", "scam": None,
+    "note": "I couldn’t read this one. Could you take another photo, a little closer, with good light?",
+    "spoken": "I couldn’t read this one. Could you take another photo, a little closer, with good light?",
+}
+
+
+def paper_photo(name: str, page) -> Path:
+    """A made-up paper's photo from scripts/check_read.py, or a stand-in."""
+    photo = ROOT / "scripts" / "read_docs" / f"{name}.png"
+    if not photo.exists():
+        photo = OUT / "read-photo-sample.png"
+        page.screenshot(path=str(photo), clip={"x": 0, "y": 0, "width": 390, "height": 500})
+    return photo
+
+
+def read_paper(page, name: str, answer: dict) -> None:
+    """Take a photo of a paper; /api/read answers with the stand-in."""
+    page.unroute("**/api/read")
+    page.route("**/api/read", lambda route: route.fulfill(json=answer))
+    page.set_input_files("#read-camera", str(paper_photo(name, page)))
+    page.wait_for_selector("#read-result:not([hidden])")
+    page.wait_for_timeout(500)  # the card has finished rising in
+
+
+def check_read(browser) -> None:
+    """Read it to me on the demo week, with /api/read faked (the real Muse
+    Spark runs only in scripts/check_read.py): the Home chip, the orb on the
+    photo while Buddy reads it, a bill (what it is, the amount and the date,
+    focus on the title), word for word with Stop, a health letter (never
+    explained, doctor's call first), a likely scam (the warning in words,
+    Check it for a scam runs the real scam checker with the words, Back
+    keeps the paper), a photo it can't read, and Meta down."""
+    for theme, width, height in [("light", 390, 844), ("dark", 1440, 900)]:
+        page = browser.new_page(viewport={"width": width, "height": height}, color_scheme=theme)
+        visit(page, "today")
+        page.click(".chips a[href='#/read']")
+        wait_for_screen(page, "read")
+        check_layout(page, f"read, start at {width}px")
+        one_line_buttons(page, ".read-start .pill-button", f"read at {width}px")
+
+        # While Buddy reads it: the photo, quiet, with the orb thinking on top.
+        held = []
+        page.route("**/api/read", lambda route: held.append(route))
+        page.set_input_files("#read-camera", str(paper_photo("bill", page)))
+        page.wait_for_selector("#read-photo:not([hidden])")
+        for _ in range(100):
+            if held:
+                break
+            page.wait_for_timeout(100)
+        assert held, "the photo was never sent to /api/read"
+        assert held[0].request.post_data_json["image"].startswith("data:image/jpeg;base64,")
+        assert page.text_content("#read-status") == "Buddy is reading it…"
+        page.wait_for_timeout(400)
+        page.screenshot(path=str(OUT / f"read-reading-{width}-{theme}.png"))
+        held[0].fulfill(json=READ_BILL)
+
+        # A bill: what it is, what it says, the amount and the date.
+        page.wait_for_selector("#read-result:not([hidden])")
+        page.wait_for_timeout(500)
+        assert page.is_hidden("#read-photo") and page.is_hidden("#read-start")
+        assert page.text_content("#read-kind") == "A bill from Riverside Power & Light"
+        assert page.text_content("#read-summary") == READ_BILL_SAYS
+        facts = page.eval_on_selector_all("#read-facts > div", "rows => rows.map(r => r.innerText.replace(/\\s+/g, ' '))")
+        assert facts == ["Amount due $84.20", "Pay by November 15, 2026"], facts
+        assert page.is_hidden("#read-scam") and page.is_hidden("#read-text")
+        assert page.evaluate("document.activeElement.id") == "read-kind"
+        assert page.text_content("#read-more a") == "Call Maria", "a bill: call her family"
+        check_layout(page, f"read, a bill at {width}px")
+        one_line_buttons(page, ".read-result .find-actions .pill-button", f"read, a bill at {width}px")
+        page.screenshot(path=str(OUT / f"read-bill-{width}-{theme}.png"), full_page=True)
+
+        # Word for word: the words show big, and the button says Stop while they are read.
+        page.click("#read-words")
+        assert page.text_content("#read-text") == READ_BILL["words"]
+        lines = page.evaluate("document.getElementById('read-text').innerText.split('\\n').length")
+        assert lines == 9, f"the paper's 9 lines show as lines, not {lines}"
+        said = page.evaluate("linesToSay(readAnswer.words)")
+        assert said.startswith("Riverside Power & Light. PO Box 4410, Portland, OR. Rose Demo."), said
+        check_layout(page, f"read, word for word at {width}px")  # a long link never pushes the page sideways
+        assert page.text_content("#read-words-label") == "Stop reading"
+        page.click("#read-words")
+        assert page.text_content("#read-words-label") == "Read it word for word"
+        assert page.is_visible("#read-text"), "the words stay on the screen"
+
+        # A letter about her health: never explained; her doctor's call button first.
+        page.click("#read-another")
+        assert page.evaluate("document.activeElement.id") == "read-title"
+        read_paper(page, "clinic", READ_CLINIC)
+        assert page.text_content("#read-summary") == READ_CLINIC_NOTE
+        assert page.is_hidden("#read-facts") and page.is_hidden("#read-scam")
+        assert page.eval_on_selector_all("#read-more a", "links => links.map(l => l.textContent)") == ["Call Dr. Lee", "Call Maria"]
+        assert page.get_attribute("#read-more a", "href") == "tel:555-0199"
+        page.screenshot(path=str(OUT / f"read-clinic-{width}-{theme}.png"), full_page=True)
+
+        # A likely scam: the warning in words and an icon.
+        page.click("#read-another")
+        read_paper(page, "scam", READ_SCAM)
+        assert page.is_visible("#read-scam")
+        assert page.eval_on_selector_all("#read-scam-flags li", "items => items.length") == 4
+        check_layout(page, f"read, a scam at {width}px")
+        page.screenshot(path=str(OUT / f"read-scam-{width}-{theme}.png"), full_page=True)
+
+        if width == 390:
+            # Check it for a scam: the real scam checker (no AI here), with the words.
+            page.click("#read-check-scam")
+            wait_for_screen(page, "scam")
+            page.wait_for_selector("#scam-result:not([hidden])")
+            assert page.input_value("#scam-text") == READ_SCAM["words"]
+            assert page.text_content("#scam-verdict") == "Likely scam"
+            # Back: the paper is still there.
+            page.go_back()
+            wait_for_screen(page, "read")
+            assert page.is_visible("#read-result")
+            assert page.text_content("#read-kind") == "A letter from National Prize Center"
+
+            # A photo it can't read: only Take another photo.
+            page.click("#read-another")
+            read_paper(page, "bill", READ_UNREADABLE)
+            assert page.is_hidden("#read-kind") and page.is_hidden("#read-words") and page.is_hidden("#read-check-scam")
+            assert page.is_visible("#read-retake")
+            assert page.text_content("#read-summary") == READ_UNREADABLE["note"]
+
+            # Meta down: a kind word, and the photo buttons again.
+            page.click("#read-another")
+            page.unroute("**/api/read")
+            page.route("**/api/read", lambda route: route.fulfill(
+                status=503, json={"detail": "I couldn’t read it just now. Please try again in a moment."}))
+            page.set_input_files("#read-camera", str(paper_photo("bill", page)))
+            page.wait_for_function("document.getElementById('read-status').textContent.startsWith('I couldn’t')")
+            assert page.is_visible("#read-take") and page.is_hidden("#read-photo")
+        page.close()
+
+
 def seed_demo_week(database: str) -> None:
     """Fill the test server's database with the made-up demo week
     (scripts/seed_demo.py --reset, which keeps a backup first; no paintings)."""
@@ -1469,6 +1637,7 @@ def main() -> int:
                 check_family(browser)
                 check_demo_reminder(browser)
                 check_help(browser)
+                check_read(browser)
                 check_today_rows(browser)
                 check_friend(browser, test_env["DATABASE_PATH"])
                 check_every_screen(browser)
@@ -1491,7 +1660,10 @@ def main() -> int:
             "work (card, I took it, remind me, ring, round check, change, remove, undo), Check a message (paste, "
             "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), Find my things (chip, \"What "
             "are you looking for?\" first, quick pick, photo, halo and sentence, nothing found, safety net first, the "
-            "Find my glasses button), the welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
+            "Find my glasses button), Read it to me (chip, the orb on the photo while Buddy reads, a bill's amount "
+            "and date, word for word with Stop, a health letter never explained with the doctor's call first, a "
+            "likely scam's warning, Check it for a scam with the words, Back keeps the paper, a photo it can't read, "
+            "Meta down), the welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
             "(sections, Mark as asked and Undo in place, Add a question, 14 days, prints on one page), the family update "
             "(the email holds exactly the words on screen, its pills count matches the Pills ring, Copy, Yesterday), "
             "the demo week's done check-in and the hidden ?demo=reminder card (pops up after the first tap, said with "

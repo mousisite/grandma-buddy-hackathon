@@ -41,7 +41,7 @@ Your tools:
 - add_doctor_question when she wants to ask her doctor something.
 - show_call_buttons when she might want to call her doctor or family.
 - suggest_calling_family when she sounds lonely.
-- open_screen when she asks to see a part of the app (her diary, pills, doctor notes, family, memory book, the scam checker, or help, also when she asks how Buddy works).
+- open_screen when she asks to see a part of the app (her diary, pills, doctor notes, family, memory book, the scam checker, or help, also when she asks how Buddy works), or read when she wants a letter, bill, or form read to her.
 - find_my_things when she can't find something, like her glasses, keys, or TV remote. Say you'll look together: she taps the button and takes a photo of the room.
 - look_up_today when she asks about today's weather, what's happening around town, or how the local teams did. Share what it found in one or two short sentences in your own warm words, with no advice of any kind. It can look up only the weather, local news, and sports, never anything about health, medicine, or food.
 - get_pills_due when she asks about her pills today. Say their names and times only: never a dose, how many pills, or what a pill is for. Her pills screen shows each label.
@@ -156,6 +156,14 @@ BRIEFING_RULES = {
              "diet, politics, or anything frightening."),
     "sports": "Say the latest score, or the day of the next game, of the local professional teams. Nothing else.",
 }
+
+READ = """You read a letter, bill, or form for an older woman who lives alone, from a photo of it, so Buddy can tell her what it is and what it says, in plain words. Fill in the form:
+- kind: bill (it asks her to pay for something, like electricity or a phone), letter, medical (anything from a doctor, clinic, hospital, lab, pharmacy, or health insurance about her health or care, including test results and appointments), pill_label (the label of a medicine bottle or box), advertisement, form, other, or unreadable (too blurry, cut off, or not a paper with writing).
+- from: who sent it, exactly as printed, or "" if it doesn't say.
+- words: every word on it, exactly as printed, in reading order, one printed line per line. Leave out barcodes.
+- summary: for a bill, letter, advertisement, form, or other: one to three short, plain sentences saying what it is and what it says or asks, using only what is printed. For medical, pill_label, and unreadable: "". Never give advice, never say whether to pay or what to do, never guess at anything not printed, and never add a number that isn't printed.
+- amount: the amount it asks her to pay, exactly as printed (like $84.20), or "".
+- due: the date it asks for, exactly as printed, or ""."""
 
 FIND = """You help an older adult who lives alone find a thing she misplaced, like her glasses, keys, or TV remote. She took a photo of the room. Another tool already found the thing; you get the photo and the part of it where the thing is.
 

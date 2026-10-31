@@ -254,10 +254,12 @@ button:disabled {
 }
 
 /* Headings get focus when a screen opens (for screen readers), no ring.
-   So does Buddy's answer in Find my things: it isn't something to press. */
+   So do Buddy's answers in Find my things and Read it to me: they aren't
+   something to press. */
 h1:focus,
 h2:focus,
-.find-answer:focus {
+.find-answer:focus,
+#read-summary:focus {
   outline: none;
 }
 
@@ -651,7 +653,7 @@ h2:focus,
   color: var(--text-2);
 }
 
-/* On phones the four Home chips become a 2×2 grid of tiles, icon above
+/* On phones the Home chips become a grid of tiles, two across, icon above
    words: big, even targets, and no name gets squeezed onto two lines. */
 @media (max-width: 767px) {
   .home .chips {
@@ -678,8 +680,7 @@ h2:focus,
   }
 }
 
-/* From 768px the four chips stay pills, two by two and the same width, so
-   none is left alone on a last row. */
+/* From 768px the chips stay pills, two by two and the same width. */
 @media (min-width: 768px) {
   .home .chips {
     display: grid;
@@ -691,6 +692,14 @@ h2:focus,
   .home .chips .chip {
     justify-content: center;
   }
+}
+
+/* A chip alone on the last row takes the whole row (icon beside its words
+   on phones too), so the grid never ends with a gap. */
+.home .chips .chip:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  gap: var(--s-2);
 }
 
 .today {
@@ -2928,6 +2937,147 @@ label.group-row .group-label {
     font-size: var(--t-32);
     line-height: 1.25;
   }
+}
+
+/* ---------- Read it to me ---------- */
+
+.read-start,
+.read-result {
+  display: grid;
+  gap: var(--s-5);
+}
+
+.read-start > .pill-button {
+  justify-self: start;
+  min-width: min(100%, 18rem);
+}
+
+#read-status {
+  margin-top: var(--s-4);
+}
+
+#read-status:empty {
+  display: none;
+}
+
+/* While Buddy reads it: her photo goes quiet and the orb thinks on top
+   (like Find my things), never taller than about half the screen. */
+.read-photo {
+  position: relative;
+  width: min(100%, calc(56vh * var(--photo-aspect, 0.75)));
+  margin: var(--s-4) auto 0;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--tint);
+  box-shadow: var(--shadow-raised);
+}
+
+.read-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: saturate(0.5) brightness(0.92);
+}
+
+.read-photo .find-looking {
+  display: grid;
+}
+
+/* The paper, small, beside what it is. */
+.read-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+
+.read-thumb {
+  flex: none;
+  width: 64px;
+  height: 84px;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  background: var(--tint);
+}
+
+.read-kind {
+  font-size: var(--t-24);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* The amount and the date: the label quiet, the value big. */
+.read-facts {
+  display: grid;
+  margin: 0;
+}
+
+.read-facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-4);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--border);
+}
+
+.read-facts > div:last-child {
+  border-bottom: 1px solid var(--border);
+}
+
+.read-facts dt {
+  color: var(--text-2);
+}
+
+.read-facts dd {
+  margin: 0;
+  font-size: var(--t-20);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A likely scam: the warning color with words and an icon. Red stays for
+   emergencies. */
+.read-scam {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  border: 2px solid var(--warning);
+  border-radius: var(--r-input);
+}
+
+.read-scam-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--warning);
+  font-size: var(--t-20);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.read-scam-title .icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  stroke-width: 2;
+}
+
+/* The words on the paper, big and easy to follow while Buddy reads them,
+   line by line as printed. */
+.read-text {
+  max-width: 60ch;
+  padding: var(--s-5);
+  border-radius: var(--r-input);
+  background: var(--tint);
+  font-size: var(--t-20);
+  line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere; /* a long printed link breaks instead of pushing the page sideways */
 }
 
 /* ---------- Welcome (the first time) ---------- */

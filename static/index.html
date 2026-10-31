@@ -133,6 +133,10 @@
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 10.01h.01"></path><path d="M10 14.01h.01"></path><path d="M14 10.01h.01"></path><path d="M14 14.01h.01"></path><path d="M18 6v12"></path><path d="M6 6v12"></path><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
           Something hurts
         </button>
+        <a class="chip" href="#/read">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
+          Read it to me
+        </a>
         <a class="chip" href="#/scam">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 15h.01"></path><path d="M12 7v4"></path></svg>
           Check a message
@@ -550,6 +554,84 @@
       </section>
     </section>
 
+    <!-- ========== Read it to me ==========
+         She takes a photo of a letter, a bill, or a form. Muse Spark reads
+         it, plain code checks every sentence (app/reader.py), and Buddy says
+         what it is and what it says (read.js; docs/SAFETY.md section 8d).
+         A letter about her health is never explained, only read word for
+         word. Her photo is never saved. -->
+    <section class="screen read" data-screen="read" aria-labelledby="read-title" hidden>
+      <header class="screen-head">
+        <h1 id="read-title" class="display" tabindex="-1">Read it to me</h1>
+        <p class="lead">A letter, a bill, or a form? Take a photo of it. Buddy tells you what it is and reads it to you.</p>
+      </header>
+
+      <div id="read-start" class="read-start">
+        <button id="read-take" class="pill-button pill-button--ink pill-button--hero" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+          Take a photo
+        </button>
+        <button id="read-choose" class="text-button find-choose" type="button">Choose a photo instead</button>
+        <p class="note">Your photo is never saved. A letter about your health is read to you word for word, never explained.</p>
+        <!-- The camera, or her photos; the picture is shrunk before it is sent. -->
+        <input id="read-camera" type="file" accept="image/*" capture="environment" hidden>
+        <input id="read-library" type="file" accept="image/*" hidden>
+      </div>
+
+      <p id="read-status" class="note" role="status" aria-live="polite"></p>
+
+      <!-- While Buddy reads it: her photo goes quiet, and the orb thinks on top. -->
+      <figure id="read-photo" class="read-photo" aria-busy="true" hidden>
+        <img id="read-image" alt="The paper you took a photo of">
+        <div class="find-looking" aria-hidden="true">
+          <div class="orb orb--find"></div>
+        </div>
+      </figure>
+
+      <!-- What it is and what it says: the screen's one raised card. -->
+      <section id="read-result" class="verdict read-result" aria-labelledby="read-kind" hidden>
+        <div class="read-head">
+          <img id="read-thumb" class="read-thumb" alt="">
+          <h2 id="read-kind" class="read-kind" tabindex="-1"></h2>
+        </div>
+        <p id="read-summary" class="verdict-explanation" tabindex="-1"></p>
+        <!-- The amount and the date, only when they are printed on the paper. -->
+        <dl id="read-facts" class="read-facts" hidden></dl>
+        <!-- Only for a likely scam: words and an icon, never color alone. -->
+        <div id="read-scam" class="read-scam" hidden>
+          <h3 class="read-scam-title">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 9-6 6"></path><path d="M2.586 16.726A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2h6.624a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586z"></path><path d="m9 9 6 6"></path></svg>
+            It has signs of a scam
+          </h3>
+          <ul id="read-scam-flags" class="verdict-list"></ul>
+        </div>
+        <!-- The words on the paper, big, once she asks for them. -->
+        <p id="read-text" class="read-text" hidden></p>
+        <div class="find-actions">
+          <button id="read-words" class="pill-button pill-button--ink pill-button--hero" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
+            <span id="read-words-label">Read it word for word</span>
+          </button>
+          <button id="read-retake" class="pill-button pill-button--ink pill-button--hero" type="button" hidden>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+            Take another photo
+          </button>
+          <button id="read-again" class="pill-button pill-button--quiet pill-button--hero" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path></svg>
+            Say it again
+          </button>
+        </div>
+        <!-- "Check it for a scam", then call buttons (read.js adds them). -->
+        <div id="read-more" class="actions verdict-actions">
+          <button id="read-check-scam" class="call-pill call-pill--quiet" type="button">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 15h.01"></path><path d="M12 7v4"></path></svg>
+            Check it for a scam
+          </button>
+        </div>
+        <button id="read-another" class="text-button find-choose" type="button">Read another paper</button>
+      </section>
+    </section>
+
     <!-- ========== Help: how Buddy works, what it never does, questions ==========
          The models and features come from /api/how (app/how.py), so the page
          always says what really runs. -->
@@ -951,6 +1033,7 @@
   <script src="/static/sayit.js"></script>
   <script src="/static/welcome.js"></script>
   <script src="/static/find.js"></script>
+  <script src="/static/read.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

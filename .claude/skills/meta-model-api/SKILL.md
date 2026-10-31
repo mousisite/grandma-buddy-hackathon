@@ -123,7 +123,7 @@ data = json.loads(resp.choices[0].message.content)
 - In strict schemas, list every property in `required`, set `"additionalProperties": false`, and use enums for levels and verdicts.
 - Always validate the parsed result in Python. If it fails, retry once. If it fails again, show a friendly "Sorry, please try again" message. For the scam checker, the fallback advice is "Not sure. Don't click anything, and call {family} before you reply or pay."
 
-## Image input (scam photos, pill bottle labels)
+## Image input (scam photos, letters and bills for Read it to me, pill bottle labels)
 
 Muse Spark accepts images. Send OpenAI-style content parts with a base64 data URL:
 

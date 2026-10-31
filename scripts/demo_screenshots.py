@@ -12,6 +12,7 @@
 #   .venv\Scripts\python scripts\demo_screenshots.py
 # Screenshots go to test-output/demo-<screen>-<width>.png.
 
+import json
 import os
 import shutil
 import sqlite3
@@ -26,14 +27,18 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app.config import get_settings  # noqa: E402
-from scripts.browser_checks.home import LAYOUT_PROBLEMS_JS, ONE_LINE_JS, wait_for_screen  # noqa: E402
+from scripts.browser_checks.home import (  # noqa: E402
+    LAYOUT_PROBLEMS_JS, ONE_LINE_JS, READ_BILL, READ_CLINIC, READ_SCAM, read_paper, wait_for_screen,
+)
+from scripts.check_read import FOLDER as PAPERS, photos  # noqa: E402
 
 OUT = ROOT / "test-output"
 FOLDER = OUT / "demo-screens"
 PORT, WELCOME_PORT = 8006, 8007
 SIZES = [(390, 844), (1440, 900)]
 # Each screen, by its address. memory/1 is the first Memory book page.
-SCREENS = ["", "talk", "diary", "pills", "notes", "family", "memories", "memory/1", "scam", "find", "settings", "help"]
+SCREENS = ["", "talk", "diary", "pills", "notes", "family", "memories", "memory/1", "scam", "find", "read", "settings",
+           "help"]
 
 
 def copy_the_app_data() -> Path:
@@ -119,11 +124,49 @@ def close_up(page, selector: str, name: str) -> str:
     return name
 
 
+def paper_answer(name: str, stand_in: dict) -> dict:
+    """What the real Muse Spark said about a made-up paper (saved by
+    scripts/check_read.py), or the browser check's stand-in."""
+    saved = PAPERS / f"{name}.json"
+    return json.loads(saved.read_text(encoding="utf-8")) if saved.exists() else stand_in
+
+
+def read_close_ups(page, width: int) -> list[str]:
+    """Read it to me: the Home chips, Buddy reading a bill (the orb on the
+    photo), and the cards for the bill, the clinic letter, and the scam."""
+    saved = []
+    page.goto(f"http://localhost:{PORT}/#/", wait_until="networkidle")
+    wait_for_screen(page, "today")
+    saved.append(close_up(page, ".home .chips", f"demo-read-chips-{width}.png"))
+    page.goto(f"http://localhost:{PORT}/#/read", wait_until="networkidle")
+    wait_for_screen(page, "read")
+    page.add_style_tag(content=".pill-banner { display: none !important; }")  # a pill may be due in the copy
+    held = []
+    page.route("**/api/read", lambda route: held.append(route))
+    page.set_input_files("#read-camera", str(PAPERS / "bill.png"))
+    page.wait_for_selector("#read-photo:not([hidden])")
+    page.wait_for_function("document.getElementById('read-status').textContent !== ''")
+    page.wait_for_timeout(800)  # the orb is thinking
+    saved.append(close_up(page, "#read-photo", f"demo-read-reading-{width}.png"))
+    while not held:
+        page.wait_for_timeout(100)
+    held[0].fulfill(json=paper_answer("bill", READ_BILL))
+    page.wait_for_selector("#read-result:not([hidden])")
+    for name, stand_in in [("bill", READ_BILL), ("clinic", READ_CLINIC), ("scam", READ_SCAM)]:
+        if name != "bill":
+            page.click("#read-another")
+            read_paper(page, name, paper_answer(name, stand_in))
+        page.wait_for_timeout(700)  # the card has risen in
+        no_problems(page, f"read, the {name} at {width}px")
+        saved.append(close_up(page, "#read-result", f"demo-read-{name}-{width}.png"))
+    return saved
+
+
 def close_ups(browser) -> list[str]:
     """The Oct 30 polish, up close at both widths: the Today list (check-in
     done), the family update's pills line, Doctor notes questions (the first
-    marked as asked, on the copy), the Memory book cards, and the pill
-    reminder card from the hidden ?demo=reminder."""
+    marked as asked, on the copy), the Memory book cards, Read it to me,
+    and the pill reminder card from the hidden ?demo=reminder."""
     saved = []
     for width, height in SIZES:
         page = browser.new_page(viewport={"width": width, "height": height})
@@ -175,6 +218,10 @@ def close_ups(browser) -> list[str]:
         if width >= 768:
             assert len(set(heights)) == 1, f"Memory book cards side by side should be the same height: {heights}"
         saved.append(close_up(page, "#memory-cards", f"demo-fix-memories-{width}.png"))
+        page.close()
+
+        page = browser.new_page(viewport={"width": width, "height": height})
+        saved += read_close_ups(page, width)
         page.close()
 
         # The hidden demo reminder: it pops up 2 seconds after the first tap.
@@ -235,6 +282,7 @@ def welcome(browser) -> list[str]:
 if __name__ == "__main__":
     from playwright.sync_api import sync_playwright
 
+    photos()  # the made-up papers for Read it to me (made once, no AI)
     database = copy_the_app_data()
     server = start_server(database, PORT)
     add_made_up_weather(database)  # after the server made its tables

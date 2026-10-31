@@ -1,0 +1,18 @@
+{
+  "kind": "letter",
+  "title": "A letter from National Prize Center",
+  "summary": "This is a winner notice from National Prize Center. It says you have won $5,000. It asks you to send a $50 processing fee in gift cards and to call the number.",
+  "note": "",
+  "facts": [],
+  "words": "NATIONAL PRIZE CENTER\nOfficial Winner Notice\nCONGRATULATIONS! YOU HAVE WON $5,000!\nTo claim your prize, send a $50 processing fee in gift cards within 24 hours.\nCall the number now. Do not tell anyone until your prize arrives.",
+  "spoken": "This is a winner notice from National Prize Center. It says you have won $5,000. It asks you to send a $50 processing fee in gift cards and to call the number. It has signs of a scam.",
+  "scam": {
+    "verdict": "likely_scam",
+    "flags": [
+      "Asks to be paid with gift cards",
+      "Asks you to keep it secret",
+      "Pushes you to act right now",
+      "Says you won a prize"
+    ]
+  }
+}

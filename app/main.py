@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from app import db, security
 from app.config import get_settings
 from app import voice
-from app.routes import briefing, checkin, companion, diary, family, find, how, learned, listen, meds, memories, notes, profile, scam
+from app.routes import briefing, checkin, companion, diary, family, find, how, learned, listen, meds, memories, notes, profile, read, scam
 from app.routes import voice as voice_routes
 
 # The folder with index.html, styles.css, and app.js.
@@ -66,6 +66,8 @@ app.include_router(how.router)
 app.include_router(briefing.router)
 # Hands-free talking: her microphone, live, to Meta's realtime speech-to-text.
 app.include_router(listen.router)
+# Read it to me: a photo of a letter or bill, in plain words.
+app.include_router(read.router)
 
 
 @app.middleware("http")

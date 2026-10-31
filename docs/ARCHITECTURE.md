@@ -22,6 +22,8 @@
  Find my things: a photo + "glasses"  --POST-->  /api/find (safety net first)
    the halo around it, the sentence    <--JSON--    finder.find  ----------------------->  SAM 3.1 (finds it: a box)
                                                                   ----------------------->  Muse Spark 1.3 (says where)
+ Read it to me: a photo of a letter   --POST-->  /api/read
+   what it is, what it says, read aloud <--JSON--   reader.read  ----------------------->  Muse Spark 1.3 (reads it into a form)
                                                     SQLite file: data/grandma_buddy.db
                                                     Pictures: data/memories/<id>.webp
 ```
@@ -69,6 +71,7 @@ grandma-buddy-hackathon/
     memories.py              the Memory book: write the page (checked: only her names and numbers, no advice), paint it, the picture style
     briefing.py              today's weather, a cheerful local story, or sports, looked up on the web for her town (our code writes the question), checked (no links, no health or advice, 2 sentences), kept 3 hours, 30 searches a day at most
     finder.py                Find my things: what she's looking for as a short noun phrase, SAM's answer line, the surest match, Spark's sentence (checked) or plain words
+    reader.py                Read it to me: Spark reads a photo of a paper into a strict form; plain code decides what she hears (health papers never explained, every summary sentence checked, printed numbers only, scam signs said, a scam's number never read out)
     voice.py                 Buddy's natural voice: Kokoro (kokoro-onnx) on this computer, the voices on offer, WAV making, a cache of recent words
     notes.py                 Doctor notes: facts straight from the logs (plain code); the AI only groups, checked
     scam.py                  Check a message: red-flag rules (a floor the AI can't lower), the AI's verdict, fixed what-to-do
@@ -83,6 +86,7 @@ grandma-buddy-hackathon/
       family.py              /api/family/summary
       memories.py            /api/memories (the pages, a picture, save, paint again)
       find.py                /api/find (safety net first, then finder.find; the photo is never saved)
+      read.py                /api/read (reader.read; the photo and the paper's words are never saved)
       briefing.py            /api/briefing/{weather,news,sports} for Home's weather row
       listen.py              /api/listen (WebSocket): hands-free talking, her microphone live to Meta's realtime speech-to-text and her words back; only Buddy's own page, one at a time, 15 minutes at most
       voice.py               /api/voice (is the natural voice here, which voices), /api/speak (words in, WAV out)
@@ -98,6 +102,7 @@ grandma-buddy-hackathon/
     welcome.js               the first-time welcome: "Step 1 of 3", name, family, pills now or later; typed or said ("Say it")
     sayit.js                 "Say it" buttons for forms (the welcome, Find my things): record, write down, the safety net first (/api/check-words), then fill the form
     find.js                  Find my things: what she's looking for (quick picks, "Say it"), the photo, the halo (an SVG in the photo's own pixels) and Buddy's sentence
+    read.js                  Read it to me: the photo, the orb while Buddy reads it, the card (what it is, Buddy's words, amount and date, scam signs), word for word with Stop, Check it for a scam, call buttons
     screens.js               the other screens: diary timeline, pills (ring, round checks) and reminder card, family, Memory book, settings, toasts
     recorder.js              microphone -> 16 kHz mono 16-bit WAV
     speech.js                read-aloud: Buddy's natural voice (/api/speak, one sentence at a time, the next made while one plays, the highlight estimated from how far it has played), else the browser's speechSynthesis (her choice in Settings, else the best English voice); any trouble falls back to the browser voice
@@ -116,6 +121,8 @@ grandma-buddy-hackathon/
     check_briefing.py        hand-run: 3 real web searches (weather, local news, sports) for the demo town, Meta's answers and what Buddy would say after its checks (about 1 cent)
     check_find.py            hand-run: Find my things end to end in a browser with the real SAM 3.1 and Muse Spark on 4 test photos (about 2 cents; 4 more the first time, to paint them), then screenshots; `--only desk-glasses` runs one look
     find_photos/             the 4 test photos for check_find.py, painted with Muse Image for this project (rooms and a desk only, no people)
+    check_read.py            hand-run: Read it to me with the real Muse Spark on 3 made-up papers (a bill, a clinic letter, a prize scam), what Buddy would say after its checks, saved next to each photo for the demo screenshots (about 1 cent); `--only scam` reads one
+    read_docs/               the 3 made-up papers as photos (made by check_read.py from small web pages, no AI) and the real answers
     demo_screenshots.py      hand-run, free: every screen with the demo week at 390 and 1440px, on a COPY of the app's database (no AI), plus the welcome's 3 steps
     try_companion.py         hand-run: 8 made-up conversations with the real AI (about 25 cents), incl. a returning chat after real daily learning
     get_voice.py             hand-run once: downloads Buddy's natural voice model (Kokoro, about 354 MB) into models/
@@ -197,6 +204,7 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `POST /api/memories` | `{"conversation_id", "mode"}` (`chat` or `memory`, the talk the button was shown in) | "Save it in my memory book": the page made from what was said in that talk (400 if she said nothing), written and painted in the background. Already saved: the same page, not painted again |
 | `POST /api/memories/{id}/paint` | | "Paint it again", only for a page with `no_picture` (writes it first if it has no title) |
 | `POST /api/find` | `{"thing", "image", "width", "height"}`: what she said or typed, and the photo as a data URL (JPEG, PNG, or WebP, at most about 6 MB; the page shrinks it to about 1600px JPEG) and its size | the safety net first: a safety-screen answer like `/api/chat`'s if her words need one (no AI). Else `{"found": true, "thing", "sentence", "box": {"x1", "y1", "x2", "y2"}, "width", "height"}` (the box in the photo's own pixels, x2 and y2 included) or `{"found": false, "thing", "sentence"}`. 400 when she named nothing or the photo isn't one; 503 with a kind sentence when SAM can't look. The photo is never saved |
+| `POST /api/read` | `{"image"}`: a photo of a paper as a data URL (JPEG, PNG, or WebP, at most about 6 MB) | `{"kind", "title", "summary", "note", "facts": [{"label", "value"}], "words", "spoken", "scam"}`: `kind` is bill, letter, medical, pill_label, advertisement, form, other, or unreadable; `summary` is Spark's checked summary, `note` Buddy's fixed words instead (a health paper, a pill label, a photo it can't read); `words` the paper's words line by line (long numbers hidden; a likely scam's numbers and links taken out); `spoken` what Buddy says; `scam` `{"verdict": "likely_scam", "flags"}` or null. 400 when it isn't a photo; 503 with a kind sentence when Spark can't read it. Nothing is saved |
 | `POST /api/check-words` | `{"text"}` | words she said outside a talk (the welcome's "Say it"): the safety net only, never the AI. `{"show": null}`, or the same safety-screen answer as `/api/chat` (saved the same way) |
 | `POST /api/greeting` | `{"conversation_id"}` | `{"greeting"}`: at the start of a conversation (no talk in the last 2 hours), "Good afternoon, Rose!" plus a follow-up that's due (asked once) or a warm opener; plain words, no AI; saved in the conversation. Otherwise `""` |
 | `GET /api/learned` | | `{"facts": [{"id", "kind", "fact", "follow_up"}], "notes": [{"id", "note"}], "days_learned"}` for Settings |

@@ -158,6 +158,16 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - The app refuses to start with a `-contributor` model in its settings.
 - Done when: the page lists exactly the models in the settings (tested), the questions open, and it is checked in a browser at every width.
 
+### 16. Read it to me (P1)
+
+- A letter, a bill, or a form she can't read well. From the "Read it to me" tile on Home, or by voice ("Buddy, can you read this letter?" gives an "Open Read it to me" button), she takes or chooses a photo of it.
+- Muse Spark 1.3 reads the photo; plain code decides what she hears (docs/SAFETY.md section 8d). Buddy says what it is and what it says, in plain words: "This is an electricity bill from Riverside Power & Light. It shows an amount due of $84.20 by November 15, 2026." The amount and the date show big, only when they are printed on the paper.
+- "Read it word for word" shows the words big, line by line as printed, and reads them aloud ("Stop reading" while it does). "Say it again" repeats what Buddy said.
+- A paper about her health (a doctor's letter, test results, an appointment, a pill label) is never explained: Buddy offers to read it word for word and says who is the right person to ask, with Call {doctor} first.
+- A likely scam is said out loud, with its warning signs; its phone number and link are never read out. "Check it for a scam" checks the words in one tap. Every paper has Call {family}.
+- Her photo is never saved, and nothing from the paper is kept. The last paper stays on the screen until she taps "Read another paper".
+- Done when: the checks are tested with a fake Meta, `scripts/check_read.py` reads three made-up papers right with the real model (a bill, a clinic letter, a prize scam), and the browser check covers the screen at every width.
+
 ## Not building (out of scope)
 
 - Any medical advice: saying how serious a symptom is, what causes it, or what to do about it

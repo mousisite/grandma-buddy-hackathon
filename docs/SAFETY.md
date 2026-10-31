@@ -182,6 +182,17 @@ How the checker keeps to these rules (`app/scam.py`):
 - Before she hears it, plain code checks the answer: it must really come from today's web (a search ran, and sources are named); links are taken out; any sentence about health, medicine, or food, or one the advice guard flags, is left out; at most 2 sentences are kept. If nothing is left, Buddy has nothing to share. The local news never includes crime, accidents, deaths, illness, politics, or anything frightening (its instructions).
 - Under Buddy's words she sees where it was read ("From the web: weather.gov"). An answer is kept 3 hours; at most 30 searches are made a day. If a new look fails, the last one from today is kept, never yesterday's.
 
+## 8d. Read it to me
+
+- The words on a paper aren't hers, so the safety net doesn't run on them (like a message in the scam checker). Nothing she says is involved.
+- Muse Spark only fills a strict form from the photo (the `READ` prompt, `app/reader.py`): what kind of paper it is, who sent it, every word as printed (one line per line), a short plain summary, and the amount and date it asks for. The prompt forbids advice, saying whether to pay or what to do, guessing, and any number that isn't printed. Plain code decides what she sees and hears.
+- A paper about her health is never explained. When Spark says it is medical or a pill label, or its summary or sender mentions health, Buddy says only fixed words: "This looks like a letter about your health from {sender}. I can read it to you word for word. If you have questions about it, {doctor_name} is the right person to ask." (for a pill label, "your pharmacist"). No summary, no amount, no date, and Call {doctor_name} comes first.
+- Every sentence of a summary is checked before she hears it: the advice guard, no advice of Buddy's own ("you should pay it", "make sure"), and every number must be printed on the paper. A sentence that fails is left out; at most 3 are kept. The amount and the date show only when they are printed on the paper.
+- Phone numbers and links are never repeated in Buddy's own words. Long numbers (5 digits or more, like account numbers) are hidden everywhere as "a long number".
+- The scam checker's plain rules (section 8) run on every paper but a pill label. A printed account number and a company website don't count here, because every real bill has them. A likely scam is said out loud ("It has signs of a scam."), with its warning signs in the warning color and a stop icon. Its phone numbers and links are never read out, even word for word, and its "fee" is never shown as an amount due. "Check it for a scam" sends the words to the scam checker in one tap.
+- Her photo is only passed to Meta to be read. It is never saved here (not in the database, on disk, or in logs: a failure prints only its kind), and nothing from the paper is kept.
+- The test papers (`scripts/read_docs/`) are made up: the companies, the people, and the numbers.
+
 ## 9. Privacy
 
 - Health data stays in `data/grandma_buddy.db` on this computer and never goes to GitHub.

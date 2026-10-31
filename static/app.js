@@ -180,6 +180,7 @@ var SCREEN_TITLES = {
   memories: "Memory book",
   memory: "Memory book", // one page: #/memory/3
   find: "Find my things", // #/find/glasses fills in what she's looking for (find.js)
+  read: "Read it to me", // a photo of a letter, a bill, or a form (read.js)
   settings: "Settings",
   help: "Help", // how Buddy works, privacy, questions
   welcome: "Welcome", // the first time, while no name is saved (welcome.js)

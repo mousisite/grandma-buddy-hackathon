@@ -11,8 +11,8 @@ from app.config import Settings
 # in her words.
 MODELS = [
     ("chat_model", "Thinks and talks: Buddy's words, check-in questions, doctor-note topics, scam checks, "
-                   "Memory book pages, and where your things are. It also looks up today's weather and news "
-                   "with Meta's web search."),
+                   "Memory book pages, where your things are, and what a letter says. It also looks up today's "
+                   "weather and news with Meta's web search."),
     ("transcribe_model", "Hears you: turns what you say into words, live, and hears when you've finished."),
     ("image_model", "Paints the pictures in your Memory book."),
     ("sam_model", "Finds your glasses or keys in a photo of the room."),
@@ -45,7 +45,7 @@ FEATURES = [
         "name": "Pill reminders",
         "what": "At each pill's time, Buddy reminds you and reads the label exactly as your family typed it.",
         "models": [],
-        "here": "Runs on this computer. The AI never sees a pill's label.",
+        "here": "Runs on this computer. The labels your family typed never go to the AI.",
     },
     {
         "name": "Daily check-in and diary",
@@ -77,6 +77,13 @@ FEATURES = [
         "what": "Finds your glasses or keys in a photo of the room, and tells you where they are.",
         "models": ["sam_model", "chat_model"],
         "here": "Your photo is never saved.",
+    },
+    {
+        "name": "Read it to me",
+        "what": "Take a photo of a letter, a bill, or a form, and Buddy tells you what it is and what it says, "
+                "in plain words, or reads it word for word.",
+        "models": ["chat_model"],
+        "here": "Your photo is never saved. Letters about your health are read word for word, never explained.",
     },
     {
         "name": "Today's weather and news",

@@ -14,11 +14,11 @@ from datetime import date, datetime, timedelta
 from app import briefing, db, finder, guard, meta_client, reminders, safety
 
 MOODS = ["great", "good", "okay", "low", "very_low"]
-SCREENS = ["today", "diary", "pills", "notes", "family", "scam", "memories", "help"]
+SCREENS = ["today", "diary", "pills", "notes", "family", "scam", "memories", "help", "read"]
 SCREEN_NAMES = {
     "today": "Today", "diary": "My diary", "pills": "My pills",
     "notes": "Doctor notes", "family": "Family", "scam": "Scam check", "memories": "Memory book",
-    "help": "Help",
+    "help": "Help", "read": "Read it to me",
 }
 # ---------- What Buddy remembers about her life ----------
 

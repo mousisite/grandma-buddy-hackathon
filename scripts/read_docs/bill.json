@@ -1,0 +1,19 @@
+{
+  "kind": "bill",
+  "title": "A bill from Riverside Power & Light",
+  "summary": "This is an electricity bill from Riverside Power & Light. It says the amount due is $84.20 by November 15, 2026.",
+  "note": "",
+  "facts": [
+    {
+      "label": "Amount due",
+      "value": "$84.20"
+    },
+    {
+      "label": "Pay by",
+      "value": "November 15, 2026"
+    }
+  ],
+  "words": "Riverside Power & Light\nPO Box 4410, Portland, OR\nRose Demo\nAccount number a long number\nStatement date October 28, 2026\nElectricity used in October 612 kWh\nAmount due $84.20\nPlease pay by November 15, 2026\nPay online, by phone, or by mail. Thank you for being our customer.",
+  "spoken": "This is an electricity bill from Riverside Power & Light. It says the amount due is $84.20 by November 15, 2026.",
+  "scam": null
+}
