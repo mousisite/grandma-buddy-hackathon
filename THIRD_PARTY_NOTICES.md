@@ -28,7 +28,7 @@ Meta has no text-to-speech model, so Buddy speaks with an open voice model that 
 
 ## Test photos
 
-`scripts/find_photos/` holds 3 photos of rooms (a living room, a kitchen counter, a sofa) that `scripts/check_find.py` uses to try Find my things with the real SAM 3.1. They were painted with Meta's Muse Image for this project during the hackathon, from prompts in that script: rooms only, with no people and no writing. They are not photos of any real home.
+`scripts/find_photos/` holds 4 photos (a living room, a kitchen counter, a sofa, and a writing desk) that `scripts/check_find.py` uses to try Find my things with the real SAM 3.1. They were painted with Meta's Muse Image for this project during the hackathon, from prompts in that script: rooms and a desk only, with no people and no writing. They are not photos of any real home.
 
 ## Fonts used by the app
 
@@ -41,4 +41,4 @@ Meta has no text-to-speech model, so Buddy speaks with an open voice model that 
 
 | Icons | Source | License | Changes |
 | --- | --- | --- | --- |
-| bandage, camera, check, chevron-left, circle-alert, circle-check, clipboard-list, house, message-square-warning, mic, moon, notebook-pen, octagon-x, phone, pill, plus, scan-search, settings, sun, users, volume-2, x | [Lucide](https://github.com/lucide-icons/lucide) (`icons/*.svg`), copied into the pages as inline SVG | ISC License, Copyright (c) 2026 Lucide Icons and Contributors. check, moon, and x are derived from Feather: MIT License, Copyright (c) 2013-present Cole Bemis. Full text of both in `static/LICENSE-lucide.txt` | Inlined; stroke width set to 1.75 in `static/styles.css` |
+| ban, bandage, camera, check, chevron-down, chevron-left, chevron-right, circle-alert, circle-check, circle-help, clipboard-list, house, mail, message-square-warning, mic, monitor, moon, notebook-pen, octagon-x, phone, pill, plus, scan-search, settings, shield, sun, users, volume-2, x | [Lucide](https://github.com/lucide-icons/lucide) (`icons/*.svg`), copied into the pages as inline SVG | ISC License, Copyright (c) 2026 Lucide Icons and Contributors. check, moon, and x are derived from Feather: MIT License, Copyright (c) 2013-present Cole Bemis. Full text of both in `static/LICENSE-lucide.txt` | Inlined; stroke width set to 1.75 in `static/styles.css` |

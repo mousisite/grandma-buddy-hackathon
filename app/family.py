@@ -40,17 +40,43 @@ def mood_line(connection, start: str, end: str) -> str:
     return f"Mood: {notes.MOOD_WORDS.get(row['mood'], row['mood'])} (at {said_at})"
 
 
+# What the update calls a reminder she hasn't taken, by what it is now.
+# Snoozed counts as due now: it is waiting for her answer.
+NOT_TAKEN_WORDS = {"missed": "Missed", "due": "Due now", "snoozed": "Due now", "upcoming": "Still to come"}
+
+
 def pills_line(connection, start: str, day_end: str) -> str:
-    found = notes.pills(connection, start, reminders.current_time(), until=day_end)
-    if not found:
+    """How many of that day's reminders she took, out of all of them, so it
+    says the same as the Pills screen ("2 of 3"). Then each one not taken,
+    by name and time: missed, due now, or still to come."""
+    if not reminders.active_pills(connection):
         return "Pills: No pills set up."
-    taken = sum(pill["taken"] for pill in found)
-    total = sum(pill["total"] for pill in found)
-    # notes.pills gives each missed dose as "Wed, Oct 28, 6:00 PM": the day
-    # is already in the update, so only the time is kept.
-    missed = [f"{pill['name']} at {when.rsplit(', ', 1)[-1]}" for pill in found for when in pill["missed"]]
-    line = f"Pills: {taken} of {total} taken."
-    return line + (" Missed: " + ", ".join(missed) + "." if missed else "")
+    now = reminders.current_time()
+    # Today's later reminders are made when the app asks for them: make sure
+    # they are there, so a pill still to come counts. (Not saved from here.)
+    reminders.make_todays_reminders(connection, now)
+    rows = connection.execute(
+        "SELECT e.due_at, e.status, e.snooze_until, m.name FROM med_events e JOIN medications m ON m.id = e.medication_id "
+        "WHERE m.active = 1 AND e.due_at >= ? AND e.due_at <= ? ORDER BY e.due_at, m.name COLLATE NOCASE",
+        (start, day_end),
+    ).fetchall()
+    if not rows:
+        return "Pills: No reminders that day."
+    taken = 0
+    not_taken: dict[str, list[str]] = {}
+    for row in rows:
+        state = reminders.status(dict(row), now)
+        if state == "taken":
+            taken += 1
+        else:
+            # The day is already in the update, so only the time: "Metformin at 6:00 PM".
+            when = notes.time_words(datetime.fromisoformat(row["due_at"]))
+            not_taken.setdefault(NOT_TAKEN_WORDS[state], []).append(f"{row['name']} at {when}")
+    line = f"Pills: {taken} of {len(rows)} taken."
+    for words in ("Missed", "Due now", "Still to come"):
+        if words in not_taken:
+            line += f" {words}: {', '.join(not_taken[words])}."
+    return line
 
 
 def diary_lines(connection, start: str, end: str) -> list[str]:

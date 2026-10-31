@@ -129,21 +129,36 @@ def pick_taken(found: list[dict], her_words: str, now: datetime) -> list[dict]:
     return chosen
 
 
-def reminder_words(due_pills: list[dict]) -> str:
-    """What the banner says and Buddy reads aloud, like "It's time for your
-    morning pill: Lisinopril, 10 mg tablet, take 1 by mouth daily." The label
-    is repeated exactly; only a period is added at the very end if needed."""
+def joined(names: list[str]) -> str:
+    """ "Lisinopril and Metformin", or "Lisinopril, Metformin, and Vitamin D". """
+    if len(names) <= 2:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + ", and " + names[-1]
+
+
+def reminder_title(due_pills: list[dict], her_name: str = "") -> str:
+    """The first thing the reminder card says, with her name: "Rose, it's
+    time for your evening Metformin." or, for several pills, "Rose, it's
+    time for your morning pills: Lisinopril and Metformin." """
     when = part_of_day(datetime.fromisoformat(due_pills[0]["due_at"]))
-    noun = "pill" if len(due_pills) == 1 else "pills"
-    words = ""
+    names = [pill["name"] for pill in due_pills]
+    what = f"{when} {names[0]}" if len(names) == 1 else f"{when} pills: {joined(names)}"
+    return f"{her_name + ', it’s' if her_name else 'It’s'} time for your {what}."
+
+
+def reminder_words(due_pills: list[dict], her_name: str = "") -> str:
+    """What Buddy reads aloud: the title, then each label exactly as the
+    family typed it ("The label says: 500 mg tablet, take 1 by mouth…", or
+    "Metformin: 500 mg tablet…" for several pills). Only a period is added
+    at the very end of a label if needed. A pill with no label is named in
+    the title, and nothing is made up for it."""
+    words = reminder_title(due_pills, her_name)
     for pill in due_pills:
-        item = f"{pill['name']}, {pill['label_dose']}" if pill["label_dose"] else pill["name"]
-        if words:
-            words += " " if words[-1] in ".!?" else "; "
-        words += item
-    if words[-1] not in ".!?":
-        words += "."
-    return f"It’s time for your {when} {noun}: {words}"
+        label = pill["label_dose"]
+        if label:
+            start = "The label says: " if len(due_pills) == 1 else f"{pill['name']}: "
+            words += " " + start + label + ("" if label[-1] in ".!?" else ".")
+    return words
 
 
 # ---------- The database ----------

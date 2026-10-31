@@ -76,13 +76,46 @@ def test_odd_pill_entries_are_refused_and_named(client, clock, changes, field):
 # ---------- Reminders through the day ----------
 
 def test_a_reminder_is_due_at_its_time_and_repeats_the_label_exactly(client, clock):
+    client.put("/api/profile", json={"preferred_name": "Rose"})
     add_pill(client)
     assert statuses(client) == [("Lisinopril", "08:00", "upcoming")]
     assert client.get("/api/reminders").json()["due_words"] == ""
     clock.set(8, 0)
     body = client.get("/api/reminders").json()
     assert [r["status"] for r in body["reminders"]] == ["due"]
-    assert body["due_words"] == "It’s time for your morning pill: Lisinopril, 10 mg tablet, take 1 by mouth daily."
+    assert body["due_title"] == "Rose, it’s time for your morning Lisinopril."
+    assert body["due_words"] == "Rose, it’s time for your morning Lisinopril. The label says: 10 mg tablet, take 1 by mouth daily."
+
+
+# ---------- The hidden demo reminder (?demo=reminder, for the demo video) ----------
+
+def test_the_demo_shows_the_next_pill_as_due_now_and_saves_nothing(client, clock):
+    client.put("/api/profile", json={"preferred_name": "Rose"})
+    add_pill(client, "Metformin", "500 mg tablet, take 1 by mouth twice daily with meals", ("08:00", "18:00"))
+    clock.set(14, 0)  # the evening pill is hours away
+    before = statuses(client)
+    demo = client.get("/api/reminders/demo").json()
+    assert demo["title"] == "Rose, it’s time for your evening Metformin."
+    assert demo["words"] == ("Rose, it’s time for your evening Metformin. "
+                             "The label says: 500 mg tablet, take 1 by mouth twice daily with meals.")
+    assert [(r["name"], r["due_at"][11:16]) for r in demo["reminders"]] == [("Metformin", "18:00")]
+    assert statuses(client) == before == [("Metformin", "18:00", "upcoming")]
+
+
+def test_after_the_last_pill_the_demo_shows_the_last_one_again(client, clock):
+    add_pill(client, "Metformin", "500 mg tablet", ("08:00", "18:00"))
+    add_pill(client, "Lisinopril", LABEL, ("08:00",))
+    clock.set(8, 5)
+    ids = [r["id"] for r in client.get("/api/reminders").json()["reminders"] if r["due_at"].endswith("08:00:00")]
+    client.post("/api/reminders/taken", json={"ids": ids})
+    clock.set(18, 30)
+    client.post("/api/reminders/taken", json={"ids": [r["id"] for r in client.get("/api/reminders").json()["reminders"]]})
+    clock.set(21, 0)
+    assert client.get("/api/reminders/demo").json()["title"] == "It’s time for your evening Metformin."
+
+
+def test_the_demo_needs_a_pill(client, clock):
+    assert client.get("/api/reminders/demo").status_code == 404
 
 
 def test_remind_me_later_then_i_took_it(client, clock):

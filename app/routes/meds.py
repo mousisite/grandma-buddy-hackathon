@@ -113,8 +113,14 @@ def restore_pill(pill_id: int):
 
 # ---------- Reminders ----------
 
+def her_name(connection) -> str:
+    """What Buddy calls her ("Rose"), or "" before her name is saved."""
+    profile = db.get_profile(connection)
+    return (profile["preferred_name"] or profile["name"]).strip()
+
+
 def todays_reminders(connection) -> dict:
-    """What the banner, the Pills screen, and the Today card need."""
+    """What the reminder card, the Pills screen, and the Today card need."""
     now = reminders.current_time()
     found = reminders.reminders_now(connection, now)
     connection.commit()  # today's new reminder rows
@@ -123,9 +129,11 @@ def todays_reminders(connection) -> dict:
     poison_control = connection.execute(
         "SELECT 1 FROM safety_events WHERE kind = 'poison_control' AND created_at >= ?", (start_of_day,)
     ).fetchone()
+    name = her_name(connection)
     return {
         "reminders": found,
-        "due_words": reminders.reminder_words(due) if due else "",
+        "due_title": reminders.reminder_title(due, name) if due else "",
+        "due_words": reminders.reminder_words(due, name) if due else "",
         "has_pills": bool(reminders.active_pills(connection)),
         # After a Poison Control screen today, the page doesn't read pill
         # reminders aloud and shows the Poison Control message instead.
@@ -139,6 +147,31 @@ def read_reminders():
     connection = db.get_connection()
     try:
         return todays_reminders(connection)
+    finally:
+        connection.close()
+
+
+@router.get("/api/reminders/demo")
+def demo_reminder():
+    """The hidden demo (?demo=reminder in the page's address), to show the
+    reminder card in a demo video without waiting for a pill's time: her
+    next pills, or after the last ones the day's last pills, as if they were
+    due now. Read only: nothing is saved, and her real reminders don't
+    change, so the page answers it without saving anything."""
+    connection = db.get_connection()
+    try:
+        found = reminders.reminders_now(connection, reminders.current_time())  # not committed: nothing saved
+        if not found:
+            raise HTTPException(status_code=404, detail="Please set up a pill first.")
+        upcoming = [r for r in found if r["status"] == "upcoming"]
+        due_at = (upcoming[0] if upcoming else found[-1])["due_at"]
+        shown = [dict(r, status="due") for r in found if r["due_at"] == due_at]
+        name = her_name(connection)
+        return {
+            "title": reminders.reminder_title(shown, name),
+            "words": reminders.reminder_words(shown, name),
+            "reminders": shown,
+        }
     finally:
         connection.close()
 

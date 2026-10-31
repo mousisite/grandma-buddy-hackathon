@@ -124,12 +124,20 @@ def test_one_mood_per_day_the_last_one_said(connection, clock):
     assert notes.gather(connection, 7)["moods"] == [{"day": "Mon, Oct 26", "mood": "Low"}, {"day": "Tue, Oct 27", "mood": "Very low"}]
 
 
-def test_only_questions_not_yet_asked_are_shown(connection, clock):
+def test_questions_say_whether_they_were_asked_in_these_days(connection, clock):
     first = db.add_doctor_question(connection, "Is it okay to keep walking every day?")
     db.add_doctor_question(connection, "Can I take my pills with coffee?")
-    connection.execute("UPDATE doctor_questions SET resolved = 1 WHERE id = ?", (first,))
+    long_ago = db.add_doctor_question(connection, "Should I bring my pill bottles?")
+    before = db.add_doctor_question(connection, "Is the clinic open on Saturdays?")
+    connection.execute("UPDATE doctor_questions SET resolved = 1, asked_at = '2026-10-27T10:00:00' WHERE id = ?", (first,))
+    connection.execute("UPDATE doctor_questions SET resolved = 1, asked_at = '2026-10-01T10:00:00' WHERE id = ?", (long_ago,))
+    # Asked before the app kept the day it was asked: it stays off the page.
+    connection.execute("UPDATE doctor_questions SET resolved = 1 WHERE id = ?", (before,))
     connection.commit()
-    assert [q["question"] for q in notes.gather(connection, 7)["questions"]] == ["Can I take my pills with coffee?"]
+    assert [(q["question"], q["asked"]) for q in notes.gather(connection, 7)["questions"]] == [
+        ("Is it okay to keep walking every day?", True),
+        ("Can I take my pills with coffee?", False),
+    ]
 
 
 # ---------- The AI only groups, and every grouping is checked ----------
@@ -202,13 +210,14 @@ def test_only_7_14_or_30_days_can_be_asked_for(client, days):
     assert client.get(f"/api/doctor-notes?days={days}").status_code == 400
 
 
-def test_asked_takes_a_question_off_and_undo_brings_it_back(client, clock, monkeypatch):
+def test_mark_as_asked_keeps_it_on_the_page_with_a_check_and_undo_takes_it_back(client, clock, monkeypatch):
     use_ai(monkeypatch, {"topics": []})
     question = client.post("/api/doctor-questions", json={"question": "Can I take my pills with coffee?"}).json()
+    shown = {"id": question["id"], "question": "Can I take my pills with coffee?"}
     assert client.post(f"/api/doctor-questions/{question['id']}/asked").status_code == 200
-    assert client.get("/api/doctor-notes?days=7").json()["questions"] == []
+    assert client.get("/api/doctor-notes?days=7").json()["questions"] == [{**shown, "asked": True}]
     assert client.post(f"/api/doctor-questions/{question['id']}/reopen").status_code == 200
-    assert [q["id"] for q in client.get("/api/doctor-notes?days=7").json()["questions"]] == [question["id"]]
+    assert client.get("/api/doctor-notes?days=7").json()["questions"] == [{**shown, "asked": False}]
 
 
 def test_asking_about_a_question_that_is_not_there(client):

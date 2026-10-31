@@ -58,7 +58,8 @@ grandma-buddy-hackathon/
   app/
     __init__.py
     main.py                  creates the FastAPI app, serves static/, includes the routes
-    config.py                reads settings from .env (only place that does)
+    config.py                reads settings from .env (only place that does); refuses a `-contributor` model
+    how.py                   "How Buddy works" for Help: every feature, the Meta models behind it (from the settings), what runs on this computer
     db.py                    SQLite connection, creates tables, small query helpers
     meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), paint() (Muse Image), segment() (SAM 3.1), transcribe()
     safety.py                emergency, crisis, and medication mix-up rules with fixed messages
@@ -107,8 +108,9 @@ grandma-buddy-hackathon/
     check_scam.py            hand-run: the SAFETY.md scam messages and one photo through the real AI (right verdicts?)
     check_notes.py           hand-run: the demo week's doctor notes grouped by the real AI (labels in her words?)
     check_memory.py          hand-run: two made-up memories written and painted by the real AI (about 3 cents), then screenshots
-    check_find.py            hand-run: Find my things end to end in a browser with the real SAM 3.1 and Muse Spark on 3 test photos (about 2 cents; 3 more the first time, to paint them), then screenshots
-    find_photos/             the 3 test photos for check_find.py, painted with Muse Image for this project (rooms only, no people)
+    check_find.py            hand-run: Find my things end to end in a browser with the real SAM 3.1 and Muse Spark on 4 test photos (about 2 cents; 4 more the first time, to paint them), then screenshots; `--only desk-glasses` runs one look
+    find_photos/             the 4 test photos for check_find.py, painted with Muse Image for this project (rooms and a desk only, no people)
+    demo_screenshots.py      hand-run, free: every screen with the demo week at 390 and 1440px, on a COPY of the app's database (no AI), plus the welcome's 3 steps
     try_companion.py         hand-run: 8 made-up conversations with the real AI (about 25 cents), incl. a returning chat after real daily learning
     get_voice.py             hand-run once: downloads Buddy's natural voice model (Kokoro, about 354 MB) into models/
     check_contrast.py        measures the contrast of every color pair the screens use
@@ -135,7 +137,7 @@ grandma-buddy-hackathon/
 | `IMAGE_MODEL` | `muse-image-1.0` | paints the Memory book pictures (standard mode; Meta lists no `-contributor` version) |
 | `SAM_MODEL` | `sam-3.1` | finds her things in a photo (Find my things) |
 | `LANGUAGE` | `English` | the app's language, sent to speech-to-text as `languageBias` |
-| `DATABASE_PATH` | `data/grandma_buddy.db` | where the SQLite file lives |
+| `DATABASE_PATH` | `data/grandma_buddy.db` | where the SQLite file lives. A relative path counts from the project folder, so the app and `scripts/seed_demo.py` always use the same file, whatever folder they're started from |
 
 ## Python packages (expected)
 
@@ -152,8 +154,8 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `med_events` | id, medication_id, due_at, status (`due`, `snoozed`, or `taken`: only her answers are stored; `upcoming` and `missed` follow from the clock), snooze_until, acted_at. One row per pill per time (`med_events_once` unique index) |
 | `symptoms` (the diary) | id, created_at, description (her own words), body_area, pain_level (0 to 10, optional), since (her words, like "since Tuesday"), source (`check_in`, `diary`, `chat`, `safety_net`), conversation_id (the talk it came from; one entry per "Something hurts" talk) |
 | `moods` | id, created_at, mood (`great`, `good`, `okay`, `low`, `very_low`), note, conversation_id (one mood per talk: saving again in the same talk replaces it) |
-| `check_ins` | day (`YYYY-MM-DD`, one row per day), started_at, skipped (1 for "Not today"). The check-in is offered until today has a row |
-| `doctor_questions` | id, created_at, question, resolved |
+| `check_ins` | day (`YYYY-MM-DD`, one row per day), started_at, skipped (1 for "Not today"). The check-in is offered until today has a row; starting it after "Not today" turns the row into a start |
+| `doctor_questions` | id, created_at, question, resolved (1 once asked), asked_at (when she marked it asked; Doctor notes shows it with a check for the days chosen) |
 | `messages` | id, conversation_id, created_at, role, content |
 | `scam_checks` | id, created_at, input_kind (`voice`, `text`, `photo`), excerpt, verdict, red_flags (JSON) |
 | `safety_events` | id, created_at, kind (`emergency`, `poison_control`, `crisis`), matched (JSON), excerpt |
@@ -172,13 +174,14 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `GET /api/diary?days=7` | `days` from 1 to 90 (the Diary screen asks for 30) | diary entries, newest first |
 | `GET/POST/PUT/DELETE /api/meds` | `{"name", "label_dose", "times": ["08:00", …]}` (1 to 6 times) | medication list; DELETE only hides it |
 | `POST /api/meds/{id}/restore` | | brings a removed pill back (Undo) |
-| `GET /api/reminders` | | `{"reminders", "due_words", "has_pills", "after_poison_control", "poison_control_words"}`: today's reminders with their status, the banner's words, and whether a Poison Control screen came up today |
+| `GET /api/reminders` | | `{"reminders", "due_title", "due_words", "has_pills", "after_poison_control", "poison_control_words"}`: today's reminders with their status, the card's words ("Rose, it's time for your evening Metformin.") and what Buddy reads aloud (those, then each label exactly), and whether a Poison Control screen came up today |
+| `GET /api/reminders/demo` | | `{"title", "words", "reminders"}`: for the hidden `?demo=reminder`, her next pills (or the day's last ones) as if due now. Read only: nothing is saved. 404 with no pills |
 | `POST /api/reminders/taken` and `/snooze` | `{"ids": [...]}` | the same as `GET /api/reminders`, updated |
 | `POST /api/meds/read-label` (P2) | photo | suggested fields for a family member to confirm |
 | `POST /api/scam-check` | `{"text", "kind"}` or `{"image": "data:image/jpeg;base64,…", "kind": "photo"}`; `kind` is `text` (pasted), `voice` (read out loud, written down by `/api/transcribe` first), or `photo` | scam result (below) |
 | `GET /api/doctor-notes?days=7` | `days` is 7, 14, or 30 | doctor notes (below) |
 | `POST /api/doctor-questions` | `{"question"}` | saved question |
-| `POST /api/doctor-questions/{id}/asked` and `/reopen` | | she asked it (off the page; never deleted), or Undo |
+| `POST /api/doctor-questions/{id}/asked` and `/reopen` | | she asked it (it stays on the page with a check for the days shown; never deleted), or Undo |
 | `GET /api/family/summary?date=YYYY-MM-DD` | the day (today when left out; up to 30 days back) | `{"date", "subject", "text", "mailto", "to"}`: the update in plain words, and a `mailto:` link with it written (line breaks as `%0D%0A`) |
 | `GET /api/memories` | | `{"pages": [{"id", "date", "title", "paragraphs", "scene", "status", "picture", "mailto"}]}`, newest first. `status` is `writing`, `painting`, `ready`, or `no_picture` (also when stuck over 15 minutes); `picture` is a URL once painted; `mailto` is "Send to {family}" with the story written in |
 | `GET /api/memories/{id}/picture` | | the painting (WebP), only a file name saved by our own code; 404 before it is painted |
@@ -189,10 +192,11 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `POST /api/greeting` | `{"conversation_id"}` | `{"greeting"}`: at the start of a conversation (no talk in the last 2 hours), "Good afternoon, Rose!" plus a follow-up that's due (asked once) or a warm opener; plain words, no AI; saved in the conversation. Otherwise `""` |
 | `GET /api/learned` | | `{"facts": [{"id", "kind", "fact", "follow_up"}], "notes": [{"id", "note"}], "days_learned"}` for Settings |
 | `POST /api/learned/{facts or notes}/{id}/forget` and `/restore` | | "Forget this" and Undo |
+| `GET /api/how` | | `{"models": [{"id", "name", "does"}], "features": [{"name", "what", "models": [ids], "here"}]}`: for Help, the Meta models from the settings and every feature with the models behind it (none: it runs on this computer) |
 | `GET /api/voice` | | `{"available", "default", "voices": [{"id", "name"}]}`: is Buddy's natural voice set up on this computer, and which voices she can choose (Heart, Bella, Nicole, Emma (British), Michael) |
 | `POST /api/speak` | `{"text", "voice", "speed"}` (a sentence, up to 600 characters; speed 0.6 to 1.4) | the words as a WAV (24 kHz mono). 503 when the natural voice isn't set up or fails: the page then uses the browser voice. The words are in the body, never the address, so they never show in the server log. The same words are made once (a cache of 64), and the model loads in the background when the app starts |
 | `GET/PUT /api/profile` | profile fields | profile |
-| `GET /api/check-in` | | `{"due", "mood"}`: whether today's check-in is still to do, and today's latest mood (`{"mood", "at"}` or `null`) |
+| `GET /api/check-in` | | `{"due", "done", "skipped", "mood"}`: whether today's check-in is still to do, done (she said how she feels after it started: Home shows a check), or skipped, and today's latest mood (`{"mood", "at"}` or `null`) |
 | `POST /api/check-in/start` | `{"conversation_id"}` | `{"opening"}`: Buddy's fixed first question ("Good morning, Rose. How are you feeling today?"), also saved in that talk so the AI knows it was asked |
 | `POST /api/check-in/skip` | | "Not today": not offered again until tomorrow |
 
@@ -243,7 +247,9 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 - The page asks `/api/reminders` every 30 seconds while open, and after each reply from Buddy.
 - Each check creates today's missing `med_events` rows, only for times later today or in the last 2 hours (just after midnight, that includes last night's late pill), and never more rows in a day than the pill has times. So a pill added at noon gets no "missed" 8 AM reminder, and moving a time later can't remind her again for a dose she took. Rows are created for the whole rest of the day at once, so a reminder that comes due while the tablet sleeps can still end up missed.
 - A reminder is due when its time has come (or its snooze ended) and it isn't taken. After 2 hours with no answer since it was last shown, it is `missed`. "I took it" still counts after that.
-- The banner repeats each label exactly as typed (`reminders.reminder_words`), is read aloud once per new set of due pills (never while she is talking, over a safety message, or over Buddy's own words), and stays until she answers.
+- The card says her name and the pill (`reminders.reminder_title`), repeats each label exactly as typed (`reminders.reminder_words`), is read aloud once per new set of due pills (never while she is talking, over a safety message, or over Buddy's own words; one that came before her first tap is read right after it), and stays until she answers.
+- `?demo=reminder` in the address (screens.js `startDemoReminder`) shows `/api/reminders/demo` on the card 2 seconds after the first tap, for the demo video. Its answers thank her the same way but post nothing. Its words are made in the natural voice ahead of time (`warmVoice`), so they are heard the moment the card shows.
+- The family update counts every reminder of the day, still to come included, so it says what the Pills screen's ring says (`family.pills_line`).
 - Changing or removing a pill drops its waiting reminders; taken and missed ones stay as a record.
 
 ## AI design

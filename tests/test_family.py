@@ -112,6 +112,47 @@ def test_a_past_day_counts_up_to_its_midnight(connection, clock):
     assert line_starting(connection, "Pills:", date(2026, 10, 27)) == "Pills: 1 of 2 taken. Missed: Metformin at 6:00 PM."
 
 
+def at_time(monkeypatch, hour, minute=0):
+    """The app's clock: Wednesday, October 28, at this time."""
+    monkeypatch.setattr(reminders, "current_time", lambda: datetime(2026, 10, 28, hour, minute))
+
+
+def test_pills_still_to_come_count_like_the_pills_screen(client, connection, monkeypatch):
+    # Mid-afternoon: both morning pills taken, the evening Metformin still to
+    # come. The Pills screen's ring says "2 of 3", so the update must too (it
+    # said "2 of 2" while it only counted reminders up to now).
+    at_time(monkeypatch, 14)
+    lisinopril = add_pill(connection, "Lisinopril", times=('"08:00"',))
+    metformin = add_pill(connection)
+    add_reminder(connection, lisinopril, "2026-10-28T08:00:00", "taken")
+    add_reminder(connection, metformin, "2026-10-28T08:00:00", "taken")
+    add_reminder(connection, metformin, "2026-10-28T18:00:00", "due")
+    ring = client.get("/api/reminders").json()["reminders"]
+    assert (sum(r["status"] == "taken" for r in ring), len(ring)) == (2, 3)
+    assert line_starting(connection, "Pills:") == "Pills: 2 of 3 taken. Still to come: Metformin at 6:00 PM."
+
+
+def test_todays_later_pills_count_before_the_app_has_asked_for_them(connection, monkeypatch):
+    # No reminder rows yet today (the app wasn't open): the evening pill still
+    # counts, as on the Pills screen. 8 AM passed long ago, so it gets none.
+    at_time(monkeypatch, 14)
+    add_pill(connection)
+    assert line_starting(connection, "Pills:") == "Pills: 0 of 1 taken. Still to come: Metformin at 6:00 PM."
+
+
+def test_a_pill_waiting_for_her_answer_is_due_now(connection, monkeypatch):
+    at_time(monkeypatch, 18, 30)
+    pill = add_pill(connection)
+    add_reminder(connection, pill, "2026-10-28T08:00:00", "taken")
+    add_reminder(connection, pill, "2026-10-28T18:00:00", "due")
+    assert line_starting(connection, "Pills:") == "Pills: 1 of 2 taken. Due now: Metformin at 6:00 PM."
+
+
+def test_a_day_without_reminders_says_so(connection, clock):
+    add_pill(connection)  # set up, but the app made no reminders that day
+    assert line_starting(connection, "Pills:", date(2026, 10, 26)) == "Pills: No reminders that day."
+
+
 def test_the_diary_lists_that_days_entries_in_her_words(connection, clock):
     db.add_symptom(connection, "The knee is a little better today, about a 2", "check_in")
     connection.execute("UPDATE symptoms SET created_at = '2026-10-28T09:30:00'")

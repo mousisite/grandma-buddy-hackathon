@@ -79,9 +79,14 @@ def gather(connection, days: int) -> dict:
         "symptoms": symptoms(connection, since),
         "pills": pills(connection, since, now),
         "moods": moods(connection, since),
+        # Her questions, in the order she added them: each still to ask, or
+        # asked in these days (shown with a check, so she sees it's done).
         "questions": [
-            {"id": row["id"], "question": row["question"]}
-            for row in connection.execute("SELECT id, question FROM doctor_questions WHERE resolved = 0 ORDER BY id")
+            {"id": row["id"], "question": row["question"], "asked": bool(row["resolved"])}
+            for row in connection.execute(
+                "SELECT id, question, resolved FROM doctor_questions WHERE resolved = 0 OR asked_at >= ? ORDER BY id",
+                (since,),
+            )
         ],
     }
 
@@ -113,13 +118,13 @@ def symptoms(connection, since: str, until: str = "9999") -> list[dict]:
     return found
 
 
-def pills(connection, since: str, now: datetime, until: str = "") -> list[dict]:
+def pills(connection, since: str, now: datetime) -> list[dict]:
     """Each pill exactly as labeled, with how many reminders were taken and
     which were missed (the same rules as the reminders: missed after 2
-    hours with no answer), from `since` up to now (or to `until`, for a
-    day that is over). A reminder still waiting for her isn't counted."""
+    hours with no answer), from `since` up to now. A reminder still
+    waiting for her isn't counted."""
     found = []
-    end = min(until or "9999", now.isoformat(timespec="seconds"))
+    end = now.isoformat(timespec="seconds")
     for pill in reminders.active_pills(connection):
         taken, missed = 0, []
         for row in connection.execute(

@@ -43,7 +43,46 @@ def start(client, talk=TALK):
 # ---------- Once a day ----------
 
 def test_the_check_in_is_due_on_the_first_visit_of_the_day(client, clock):
-    assert client.get("/api/check-in").json() == {"due": True, "mood": None}
+    assert client.get("/api/check-in").json() == {"due": True, "done": False, "skipped": False, "mood": None}
+
+
+def add_mood(hour, minute=0):
+    """She told Buddy how she feels, at this time on October 27."""
+    connection = db.get_connection()
+    connection.execute("INSERT INTO moods (created_at, mood, note) VALUES (?, 'good', '')",
+                       (datetime(2026, 10, 27, hour, minute).isoformat(timespec="seconds"),))
+    connection.commit()
+    connection.close()
+
+
+# ---------- Done (Home shows a check instead of "Start") ----------
+
+def test_it_is_done_once_she_has_said_how_she_feels(client, clock):
+    start(client)
+    assert client.get("/api/check-in").json()["done"] is False  # started, no answer yet
+    add_mood(9, 1)
+    assert client.get("/api/check-in").json()["done"] is True
+
+
+def test_a_mood_from_before_the_check_in_does_not_finish_it(client, clock):
+    add_mood(8, 30)  # an ordinary talk earlier
+    start(client)
+    assert client.get("/api/check-in").json()["done"] is False
+
+
+def test_not_today_is_skipped_not_done(client, clock):
+    client.post("/api/check-in/skip")
+    body = client.get("/api/check-in").json()
+    assert (body["done"], body["skipped"]) == (False, True)
+
+
+def test_starting_after_not_today_counts_as_started(client, clock):
+    client.post("/api/check-in/skip")
+    clock.set(11)
+    start(client)
+    add_mood(11, 1)
+    body = client.get("/api/check-in").json()
+    assert (body["done"], body["skipped"]) == (True, False)
 
 
 def test_starting_it_means_it_is_not_asked_again_today(client, clock):

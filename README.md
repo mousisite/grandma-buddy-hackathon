@@ -20,6 +20,7 @@ I'm building this for my grandma. She is often lonely, struggles to use her phon
 - **Family updates.** A short daily summary for a family member she chooses.
 - **Memory book.** She tells Buddy a story from her life; it becomes a page in her own words with a painting, to share with her family.
 - **Find my things.** Can't find her glasses, keys, or TV remote? She says what she's looking for and takes a photo of the room. Buddy circles it with a soft glow and tells her where it is: "Your glasses are on the side table, next to the lamp."
+- **Help and how Buddy works.** Shows every feature with the Meta model behind it (read from the app's own settings), what Buddy never does, privacy in plain words, and common questions.
 - **Safety net.** If she mentions emergency warning signs, crisis words, or a medication mix-up, a fixed screen with big Call 911, Call 988, or Call Poison Control buttons appears.
 
 ## It never gives medical advice

@@ -21,6 +21,9 @@ THEMES = {
         "danger": "#C21F3A",
         "field-edge": "#8C8880",
         "tint": "#EFEEEA",
+        # The pill reminder card where Buddy's warm light is strongest: its
+        # amber and rose glows (styles.css .pill-banner) over the card.
+        "card-glow": "#FCEDE2",
     },
     "dark": {
         "bg": "#131211",
@@ -34,6 +37,7 @@ THEMES = {
         "danger": "#FF6B7F",
         "field-edge": "#77726A",
         "tint": "#262522",
+        "card-glow": "#413125",
     },
 }
 
@@ -57,6 +61,8 @@ PAIRS = [
     ("field-edge", "surface", "edges of fields, switches, and checkboxes", 3),
     ("field-edge", "tint", "a switch's knob when it is off", 3),
     ("text", "bg", "focus ring", 3),
+    ("text", "card-glow", "Buddy's words on the pill reminder card", 4.5),
+    ("text-2", "card-glow", "\"Pill time\" and its time on the card", 4.5),
 ]
 
 

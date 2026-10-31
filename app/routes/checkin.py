@@ -35,24 +35,35 @@ def opening_words(profile: dict) -> str:
 
 def save_today(connection, skipped: bool) -> None:
     """Remember that today's check-in was started (or skipped). Once a day:
-    starting it again later ("Start" on Home) keeps the first row."""
+    starting it again later ("Start" on Home) keeps the first start, and
+    starting it after "Not today" counts as started from then on."""
     connection.execute(
-        "INSERT OR IGNORE INTO check_ins (day, started_at, skipped) VALUES (?, ?, ?)",
+        "INSERT INTO check_ins (day, started_at, skipped) VALUES (?, ?, ?) "
+        "ON CONFLICT (day) DO UPDATE SET started_at = excluded.started_at, skipped = 0 "
+        "WHERE check_ins.skipped = 1 AND excluded.skipped = 0",
         (today(), reminders.current_time().isoformat(timespec="seconds"), int(skipped)),
     )
 
 
 @router.get("/api/check-in")
 def check_in_status():
-    """Whether today's check-in is still to do, and her latest mood today."""
+    """Today's check-in: still to do (due), done, or skipped ("Not today"),
+    and her latest mood today. It is done once she has said how she feels
+    in it: a mood saved after it started. Home then shows a check."""
     connection = db.get_connection()
     try:
-        done = connection.execute("SELECT 1 FROM check_ins WHERE day = ?", (today(),)).fetchone()
+        check_in = connection.execute("SELECT started_at, skipped FROM check_ins WHERE day = ?", (today(),)).fetchone()
         mood = connection.execute(
             "SELECT mood, created_at FROM moods WHERE created_at LIKE ? ORDER BY id DESC LIMIT 1",
             (today() + "%",),
         ).fetchone()
-        return {"due": done is None, "mood": {"mood": mood["mood"], "at": mood["created_at"]} if mood else None}
+        started = check_in is not None and not check_in["skipped"]
+        return {
+            "due": check_in is None,
+            "done": started and mood is not None and mood["created_at"] >= check_in["started_at"],
+            "skipped": check_in is not None and bool(check_in["skipped"]),
+            "mood": {"mood": mood["mood"], "at": mood["created_at"]} if mood else None,
+        }
     finally:
         connection.close()
 

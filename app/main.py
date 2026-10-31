@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from app import db
 from app.config import get_settings
 from app import voice
-from app.routes import checkin, companion, diary, family, find, learned, meds, memories, notes, profile, scam
+from app.routes import checkin, companion, diary, family, find, how, learned, meds, memories, notes, profile, scam
 from app.routes import voice as voice_routes
 
 # The folder with index.html, styles.css, and app.js.
@@ -60,6 +60,8 @@ app.include_router(find.router)
 app.include_router(voice_routes.router)
 # What Buddy has learned about her (Settings): see it, forget it, undo.
 app.include_router(learned.router)
+# Help: how Buddy works (each feature and its Meta model).
+app.include_router(how.router)
 
 
 @app.middleware("http")

@@ -72,6 +72,32 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
 
+- Oct 30, night: **Help and how Buddy works** (feature 13, the first of the final-week plan).
+  - A Help screen: the 4 Meta models (read from the app's settings by `/api/how`, `app/how.py`), every feature with its models or "No AI", what Buddy never does, privacy in short, questions that open, and Call {family}. From the sidebar, the first row of Settings, or by voice ("How do you work?" through `open_screen`).
+  - The app now refuses to start with a `-contributor` model in its settings.
+  - Tests first: 10 new (models follow the settings, only standard models, every feature names real models, every sentence passes the advice guard, which caught "signs of" in one line, Buddy can open Help); 532 pytest pass. Browser check: opened from Settings and the sidebar, models, No AI chips, questions, Call Maria. Screenshots at 390 and 1440.
+
+- Oct 30, evening (final polish from a check of every screen with the demo week):
+  - **Home:** the daily check-in shows a green check and "Done" (no "Start") once she has said how she feels in it; "Skipped for today" after "Not today". `/api/check-in` gives `done` and `skipped`; starting after "Not today" now counts. "Next: evening pill at 6:00 PM" (one pill), and a time never breaks over two lines.
+  - **Family update:** the pills line counts every reminder of the day like the Pills screen's ring: "Pills: 2 of 3 taken. Still to come: Metformin at 6:00 PM." (it said "2 of 2"). Due now and missed pills are named too.
+  - **Doctor notes:** a quiet "Mark as asked" under each question; an asked one stays in place with a check, "Asked", and Undo (new `asked_at` column, shown for the days chosen). The cursor stays on it, and nothing else on the page redraws (so no AI call per tap).
+  - **Memory book:** cards side by side are the same height, titles in up to two even lines, the days lined up.
+  - **Pill reminder:** it already popped up and was read aloud. Now a calm card with Buddy's small living orb, "Rose, it's time for your evening Metformin." in Newsreader, each label on a panel exactly as typed, and two 56px answers. A reminder that came before her first tap is read right after it. `?demo=reminder` pops it up for her next pill 2 seconds after the first tap, saving nothing, with the voice made ahead so it's heard at once.
+  - Tests first for every backend change (11 new or changed); 522 pytest pass. The browser check covers all of it; `scripts/demo_screenshots.py` adds close-ups of each fix at 390 and 1440px (40 screenshots, no layout problems).
+  - Checked the card from 320 to 1440px at every text size, light and dark: at 360px with the largest text it was wider than the screen, so on phones it has slimmer padding, and below 360px "Remind me in 10 minutes" takes two even lines instead of being cut off. The card's warm glow is in `scripts/check_contrast.py` (6.1:1 or more). `/safety-check`, `/web-design-guidelines`, and `/senior-friendly-ui` pass.
+
+- Oct 30 (ready for the demo video):
+  - **The demo week is in the app.** Every screen was empty because `scripts/seed_demo.py` had never been run on the app's database. It ran with `--reset`: a backup was saved first (`data/backup-20261030-152943.db`), and the 2 Memory book pages were painted.
+    - The database path now counts from the project folder (`app/config.py`), so the app and the seed script can never use different files when started from another folder (test in `tests/test_skeleton.py`).
+  - **Find my things:** "Take a photo" and the other buttons keep their words on one line at every width (a button that can't fit beside its neighbor takes its own row).
+    - Checked from 320 to 1440px at all 3 text sizes; the browser check now fails if a button's words wrap.
+  - **Home on desktop:** the 4 chips are two by two, so "Find my things" isn't alone on a last row.
+  - **A 4th test photo** (a desk with reading glasses, painted with Muse Image). One real SAM 3.1 and Muse Spark look found the glasses: "Your glasses are on the left side of the wooden table, next to the green notebook."
+  - **`scripts/demo_screenshots.py`:** every screen with the demo week at 390 and 1440px, on a copy of the database, for free. 28 screenshots, no layout problems.
+  - **Fix: doubled call buttons.** For "should I go to the doctor?", the real AI called `show_call_buttons` in two tool rounds, so Call Dr. Lee and Call Maria showed twice. Tool buttons now go through `add_buttons`, which skips any already there.
+    - New test in `tests/test_companion.py`; 511 pytest pass.
+    - `scripts/check_advice.py` with the real AI: each button once, no advice, the guard needed 0 of 8 times.
+
 - Oct 29 (Find my things, and welcome polish):
   - **Find my things** (SPEC feature 12): she says or types what she's looking for and takes a photo of the room.
     - **SAM 3.1** finds it (`meta_client.segment`, `/v1/responses`, `store=false`).

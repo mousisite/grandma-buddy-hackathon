@@ -59,7 +59,8 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 ### 4. Pill reminders (P0)
 
 - A family member adds each medication: the name and dose exactly as written on the label, and the times of day.
-- At each time, a big banner appears and is read aloud: "It's time for your morning pills: ..." with two big buttons: "I took it" and "Remind me in 10 minutes".
+- At each time, a calm card pops up at the top of whatever screen is open (never red) and Buddy reads it aloud with her name: "Rose, it's time for your evening Metformin. The label says: ...". The card shows Buddy's small orb, each label exactly as typed, and two big buttons: "I took it" and "Remind me in 10 minutes". A reminder that comes before her first tap on the page (browsers stay silent until then) is read right after that tap.
+- For the demo video, `?demo=reminder` in the address (for example `http://localhost:8000/?demo=reminder`) pops up the card for her next pill 2 seconds after the first tap, as if it were due now. It saves nothing: her real reminders don't change, so it can be shown again and again.
 - She can also say "I took my pills" to the companion.
 - Missed doses (no answer after 2 hours) are logged and appear in the family update.
 - The app only repeats what the label says. It never suggests doses or changes.
@@ -70,6 +71,7 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 
 - The first time she opens the app each day, the companion asks three gentle questions, one at a time: how she is feeling, whether anything hurts or feels different, and whether she took her morning pills.
 - It saves her mood, adds any symptom to the diary, and marks pills taken, using tools (function calling). No advice.
+- Home's Today list shows it as done once she has said how she feels in today's check-in: her mood, a check, and "Done" instead of "Start". "Not today" shows "Skipped for today", and she can still start it.
 - Done when: after a check-in, the mood, diary, and pill logs show the right entries.
 
 ### 6. Companion chat (P1)
@@ -97,12 +99,14 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - Muse Spark turns the diary, mood, and medication logs into one clear page: her symptoms by date in her own words with pain levels, missed doses, how her mood has been, and the questions she wants to ask.
 - It only organizes what she said. It never adds interpretation, guesses at causes, or suggests treatment.
 - She can add a question any time by saying "I want to ask my doctor about ...".
+- Each question still to ask has a quiet "Mark as asked" button. An asked question stays on the page for the days shown, with a check and "Asked" (and Undo); it is never deleted.
 - Print button prints the page (or saves it as a PDF).
 - Done when: notes for a week of demo data fit on one printed page and contain only facts from the logs.
 
 ### 9. Family updates (P2)
 
 - A daily summary: mood, pills taken or missed, new diary entries, and any safety-net events.
+- The pills line counts the same reminders as the Pills screen, those still to come included: "Pills: 2 of 3 taken. Still to come: Metformin at 6:00 PM." Each pill not taken is named with its time: missed, due now, or still to come.
 - "Send to {family}" opens her email app with the summary already written (a `mailto:` link), so no email passwords are stored. A "Copy" button is there too.
 - Done when: the summary for a demo day is accurate and the email opens pre-filled.
 
@@ -112,7 +116,7 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - Buddy listens and asks one or two gentle questions, one at a time (when was it, who was there).
 - Muse Spark writes a short page in her own voice: a title and 2 or 3 warm paragraphs. It keeps her details and never invents facts. Plain code checks that every name and number came up in her talk with Buddy (so "Was Maria there?" "Yes!" keeps Maria).
 - Muse Image paints one picture for it, always in the same soft watercolor-storybook style. No photorealistic faces of real people.
-- The Memory book shows the pages newest first as cards (picture, title, date). Each opens as a full page with "Send to {family}" (the family update's email link) and "Print". New pages appear in the family update.
+- The Memory book shows the pages newest first as cards (picture, title, date). Cards side by side are the same height, a title takes up to two even lines, and the dates line up. Each opens as a full page with "Send to {family}" (the family update's email link) and "Print". New pages appear in the family update.
 - It fights loneliness by turning her stories into a keepsake for her family. No advice of any kind, and the safety net still runs first on everything she says.
 - Done when: a told memory becomes a page with a painting; a page with a name or number she never said, or with advice, falls back to her own words; and the family update names new pages.
 
@@ -130,6 +134,14 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - If nothing is found, Buddy says so kindly and asks for another photo, maybe from a different spot with the lights on.
 - The safety net runs first on what she said. Her photo is never saved (and is sent to Meta with `store=false`). Buddy never reads labels, never says anything about medicines or health, and never describes people.
 - Done when: it works on 3 made-up test photos with the real SAM 3.1 (`scripts/check_find.py`), every Meta call has a mocked test, and the result screen is checked in a browser.
+
+### 13. Help and how Buddy works (P1)
+
+- A Help screen (sidebar on desktop; Settings, "Help and how Buddy works", on phones; or by voice: "How do you work?" opens it).
+- "How Buddy works": the 4 Meta models with what each does, then every feature with the models behind it, or "No AI" for the parts that run on this computer only (the safety net, pill reminders, the family update). The model names come from the app's settings (`/api/how`), so the page always says what really runs.
+- "What Buddy never does", "Your privacy, in short", common questions that open one at a time, and a Call {family} button.
+- The app refuses to start with a `-contributor` model in its settings.
+- Done when: the page lists exactly the models in the settings (tested), the questions open, and it is checked in a browser at every width.
 
 ## Not building (out of scope)
 

@@ -130,7 +130,7 @@ if (canSpeak()) {
 }
 
 // Is Buddy's natural voice set up on this computer?
-fetch("/api/voice")
+var voiceStatus = fetch("/api/voice")
   .then(function (response) { return response.json(); })
   .then(function (status) {
     naturalVoice = status;
@@ -139,6 +139,25 @@ fetch("/api/voice")
   .catch(function () {
     // No answer: the browser's voice it is.
   });
+
+// Have the natural voice make these words ahead of time (the server keeps
+// what it made), so when they are said there is no wait. Used for the demo
+// reminder, which should be heard the moment it shows.
+function warmVoice(text) {
+  voiceStatus.then(function () {
+    var natural = chosenNatural();
+    if (!natural) {
+      return;
+    }
+    sentencesOf(text).forEach(function (sentence) {
+      fetch("/api/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: sentence.trim(), voice: natural, speed: voiceSettings.rate }),
+      }).catch(function () {});
+    });
+  });
+}
 
 // ---------- Speaking ----------
 

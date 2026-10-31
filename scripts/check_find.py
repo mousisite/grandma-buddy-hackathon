@@ -2,20 +2,23 @@
 # A hand-run check of "Find my things" with the REAL SAM 3.1 and Muse Spark,
 # end to end in a browser, then screenshots.
 #
-# 1. Makes 3 test photos with Muse Image, once (rooms only, no people, no
-#    writing), into scripts/find_photos/. Made for this project, so we can
-#    use them. Skipped when the photos are already there.
+# 1. Makes 4 test photos with Muse Image, once (rooms and a desk only, no
+#    people, no writing), into scripts/find_photos/. Made for this project,
+#    so we can use them. Skipped when the photos are already there.
 # 2. Starts the app on a throwaway database and, in a browser, looks for
-#    the glasses, the keys, the pill bottle, the remote, and an umbrella
-#    that isn't there, exactly as she would: type what she's looking for,
+#    the glasses (in the living room and on a desk), the keys, the pill
+#    bottle, the remote, and an umbrella that isn't there, exactly as she
+#    would: type what she's looking for,
 #    give it the photo. The real SAM 3.1 finds it; the real Muse Spark says
 #    where. Prints each answer, and SAM's own answer line for the glasses.
 # 3. Saves screenshots at 390px (light) from those real looks, then replays
 #    the same answers (no more AI calls) for 1440px and dark.
 #
-# Run it by hand only. The first run costs about 6 cents (3 pictures at
-# $0.01, 6 looks at $0.0025, 4 short sentences); later runs about 3 cents:
+# Run it by hand only. The first run costs about 7 cents (4 pictures at
+# $0.01, 7 looks at $0.0025, 5 short sentences); later runs about 3 cents:
 #   .venv\Scripts\python scripts\check_find.py
+# Just one look (about half a cent, plus a cent the first time to paint its photo):
+#   .venv\Scripts\python scripts\check_find.py --only desk-glasses
 # Only the screenshots again, from the answers it saved last time (free):
 #   .venv\Scripts\python scripts\check_find.py --screenshots
 
@@ -36,6 +39,7 @@ ANSWERS = FOLDER / "answers.json"
 PORT = 8003
 
 ONLY_SCREENSHOTS = "--screenshots" in sys.argv
+ONLY = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
 SENT = {}  # the photo the page sent for each look (only while this runs)
 
 sys.path.insert(0, str(ROOT))
@@ -59,6 +63,11 @@ PICTURES = {
         "control lying between two cushions, a low coffee table with a houseplant and a folded newspaper turned face "
         "down. Warm evening lamp light. No people, no pets, no writing or text anywhere."
     ),
+    "desk.webp": (
+        "A realistic phone photo of a small wooden writing desk at home by a window, taken from standing height in "
+        "daylight: a pair of reading glasses lying folded on the desk beside a closed notebook and a pen, a desk lamp, "
+        "a mug, and a small potted plant. No people, no pets, no writing or text anywhere."
+    ),
 }
 
 # What she looks for, in which photo (the umbrella isn't there).
@@ -68,15 +77,24 @@ LOOKS = [
     ("pill-bottle", "pill bottle", "kitchen.webp"),
     ("remote", "the remote", "sofa.webp"),
     ("umbrella", "my umbrella", "living-room.webp"),
+    ("desk-glasses", "Where are my glasses?", "desk.webp"),
 ]
+
+
+def chosen_looks() -> list:
+    """Every look, or only the one named with --only."""
+    return [look for look in LOOKS if ONLY in (None, look[0])]
 
 
 def make_photos() -> None:
     from app import meta_client
 
     PHOTOS.mkdir(parents=True, exist_ok=True)
+    needed = {photo for _, _, photo in chosen_looks()}
     for name, prompt in PICTURES.items():
         path = PHOTOS / name
+        if name not in needed:
+            continue
         if path.exists():
             continue
         started = time.time()
@@ -138,7 +156,7 @@ def real_looks() -> dict:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
             page = browser.new_page(viewport={"width": 390, "height": 844})
-            for name, said, photo in LOOKS:
+            for name, said, photo in chosen_looks():
                 started = time.time()
                 answer = look(page, said, PHOTOS / photo, "light", 390, name)
                 answers[name] = answer
@@ -157,6 +175,8 @@ def sam_line() -> None:
     and mask records can be checked by eye."""
     from app import finder, meta_client
 
+    if "glasses" not in SENT:
+        return  # only one look this time
     line = meta_client.segment(SENT["glasses"], "glasses")  # the same JPEG the page sent
     (FOLDER / "sam-line.txt").write_text(line, encoding="utf-8")
     print(f"SAM 3.1's answer line ({len(line)} characters, saved to test-output/find-check/sam-line.txt):")
@@ -180,8 +200,8 @@ def replayed_screenshots(answers: dict) -> None:
             browser = playwright.chromium.launch()
             for theme, width, height in [("light", 1440, 900), ("dark", 390, 844), ("dark", 1440, 900)]:
                 page = browser.new_page(viewport={"width": width, "height": height}, color_scheme=theme)
-                for name, said, photo in LOOKS:
-                    if name not in ("glasses", "umbrella", "keys"):
+                for name, said, photo in chosen_looks():
+                    if name not in ("glasses", "umbrella", "keys", "desk-glasses"):
                         continue
                     page.unroute("**/api/find")
                     page.route("**/api/find", replay(answers[name]))
@@ -195,6 +215,8 @@ def replayed_screenshots(answers: dict) -> None:
 if __name__ == "__main__":
     if ONLY_SCREENSHOTS:
         saved = json.loads(ANSWERS.read_text(encoding="utf-8"))
+        if ONLY:
+            saved = {ONLY: saved[ONLY]}
     else:
         shutil.rmtree(FOLDER, ignore_errors=True)
         FOLDER.mkdir(parents=True)
@@ -204,6 +226,9 @@ if __name__ == "__main__":
     replayed_screenshots(saved)
     found = [name for name, answer in saved.items() if answer.get("found")]
     print(f"Found: {', '.join(found) or 'nothing'}. Screenshots: test-output/find-*.png")
-    good = set(found) == {"glasses", "keys", "pill-bottle", "remote"} and not saved["umbrella"].get("found")
+    if ONLY:
+        good = bool(saved[ONLY].get("found"))
+    else:
+        good = set(found) == {"glasses", "keys", "pill-bottle", "remote", "desk-glasses"} and not saved["umbrella"].get("found")
     print("Find check OK." if good else "PROBLEM: see the answers above.")
     sys.exit(0 if good else 1)

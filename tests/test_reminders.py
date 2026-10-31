@@ -58,22 +58,32 @@ def pill(name, label, due):
     return {"name": name, "label_dose": label, "due_at": due.isoformat(timespec="seconds")}
 
 
-def test_the_reminder_repeats_the_label_exactly():
-    words = reminders.reminder_words([pill("Lisinopril", "10 mg tablet, take 1 by mouth daily", at(8))])
-    assert words == "It’s time for your morning pill: Lisinopril, 10 mg tablet, take 1 by mouth daily."
+def test_buddy_says_her_name_and_the_pill_then_repeats_the_label_exactly():
+    due = [pill("Metformin", "500 mg tablet, take 1 by mouth twice daily with meals", at(18))]
+    assert reminders.reminder_title(due, "Rose") == "Rose, it’s time for your evening Metformin."
+    assert reminders.reminder_words(due, "Rose") == (
+        "Rose, it’s time for your evening Metformin. "
+        "The label says: 500 mg tablet, take 1 by mouth twice daily with meals.")
 
 
-def test_several_pills_and_the_time_of_day():
-    words = reminders.reminder_words([
-        pill("Lisinopril", "10 mg tablet. Take 1 daily.", at(20)),
-        pill("Vitamin D", "", at(20)),
-    ])
-    # The label's own period is kept as it is; the next pill follows it.
-    assert words == "It’s time for your evening pills: Lisinopril, 10 mg tablet. Take 1 daily. Vitamin D."
+def test_several_pills_are_named_then_each_label_is_repeated_exactly():
+    due = [
+        pill("Lisinopril", "10 mg tablet. Take 1 daily.", at(8)),
+        pill("Metformin", "500 mg tablet", at(8)),
+        pill("Vitamin D", "", at(8)),
+    ]
+    assert reminders.reminder_title(due, "Rose") == (
+        "Rose, it’s time for your morning pills: Lisinopril, Metformin, and Vitamin D.")
+    # A label's own period is kept as it is; one is added only at its end if
+    # needed. A pill with no label is named, with nothing made up for it.
+    assert reminders.reminder_words(due, "Rose") == (
+        "Rose, it’s time for your morning pills: Lisinopril, Metformin, and Vitamin D. "
+        "Lisinopril: 10 mg tablet. Take 1 daily. Metformin: 500 mg tablet.")
 
 
-def test_afternoon():
-    assert reminders.reminder_words([pill("Vitamin D", "", at(13))]).startswith("It’s time for your afternoon pill")
+def test_without_her_name_it_still_reads_well():
+    due = [pill("Lisinopril", "", at(13)), pill("Vitamin D", "", at(13))]
+    assert reminders.reminder_words(due, "") == "It’s time for your afternoon pills: Lisinopril and Vitamin D."
 
 
 # ---------- Night, and last night's late pill ----------

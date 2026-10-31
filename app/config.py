@@ -6,8 +6,14 @@
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
+
+# The project folder. A relative DATABASE_PATH counts from here, so the app
+# and scripts/seed_demo.py use the same database whatever folder they are
+# started from.
+PROJECT_FOLDER = Path(__file__).resolve().parent.parent
 
 # Load the .env file (if it exists) into environment variables.
 load_dotenv()
@@ -32,12 +38,18 @@ def get_settings() -> Settings:
     Called fresh each time (instead of once at startup) so tests
     can change settings with environment variables.
     """
-    return Settings(
+    settings = Settings(
         model_api_key=os.getenv("MODEL_API_KEY", ""),
         chat_model=os.getenv("CHAT_MODEL", "muse-spark-1.3"),
         transcribe_model=os.getenv("TRANSCRIBE_MODEL", "muse-voice-transcribe-1.0"),
         image_model=os.getenv("IMAGE_MODEL", "muse-image-1.0"),
         sam_model=os.getenv("SAM_MODEL", "sam-3.1"),
         language=os.getenv("LANGUAGE", "English"),
-        database_path=os.getenv("DATABASE_PATH", "data/grandma_buddy.db"),
+        database_path=str(PROJECT_FOLDER / os.getenv("DATABASE_PATH", "data/grandma_buddy.db")),
     )
+    # Standard models only. In "-contributor" mode Meta may train on what she
+    # says, and this app holds her health information, so it refuses to run.
+    for model in (settings.chat_model, settings.transcribe_model, settings.image_model, settings.sam_model):
+        if "contributor" in model:
+            raise ValueError(f"Grandma Buddy uses standard Meta models only, not {model}.")
+    return settings

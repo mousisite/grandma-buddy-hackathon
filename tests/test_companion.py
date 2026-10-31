@@ -232,6 +232,20 @@ def test_call_buttons_tool_only_uses_numbers_that_exist(client, monkeypatch):
     assert [a["href"] for a in body["actions"] if a["type"] == "call"] == ["tel:555-0100"]
 
 
+def test_each_button_shows_once_even_when_the_ai_asks_twice(client, monkeypatch):
+    # The real model once called show_call_buttons in two tool rounds for
+    # "should I go to the doctor?": Call Dr. Lee and Call Maria showed twice.
+    client.put("/api/profile", json={"family_name": "Maria", "family_phone": "555-0100",
+                                     "doctor_name": "Dr. Lee", "doctor_phone": "555-0199"})
+    use_fake(monkeypatch,
+             tool_call("c1", "show_call_buttons", {"who": "both"}),
+             tool_call("c2", "show_call_buttons", {"who": "both"}),
+             reply("I can't give medical advice. Dr. Lee is the right person to ask."))
+    body = chat(client, "I've had a headache since yesterday, should I go to the doctor?")
+    labels = [a["label"] for a in body["actions"]]
+    assert labels == ["Call Dr. Lee", "Call Maria", "Add to doctor notes"], labels
+
+
 def test_after_a_crisis_buddy_stays_gentle_and_988_stays_visible(client, monkeypatch):
     client.put("/api/profile", json={"family_name": "Maria", "family_phone": "555-0100"})
     chat(client, "I want to die")  # the safety net answers; no AI

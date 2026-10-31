@@ -222,6 +222,9 @@ def init_db(db_path: str | None = None) -> None:
         # A second family member to call (the welcome, Settings): October 29.
         add_column(connection, "profile", "family2_name", "TEXT NOT NULL DEFAULT ''")
         add_column(connection, "profile", "family2_phone", "TEXT NOT NULL DEFAULT ''")
+        # When she marked a doctor question asked, so Doctor notes can show
+        # it with a check for a while: October 30.
+        add_column(connection, "doctor_questions", "asked_at", "TEXT NOT NULL DEFAULT ''")
         # WAL mode lets one connection read while another writes. Writers
         # still take turns, so the companion saves after each round of tools
         # (app/companion.py) and never holds the lock while the AI thinks.

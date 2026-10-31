@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 ROOT = Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "test-output"
 PORT = 8001
-SCREENS = ["today", "talk", "diary", "pills", "notes", "scam", "find", "family", "memories", "settings"]
+SCREENS = ["today", "talk", "diary", "pills", "notes", "scam", "find", "family", "memories", "settings", "help"]
 SIZES = [(390, 844), (768, 1024), (1440, 900)]  # phone, tablet, desktop
 
 
@@ -483,12 +483,16 @@ def check_pills(page, problems: list[str]) -> None:
     page.wait_for_selector("#pill-times .field-problem")
     problems.remove("Failed to load resource: the server responded with a status of 400 (Bad Request)")
 
-    # Due now: the card repeats the label exactly as typed.
+    # Due now: Buddy says it with her name, and the card repeats the label
+    # exactly as typed.
     page.fill("#pill-form .time-input", time_now)
     page.click("#pill-save")
     page.wait_for_selector("#pill-banner:not([hidden])")
     words = page.text_content("#pill-banner-words") or ""
-    assert words == f"It’s time for your {part} pill: Lisinopril, 10 mg tablet, take 1 by mouth daily.", words
+    assert words == f"Rose, it’s time for your {part} Lisinopril.", words
+    labels = page.eval_on_selector_all(
+        "#pill-banner-labels li", "items => items.map(i => [...i.querySelectorAll('p')].map(p => p.textContent))")
+    assert labels == [["Lisinopril", "10 mg tablet, take 1 by mouth daily"]], labels
     assert page.text_content("#pill-taken") == "I took it"
     # Spoken one sentence at a time, but a dose like "0.5 mg" is never split.
     parts = page.evaluate("sentencesOf('It’s time for your morning pills: Lorazepam, 0.5 mg tablet; Take 1.5 daily.')")
@@ -711,6 +715,22 @@ def found_in_the_middle(route) -> None:
     })
 
 
+ONE_LINE_JS = """sel => [...document.querySelectorAll(sel)].filter(b => b.offsetParent).filter(b => {
+  const words = [...b.childNodes].find(n => n.nodeType === 3 && n.textContent.trim()) || b.querySelector('span');
+  const range = document.createRange();
+  range.selectNodeContents(words);
+  const lines = new Set([...range.getClientRects()].filter(r => r.width > 1).map(r => Math.round(r.top))).size;
+  return lines !== 1 || b.scrollWidth > b.clientWidth + 1;
+}).map(b => b.textContent.trim())"""
+
+
+def one_line_buttons(page, selector: str, where: str) -> None:
+    """Every button's words on one line, none cut off ("Take a photo" must
+    never wrap; the buttons hide overflow, so check_layout can't see it)."""
+    broken = page.evaluate(ONE_LINE_JS, selector)
+    assert not broken, f"button words wrap or spill at {where}: {broken}"
+
+
 def check_find(browser) -> None:
     """Find my things, with /api/find faked (the real SAM 3.1 runs only in
     scripts/check_find.py): the Home chip, "say what you're looking for
@@ -734,6 +754,7 @@ def check_find(browser) -> None:
         assert page.input_value("#find-thing") == "keys"
         assert page.get_attribute("[data-find-pick='keys']", "aria-pressed") == "true"
         check_layout(page, f"find, asking at {width}px")
+        one_line_buttons(page, ".find-actions .pill-button", f"find at {width}px")
 
         page.route("**/api/find", found_in_the_middle)
         page.set_input_files("#find-camera", str(picture))
@@ -746,6 +767,7 @@ def check_find(browser) -> None:
         assert page.get_attribute("#find-image", "alt") == sentence, "a screen reader hears where it is"
         assert page.evaluate("document.activeElement.id") == "find-answer"
         check_layout(page, f"find, found at {width}px")
+        one_line_buttons(page, ".find-actions .pill-button", f"find, found at {width}px")
         page.screenshot(path=str(OUT / f"find-found-{width}-{theme}.png"), full_page=True)
 
         # Nothing found: no halo, a kind sentence, and "Try another photo".
@@ -895,13 +917,21 @@ def check_notes(browser) -> None:
     (OUT / "doctor-notes-7-days.pdf").write_bytes(pdf)
     assert pages == 1, f"a week of doctor notes should print on one page, not {pages}"
 
-    # "Asked" takes a question off, Undo brings it back.
+    # "Mark as asked": the question stays, with a check and "Asked", and the
+    # cursor stays on it (on Undo). Undo makes it a question to ask again.
     questions = "#notes-doc .doc-questions li"
     assert page.locator(questions).count() == 2
-    page.click(f"{questions} >> nth=0 >> button")
-    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 1")
-    page.click("#notes-undo button")
-    page.wait_for_function(f"document.querySelectorAll('{questions}').length === 2")
+    first = page.locator(questions).first
+    assert first.locator("button").text_content() == "Mark as asked"
+    first.locator("button").click()
+    page.wait_for_selector(f"{questions} >> nth=0 >> .doc-asked")
+    page.wait_for_selector(".toast:has-text('Marked as asked')")
+    assert page.locator(questions).count() == 2, "an asked question stays on the page"
+    assert (page.text_content(f"{questions} >> nth=0 >> .doc-asked") or "").strip() == "Asked"
+    assert page.evaluate("document.activeElement.textContent") == "Undo", "the cursor should stay on the question"
+    page.click(f"{questions} >> nth=0 >> .doc-undo")
+    page.wait_for_selector(f"{questions} >> nth=0 >> button:has-text('Mark as asked')")
+    assert page.locator(f"{questions} .doc-asked").count() == 0
 
     # Add a question.
     page.fill("#question-text", "Can I go swimming with my knee?")
@@ -918,6 +948,48 @@ def check_notes(browser) -> None:
     page.close()
 
 
+def check_demo_reminder(browser) -> None:
+    """On the demo week: Home shows today's check-in as done (a check and
+    "Done", no Start), and the hidden ?demo=reminder pops up the reminder
+    card for her next pill 2 seconds after the first tap. Buddy says it with
+    her name; "I took it" thanks her and closes it, and nothing is saved."""
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    # Not "networkidle": the demo makes its voice ahead (warmVoice), which keeps the network busy.
+    page.goto(f"http://localhost:{PORT}/?demo=reminder#/", wait_until="load")
+    wait_for_screen(page, "today")
+    page.wait_for_function("pillState.reminders.length > 0")
+    due = page.evaluate("pillState.reminders.filter(r => r.status === 'due').map(r => r.id)")
+    if due:  # run between 6 and 8 PM, her real evening pill is due: snooze it, so the demo's card shows
+        page.evaluate(f"api('/api/reminders/snooze', 'POST', {{ ids: {due} }})")
+        page.reload(wait_until="load")
+        wait_for_screen(page, "today")
+        page.wait_for_function("pillState.reminders.length > 0")
+    page.wait_for_selector("#check-in-done:not([hidden])")
+    assert page.is_hidden("#check-in-start"), "a done check-in shows no Start"
+    assert (page.text_content("#today-check-in") or "").startswith("Feeling great, at ")
+    # (Ends with 0: Playwright would call a snippet that ends in a function.)
+    page.evaluate("window.spokenWords = []; var realSpeak = speak;"
+                  "window.speak = function (text, options) { spokenWords.push(text); return realSpeak(text, options); }; 0")
+    before = page.evaluate("JSON.stringify(pillState.reminders.map(r => [r.id, r.status]))")
+    page.mouse.click(5, 300)  # the first tap, on an empty spot
+    page.wait_for_selector("#pill-banner:not([hidden])", timeout=10000)
+    title = page.text_content("#pill-banner-words") or ""
+    assert title.startswith("Rose, it’s time for your "), title
+    page.wait_for_function("spokenWords.length > 0")
+    assert page.evaluate("spokenWords[0]").startswith(title), "Buddy should say the reminder as it pops up"
+    page.wait_for_timeout(600)
+    page.screenshot(path=str(OUT / "pill-reminder-demo-390.png"))
+    check_layout(page, "the demo pill reminder at 390px")
+    page.click("#pill-taken")
+    page.wait_for_selector("#pill-banner", state="hidden")
+    page.wait_for_selector(".toast:has-text('Marked as taken')")
+    page.evaluate("loadReminders()")
+    page.wait_for_timeout(500)
+    after = page.evaluate("JSON.stringify(pillState.reminders.map(r => [r.id, r.status]))")
+    assert after == before, "the demo reminder must not change her real reminders"
+    page.close()
+
+
 def check_family(browser) -> None:
     """The family update on the demo week: exactly the words on screen go in
     the email, addressed to Maria; Copy copies them; Yesterday switches day."""
@@ -930,6 +1002,9 @@ def check_family(browser) -> None:
     assert page.text_content("#update-send") == "Send to Maria"
     shown = page.text_content("#update-text") or ""
     assert "Mood: " in shown and "Pills: " in shown and "Diary: " in shown and "Safety screens" in shown, shown
+    # The pills count is the Pills screen's ring, pills still to come included.
+    ring = page.evaluate("[pillState.reminders.filter(r => r.status === 'taken').length, pillState.reminders.length]")
+    assert f"Pills: {ring[0]} of {ring[1]} taken." in shown, (ring, shown)
     link = urlsplit(page.get_attribute("#update-send", "href") or "")
     assert link.scheme == "mailto" and unquote(link.path) == "maria@example.com", link
     body = parse_qs(link.query)["body"][0].replace("\r\n", "\n")
@@ -976,6 +1051,38 @@ def check_greeting_and_theme(browser) -> None:
         shown = page.get_attribute("html", "data-theme")
         assert shown == theme, f"Auto with {scheme} at {hour}:00 should be {theme}, not {shown}"
         page.close()
+
+
+def check_help(browser) -> None:
+    """Help on the demo week: opened from Settings on a phone (the tab bar
+    keeps Settings lit), the 4 Meta models from the app's settings, every
+    feature with its models or "No AI", questions that open, and Call Maria.
+    On a desktop the sidebar has Help."""
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    visit(page, "settings")
+    page.click("text=Help and how Buddy works")
+    wait_for_screen(page, "help")
+    assert page.get_attribute(".tabbar [data-nav='settings']", "aria-current") == "page"
+    page.wait_for_selector("#help-models .help-model")
+    names = page.eval_on_selector_all(".help-model-name", "items => items.map(i => i.textContent)")
+    assert names == ["Muse Spark 1.3", "Muse Voice Transcribe 1.0", "Muse Image 1.0", "SAM 3.1"], names
+    assert page.locator(".help-feature").count() >= 9
+    safety_net = page.locator(".help-feature", has_text="The safety net")
+    assert safety_net.locator(".tag").all_text_contents() == ["No AI"], "the safety net uses no AI"
+    first = page.locator(".faq-item").first
+    first.locator("summary").click()
+    assert first.locator(".faq-answer").is_visible()
+    assert page.text_content("#help-call-label") == "Call Maria"
+    assert page.get_attribute("#help-call-family", "href") == "tel:555-0100"
+    check_layout(page, "Help at 390px")
+    page.close()
+
+    wide = browser.new_page(viewport={"width": 1440, "height": 900})
+    visit(wide, "today")
+    wide.click("[data-nav='help']:visible")
+    wait_for_screen(wide, "help")
+    assert wide.get_attribute(".sidebar [data-nav='help']", "aria-current") == "page"
+    wide.close()
 
 
 def check_every_screen(browser) -> None:
@@ -1182,6 +1289,8 @@ def main() -> int:
                 seed_demo_week(test_env["DATABASE_PATH"])
                 check_notes(browser)
                 check_family(browser)
+                check_demo_reminder(browser)
+                check_help(browser)
                 check_friend(browser, test_env["DATABASE_PATH"])
                 check_every_screen(browser)
                 check_buddy_states(browser)
@@ -1204,8 +1313,11 @@ def main() -> int:
             "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), Find my things (chip, \"What "
             "are you looking for?\" first, quick pick, photo, halo and sentence, nothing found, safety net first, the "
             "Find my glasses button), the welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
-            "(sections, Asked and Undo, Add a question, 14 days, prints on one page), the family update (the email holds "
-            "exactly the words on screen, Copy, Yesterday), the emergency screen never "
+            "(sections, Mark as asked and Undo in place, Add a question, 14 days, prints on one page), the family update "
+            "(the email holds exactly the words on screen, its pills count matches the Pills ring, Copy, Yesterday), "
+            "the demo week's done check-in and the hidden ?demo=reminder card (pops up after the first tap, said with "
+            "her name, saves nothing), Help (from Settings and the sidebar, the 4 Meta models, "
+            "every feature with its models or No AI, questions open, Call Maria), the emergency screen never "
             "moves, Auto theme follows the computer and the evening, every screen at 390/768/1440px in light and "
             "dark, the orb's states and reduced motion look right, no layout problems. Screenshots in test-output/."
         )

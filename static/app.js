@@ -181,6 +181,7 @@ var SCREEN_TITLES = {
   memory: "Memory book", // one page: #/memory/3
   find: "Find my things", // #/find/glasses fills in what she's looking for (find.js)
   settings: "Settings",
+  help: "Help", // how Buddy works, privacy, questions
   welcome: "Welcome", // the first time, while no name is saved (welcome.js)
 };
 
@@ -231,10 +232,11 @@ function showScreen(moveFocus) {
   document.querySelectorAll("section[data-screen]").forEach(function (screen) {
     screen.hidden = screen.getAttribute("data-screen") !== name;
   });
-  // The tab bar and sidebar show where she is (a memory page is in the Memory book).
+  // The tab bar and sidebar show where she is (a memory page is in the
+  // Memory book; on a phone, Help is under Settings: data-nav-also).
   var place = name === "memory" ? "memories" : name;
   document.querySelectorAll("[data-nav]").forEach(function (link) {
-    if (link.getAttribute("data-nav") === place) {
+    if (link.getAttribute("data-nav") === place || link.getAttribute("data-nav-also") === place) {
       link.setAttribute("aria-current", "page");
     } else {
       link.removeAttribute("aria-current");
@@ -282,7 +284,7 @@ function say(text) {
 // Every press shows the moment it lands: the button squeezes and darkens a
 // little (data-pressed, styles.css "Pressing"), and a circle of light
 // spreads from the spot she touched. Calm motion keeps only the color.
-var PRESSABLE = ".pill-button, .text-button, .chip, .tab, .nav-link, .row-link, .call-pill, .check, .for-family-summary, .memory-card, .segmented label, label.group-row";
+var PRESSABLE = ".pill-button, .text-button, .chip, .tab, .nav-link, .row-link, .call-pill, .check, .for-family-summary, .memory-card, .segmented label, label.group-row, .row--link, .faq-question";
 
 function showPress(event) {
   var target = event.target.closest(PRESSABLE);
@@ -336,6 +338,7 @@ function start() {
   // Pill reminders: check now and every 30 seconds while the app is open.
   loadReminders();
   setInterval(loadReminders, 30 * 1000);
+  startDemoReminder(); // only with ?demo=reminder in the address (screens.js)
 
   // Show the screen in the address (Home when there is none), and follow
   // every change after that, including the browser's Back button.

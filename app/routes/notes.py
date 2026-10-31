@@ -3,13 +3,13 @@
 # - GET  /api/doctor-notes?days=7       the page (app/notes.py)
 # - POST /api/doctor-questions          add a question ("Add a question", or
 #                                       "Add to doctor notes" after a talk)
-# - POST /api/doctor-questions/{id}/asked   she asked it: off the page
-# - POST /api/doctor-questions/{id}/reopen  Undo: back on the page
+# - POST /api/doctor-questions/{id}/asked   she asked it: shown with a check
+# - POST /api/doctor-questions/{id}/reopen  Undo: still to ask
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app import db, notes
+from app import db, notes, reminders
 
 router = APIRouter()
 
@@ -45,12 +45,13 @@ def add_question(body: Question):
 
 
 def set_asked(question_id: int, asked: bool) -> dict:
-    """Mark a question asked (it leaves the page) or not asked (Undo).
-    Questions are never deleted."""
+    """Mark a question asked (it stays on the page with a check, for the days
+    shown) or not asked (Undo). Questions are never deleted."""
+    asked_at = reminders.current_time().isoformat(timespec="seconds") if asked else ""
     connection = db.get_connection()
     try:
         changed = connection.execute(
-            "UPDATE doctor_questions SET resolved = ? WHERE id = ?", (int(asked), question_id)
+            "UPDATE doctor_questions SET resolved = ?, asked_at = ? WHERE id = ?", (int(asked), asked_at, question_id)
         ).rowcount
         connection.commit()
     finally:

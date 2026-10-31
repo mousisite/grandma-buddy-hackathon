@@ -67,6 +67,10 @@
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle cx="12" cy="12" r="3"></circle></svg>
         Settings
       </a>
+      <a class="nav-link" href="#/help" data-nav="help">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>
+        Help
+      </a>
     </nav>
     <button class="pill-button pill-button--ink sidebar-talk" type="button" data-talk-start>
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
@@ -76,18 +80,22 @@
 
   <main class="main">
     <!-- Pill reminder: the one raised card, on every screen while a pill is
-         due (screens.js). The words repeat each label exactly as typed. -->
+         due (screens.js). Buddy (a small living orb) says it with her name;
+         under it, each pill's label exactly as typed. -->
     <section id="pill-banner" class="pill-banner" aria-labelledby="pill-banner-title" hidden>
       <h2 id="pill-banner-title" class="pill-banner-title">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
-        Pill time
+        <span class="orb orb--card" aria-hidden="true"></span>
+        <span class="pill-banner-name">Pill time</span>
+        <span id="pill-banner-time" class="pill-banner-time"></span>
       </h2>
       <!-- After a Poison Control screen today: its fixed message first. -->
       <div id="pill-banner-poison" class="pill-banner-poison" hidden>
-        <p id="pill-banner-poison-words" class="pill-banner-words"></p>
+        <p id="pill-banner-poison-words" class="pill-banner-poison-words"></p>
         <a class="pill-button pill-button--danger" href="tel:18002221222">Call Poison Control</a>
       </div>
       <p id="pill-banner-words" class="pill-banner-words" aria-live="polite"></p>
+      <!-- Each pill as on its bottle: the name, then the label word for word. -->
+      <ul id="pill-banner-labels" class="pill-banner-labels" role="list"></ul>
       <div class="pill-banner-actions">
         <button id="pill-taken" class="pill-button pill-button--ink" type="button">I took it</button>
         <button id="pill-snooze" class="pill-button pill-button--quiet" type="button">Remind me in 10 minutes</button>
@@ -151,7 +159,12 @@
               <span class="row-title">Daily check-in</span>
               <span id="today-check-in" class="row-meta">Not done yet</span>
             </span>
-            <button class="row-link" type="button" data-start-check-in>Start</button>
+            <button id="check-in-start" class="row-link" type="button" data-start-check-in>Start</button>
+            <!-- Once she has said how she feels today: a check and "Done". -->
+            <span id="check-in-done" class="row-done" hidden>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+              Done
+            </span>
           </li>
           <li class="row">
             <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
@@ -374,7 +387,6 @@
       <!-- The page itself (screens.js): every fact straight from her logs.
            A shimmer shows while it is put together. -->
       <article id="notes-doc" class="doc" aria-labelledby="notes-doc-title" aria-busy="true"></article>
-      <p id="notes-undo" class="form-status" role="status"></p>
       <form id="question-form" class="add-question" novalidate>
         <label for="question-text" id="question-label">Add a question for your doctor</label>
         <div class="add-question-row">
@@ -521,6 +533,88 @@
       </section>
     </section>
 
+    <!-- ========== Help: how Buddy works, what it never does, questions ==========
+         The models and features come from /api/how (app/how.py), so the page
+         always says what really runs. -->
+    <section class="screen help" data-screen="help" aria-labelledby="help-title" hidden>
+      <header class="screen-head">
+        <h1 id="help-title" class="display" tabindex="-1">Help</h1>
+        <p class="lead">How Buddy works, what it never does, and answers to common questions.</p>
+      </header>
+
+      <section class="help-section" aria-labelledby="help-how-title">
+        <h2 id="help-how-title" class="help-heading">How Buddy works</h2>
+        <p class="help-intro">Buddy is an AI helper made with four of Meta’s AI models. Everything else runs here, on this computer.</p>
+        <ul id="help-models" class="help-models" role="list" aria-busy="true"></ul>
+        <ul id="help-features" class="rows help-features" role="list"></ul>
+        <p id="help-status" class="empty" role="status" hidden></p>
+      </section>
+
+      <section class="help-section" aria-labelledby="help-never-title">
+        <h2 id="help-never-title" class="help-heading">What Buddy never does</h2>
+        <ul class="rows help-list" role="list">
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></svg><span class="row-text">Give medical advice. Your doctor is the right person for that.</span></li>
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></svg><span class="row-text">Call 911 by itself. It shows a big button, and you decide.</span></li>
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></svg><span class="row-text">Send your words to anyone unless you press Send.</span></li>
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></svg><span class="row-text">Ask for passwords, bank numbers, or your Social Security number.</span></li>
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></svg><span class="row-text">Pretend to be a person. Buddy is an AI helper.</span></li>
+        </ul>
+      </section>
+
+      <section class="help-section" aria-labelledby="help-privacy-title">
+        <h2 id="help-privacy-title" class="help-heading">Your privacy, in short</h2>
+        <ul class="rows help-list" role="list">
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path></svg><span class="row-text">What Buddy writes down (your diary, pills, and Memory book) is kept on this computer.</span></li>
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg><span class="row-text">What you say is sent to Meta’s AI so Buddy can understand and answer. Buddy uses Meta’s standard models only, so Meta doesn’t use your words to train its AI.</span></li>
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg><span class="row-text">Photos you show Buddy to check a message or find your things are never saved.</span></li>
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path><rect x="2" y="4" width="20" height="16" rx="2"></rect></svg><span class="row-text">Your family sees only the update you choose to send them.</span></li>
+        </ul>
+      </section>
+
+      <section class="help-section" aria-labelledby="help-faq-title">
+        <h2 id="help-faq-title" class="help-heading">Questions</h2>
+        <div class="rows faq">
+          <details class="faq-item">
+            <summary class="faq-question">Is Buddy a real person?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">No. Buddy is an AI helper. It is kind, and it remembers what you share about your life, but it is not a person. The people who care about you are always the ones to call.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Can Buddy tell me what to do about my health?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">No. Buddy never gives medical advice. It writes down how you feel, in your own words, for your doctor, and it can help you call your doctor or your family.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">What happens in an emergency?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">If you tell Buddy about a warning sign, like chest pain or a fall, it shows a big Call 911 button right away, before any AI is asked. Buddy never calls by itself: you decide.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Does Buddy listen all the time?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">No. Buddy listens only after you tap Talk to Buddy, and stops when you are done.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Who can see my diary?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">It is kept on this computer. Your doctor sees it on the notes you print or bring, and your family sees only the update you choose to send.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">How do I make the words bigger, or the voice slower?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">Open Settings. Text size has three sizes, and Voice speed has Slower.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Does Buddy work without the internet?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">Your pill reminders and the safety net work on this computer, even without the internet. Talking with Buddy needs the internet.</p>
+          </details>
+        </div>
+      </section>
+
+      <section class="help-section help-call" aria-labelledby="help-call-title">
+        <h2 id="help-call-title" class="help-heading">Still need help?</h2>
+        <p class="help-intro">Your family is happy to help. In an emergency, <a href="tel:911">call 911</a>.</p>
+        <a id="help-call-family" class="pill-button pill-button--ink" href="#" hidden>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"></path></svg>
+          <span id="help-call-label">Call family</span>
+        </a>
+      </section>
+    </section>
+
     <!-- ========== Welcome (the first time, while no name is saved) ==========
          Three steps: her name, her family, pills now or later. Each can be
          typed or said ("Say it"); what she says goes through the safety net
@@ -616,6 +710,20 @@
            novalidate: the server checks every entry and says which one
            needs another look. -->
       <form id="settings-form" class="settings" novalidate>
+        <!-- Help, one tap away (on phones the sidebar isn't there). -->
+        <ul class="rows settings-help" role="list">
+          <li>
+            <a class="row row--link" href="#/help">
+              <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>
+              <span class="row-text">
+                <span class="row-title">Help and how Buddy works</span>
+                <span class="row-meta">Questions, privacy, and the AI behind each part</span>
+              </span>
+              <svg class="icon row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+            </a>
+          </li>
+        </ul>
+
         <h2 class="group-title">Appearance</h2>
         <div class="group">
           <div class="group-row">
@@ -774,7 +882,7 @@
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></svg>
       Family
     </a>
-    <a class="tab" href="#/settings" data-nav="settings">
+    <a class="tab" href="#/settings" data-nav="settings" data-nav-also="help">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle cx="12" cy="12" r="3"></circle></svg>
       Settings
     </a>

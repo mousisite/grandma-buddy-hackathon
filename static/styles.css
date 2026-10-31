@@ -678,6 +678,21 @@ h2:focus,
   }
 }
 
+/* From 768px the four chips stay pills, two by two and the same width, so
+   none is left alone on a last row. */
+@media (min-width: 768px) {
+  .home .chips {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(100%, 32rem);
+    margin-inline: auto;
+  }
+
+  .home .chips .chip {
+    justify-content: center;
+  }
+}
+
 .today {
   margin-top: var(--s-16);
 }
@@ -745,6 +760,19 @@ button.row-link {
   border: 0;
   background: transparent;
   cursor: pointer;
+}
+
+/* The check-in once it's done today: a check and "Done", in the green of a
+   taken pill. Words and an icon, never color alone; nothing to tap. */
+.row-done {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: var(--target);
+  padding: 0 var(--s-3);
+  color: var(--success);
+  font-size: var(--t-15);
+  font-weight: 600;
 }
 
 /* ---------- Buddy, the orb ---------- */
@@ -1122,6 +1150,10 @@ button.row-link {
 
 /* ---------- Pill reminder: the one raised card ---------- */
 
+/* Buddy speaking to her: a small living orb, whose warm light spills softly
+   onto the top of the card, then her name and the pill in Newsreader (like
+   the greeting), and each label as on the bottle. Calm, never red: red is
+   only for emergencies. */
 .pill-banner {
   display: grid;
   gap: var(--s-4);
@@ -1129,7 +1161,10 @@ button.row-link {
   padding: var(--s-6);
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: var(--surface);
+  background:
+    radial-gradient(26rem 12rem at 0% 0%, rgba(246, 176, 66, 0.12), transparent 70%),
+    radial-gradient(22rem 10rem at 60% 0%, rgba(225, 96, 126, 0.06), transparent 70%),
+    var(--surface);
   box-shadow: var(--shadow-raised);
   animation: rise-in var(--slow) var(--spring) both;
 }
@@ -1142,23 +1177,71 @@ button.row-link {
 .pill-banner-title {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
+  gap: var(--s-3);
   color: var(--text-2);
   font-size: var(--t-15);
   font-weight: 600;
   letter-spacing: 0;
 }
 
+/* Buddy, small: the same orb as on Home, so it glows while it speaks. */
+.orb--card {
+  --orb-size: 40px;
+  flex: none;
+  view-transition-name: none;
+}
+
+.orb--card .orb-blob {
+  filter: blur(6px);
+}
+
+.orb--card .orb-glow {
+  filter: blur(10px);
+}
+
+.pill-banner-time {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
 .pill-banner-words {
-  font-size: var(--t-24);
+  max-width: 24ch;
+  font-family: var(--font-serif);
+  font-size: var(--t-32);
   font-weight: 500;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+/* Each pill as on its bottle: the name, then the label word for word. */
+.pill-banner-labels {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pill-banner-label {
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-card);
+  background: var(--tint);
+}
+
+.pill-banner-label-words {
+  color: var(--text-2);
 }
 
 .pill-banner-poison {
   display: grid;
   gap: var(--s-3);
+}
+
+.pill-banner-poison-words {
+  font-size: var(--t-20);
+  font-weight: 500;
+  line-height: 1.35;
 }
 
 .pill-banner-actions {
@@ -1168,8 +1251,36 @@ button.row-link {
   gap: var(--s-2);
 }
 
-.pill-banner-actions #pill-taken {
+/* Both answers are main actions: the same height, words on one line (a
+   button that can't fit beside the other takes its own row). */
+.pill-banner-actions .pill-button {
   min-height: var(--main-action);
+  white-space: nowrap;
+}
+
+.pill-banner-actions #pill-taken {
+  min-width: 10rem;
+}
+
+@media (max-width: 480px) {
+  .pill-banner {
+    padding: var(--s-4);
+  }
+
+  .pill-banner-words {
+    font-size: var(--t-24);
+  }
+
+  /* On a phone the two answers are full width, the biggest targets there
+     are. "Remind me in 10 minutes" fits on one line even at 360px with the
+     largest text; on a smaller screen it takes two even lines instead of
+     being cut off. */
+  .pill-banner-actions .pill-button {
+    flex: 1 1 100%;
+    padding-inline: var(--s-2); /* the words are centered in a full-width button */
+    white-space: normal;
+    text-wrap: balance;
+  }
 }
 
 .pill-banner-note:empty {
@@ -1904,8 +2015,41 @@ textarea::placeholder {
   padding-left: var(--s-1);
 }
 
-.doc-questions li > span {
-  margin-right: var(--s-2);
+/* Each question, and always just under it: a quiet "Mark as asked", or a
+   check with "Asked" and Undo. */
+.doc-question-answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1);
+  margin-top: var(--s-1);
+}
+
+.is-asked .doc-question {
+  color: var(--text-2);
+}
+
+.doc-asked {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding-right: var(--s-1);
+  color: var(--success);
+  font-size: var(--t-15);
+  font-weight: 600;
+}
+
+.doc-asked .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.doc-undo {
+  color: var(--text-2);
+  font-size: var(--t-15);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .doc-topic {
@@ -1998,10 +2142,6 @@ textarea::placeholder {
 .add-question-row input {
   flex: 1;
   min-width: 0;
-}
-
-#notes-undo {
-  margin-top: var(--s-4);
 }
 
 .call-list {
@@ -2419,9 +2559,17 @@ label.group-row .group-label {
   list-style: none;
 }
 
-/* A page in the book: its picture, then its title in Newsreader and the day. */
+/* Each card fills its row, so two side by side are always the same height. */
+.memory-cards > li {
+  display: grid;
+}
+
+/* A page in the book: its picture, then its title in Newsreader and the day.
+   The words fill the rest of the card, the title at the top and the day at
+   the bottom, so the days line up across a row. */
 .memory-card {
   display: grid;
+  grid-template-rows: auto 1fr;
   gap: var(--s-3);
   padding: var(--s-3);
   border: 1px solid var(--border);
@@ -2433,16 +2581,20 @@ label.group-row .group-label {
 
 .memory-card-text {
   display: grid;
-  gap: var(--s-1);
+  grid-template-rows: 1fr auto;
+  gap: var(--s-2);
   padding: 0 var(--s-2) var(--s-2);
 }
 
+/* Up to two even lines: "Summers at / aunt Lucy's farm", never one word
+   left alone on a line. */
 .memory-card-title {
   font-family: var(--font-serif);
   font-size: var(--t-24);
   font-weight: 500;
   line-height: 1.2;
   letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 
 .memory-card-date,
@@ -2627,8 +2779,20 @@ label.group-row .group-label {
   gap: var(--s-3);
 }
 
+/* Each button's words stay on one line: a button that can't fit beside its
+   neighbor takes a whole row of its own instead of squeezing its words. */
 .find-actions .pill-button {
   flex: 1 1 11rem;
+  min-width: max-content; /* never narrower than its words (it hides overflow, so say so) */
+  white-space: nowrap;
+}
+
+/* Narrow phones, big text: a little less padding, so even "Try another
+   photo" fits on one line. */
+@media (max-width: 420px) {
+  .find-actions .pill-button {
+    padding: 0 var(--s-4);
+  }
 }
 
 .find-choose {
@@ -2951,9 +3115,17 @@ label.group-row .group-label {
 }
 
 .segmented label,
-label.group-row {
+label.group-row,
+.row--link,
+.faq-question {
   position: relative;
   overflow: hidden;
+}
+
+/* Whole rows don't squeeze (they are wide): they only darken a little. */
+.row--link,
+.faq-question {
+  transition: background-color var(--fast) var(--ease);
 }
 
 .segmented label {
@@ -2978,7 +3150,7 @@ label.group-row {
   transform: scale(0.98);
 }
 
-:is(.pill-button--quiet, .text-button, .chip, .tab, .nav-link, .row-link, .call-pill--quiet, .for-family-summary, label.group-row):is(:active, [data-pressed]) {
+:is(.pill-button--quiet, .text-button, .chip, .tab, .nav-link, .row-link, .call-pill--quiet, .for-family-summary, label.group-row, .row--link, .faq-question):is(:active, [data-pressed]) {
   background: var(--tint);
 }
 
@@ -2998,7 +3170,7 @@ label.group-row {
 }
 
 @media (hover: hover) {
-  :is(.pill-button--quiet, .text-button, .chip, .nav-link, .tab, .row-link, .call-pill--quiet, .for-family-summary):hover {
+  :is(.pill-button--quiet, .text-button, .chip, .nav-link, .tab, .row-link, .call-pill--quiet, .for-family-summary, .row--link, .faq-question):hover {
     background: var(--tint);
     color: var(--text);
   }
@@ -3080,6 +3252,158 @@ label.group-row {
   from { opacity: 0; }
 }
 
+/* ---------- Help: how Buddy works ---------- */
+
+/* A whole row that opens a page, with a chevron (Settings > Help). */
+.row--link {
+  color: var(--text);
+  text-decoration: none;
+  border-radius: inherit;
+}
+
+.row-chevron {
+  flex: none;
+  color: var(--text-2);
+}
+
+.settings-help {
+  margin-bottom: var(--s-8);
+}
+
+.help-section {
+  display: grid;
+  gap: var(--s-4);
+  margin-top: var(--s-12);
+}
+
+.help-section:first-of-type {
+  margin-top: 0;
+}
+
+.help-heading {
+  font-size: var(--t-24);
+  font-weight: 650;
+}
+
+.help-intro {
+  max-width: 60ch;
+  color: var(--text-2);
+}
+
+.help-intro a {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* The four Meta models: one under another on a phone, two by two from 520px. */
+.help-models {
+  display: grid;
+  gap: var(--s-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 520px) {
+  .help-models {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.help-model {
+  display: grid;
+  align-content: start;
+  gap: var(--s-1);
+  padding: var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+
+.help-model-name {
+  font-weight: 650;
+}
+
+.help-model-does {
+  color: var(--text-2);
+}
+
+/* Each feature: what it does, then the models behind it as chips. */
+.help-feature,
+.help-list .row {
+  align-items: flex-start;
+  padding-block: var(--s-4);
+}
+
+.help-feature .row-text {
+  gap: var(--s-1);
+}
+
+/* What each feature does is a full sentence: body size, not a caption. */
+.help-feature .row-meta {
+  font-size: var(--t-17);
+}
+
+.help-feature .tags {
+  margin-top: var(--s-2);
+}
+
+.tag--no-ai {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+}
+
+.help-here {
+  color: var(--text-2);
+  font-size: var(--t-15);
+}
+
+.help-list .row-icon {
+  margin-top: 2px;
+}
+
+/* Questions open one at a time, like a help center. */
+.faq-item + .faq-item {
+  border-top: 1px solid var(--border);
+}
+
+.faq-question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 56px;
+  padding: var(--s-3) var(--s-4);
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+  border-radius: inherit;
+}
+
+.faq-question::-webkit-details-marker {
+  display: none;
+}
+
+.faq-chevron {
+  flex: none;
+  color: var(--text-2);
+  transition: rotate var(--base) var(--spring);
+}
+
+.faq-item[open] .faq-chevron {
+  rotate: 180deg;
+}
+
+.faq-answer {
+  max-width: 62ch;
+  padding: 0 var(--s-4) var(--s-4);
+  color: var(--text-2);
+}
+
+.help-call {
+  justify-items: start;
+}
+
 /* ---------- Printing (Doctor notes, Family) ---------- */
 
 @media print {
@@ -3129,7 +3453,7 @@ label.group-row {
   .screen-head,
   .notes-controls,
   .add-question,
-  #notes-undo,
+  .doc-undo,
   #notes-status {
     display: none !important;
   }

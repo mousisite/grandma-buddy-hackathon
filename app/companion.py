@@ -90,7 +90,7 @@ def ask_the_ai(messages: list[dict], context: dict, buttons: list[dict]) -> str:
         messages.append(answer["message"])
         for call in answer["tool_calls"]:
             result, new_buttons = tools.run_tool(call["name"], call["arguments"], context)
-            buttons.extend(new_buttons)
+            add_buttons(buttons, new_buttons)  # the AI may ask for the same buttons twice
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
         # Save what the tools wrote before asking the AI again, so "I took it"
         # and the 30-second pill check never wait on a slow AI reply.

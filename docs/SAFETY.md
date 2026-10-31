@@ -66,7 +66,8 @@ After a crisis response, keep the conversation open and gentle. Never end it abr
 - Never recommend any medicine, painkiller, vitamin, or supplement.
 - Missed dose: "Please check the label or call your pharmacist about what to do."
 - Side effects (dizzy, sick, sleepy): "Please call your doctor or pharmacist today and tell them." Add it to the diary. Don't guess which pill is causing it.
-- Reminders repeat the label text exactly as a family member entered it. The app never invents or edits dose information. When read aloud, a dose like "0.5 mg" or "1.5 tablets" is never split into two sentences.
+- Reminders repeat the label text exactly as a family member entered it. The app never invents or edits dose information. When read aloud, a dose like "0.5 mg" or "1.5 tablets" is never split into two sentences. Buddy says her name and the pill's name first ("Rose, it's time for your evening Metformin."), then reads the label as the label ("The label says: …"), written by plain code, never by the AI.
+- The hidden demo reminder (`?demo=reminder`, for the demo video) never saves anything: "I took it" on it doesn't mark her real pill taken, so it can never hide a dose from her family.
 - The AI never sees a label: it gets pill names (without any strength typed into the name), times, and whether each is taken, due, or missed. It never says a dose or how many pills.
 - "I took my pills" marks at most one reminder per pill, and never a missed one unless she names that pill, so a missed dose isn't hidden from her family.
 - After a Poison Control screen, for the rest of that day pill reminders are not read aloud, and the reminder card shows the fixed Poison Control message and its call button first.
@@ -169,9 +170,9 @@ How the checker keeps to these rules (`app/scam.py`):
 ## 9. Privacy
 
 - Health data stays in `data/grandma_buddy.db` on this computer and never goes to GitHub.
-- The app uses standard Meta models only (never `-contributor`), so her conversations aren't used for training.
+- The app uses standard Meta models only (never `-contributor`), so her conversations aren't used for training. It refuses to start if a `-contributor` model is ever put in its settings (`app/config.py`), and the Help screen lists the models it really uses.
 - Family updates go only to the person she chose, and only when she taps "Send": that opens her own email app with the update written (a `mailto:` link), and nothing is sent until she presses Send there. No email password is stored.
-- The family update is written by plain code from the logs, never by the AI, so it only says what happened: her mood, pills taken and missed, her diary entries in her own words, and each safety screen with a fixed sentence and its time. A crisis is named ("Buddy showed her the 988 Suicide & Crisis Lifeline. Please call her today."), never with her words.
+- The family update is written by plain code from the logs, never by the AI, so it only says what happened: her mood, pills taken and missed (and, for today, which are due now or still to come), her diary entries in her own words, and each safety screen with a fixed sentence and its time. A crisis is named ("Buddy showed her the 988 Suicide & Crisis Lifeline. Please call her today."), never with her words.
 - Demos, tests, and screenshots use made-up data only.
 
 ## 10. Test phrases
