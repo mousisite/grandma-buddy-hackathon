@@ -191,20 +191,78 @@ def segment(image: str, phrase: str) -> str:
         "metadata": {"include_confidence": "true", "mask_encoding": "one_bit"},
         "store": False,
     }
+    return (_respond(request, "SAM").output_text or "").strip()
+
+
+def _respond(request: dict, what: str):
+    """Send one Responses API request (SAM, web search), waiting and
+    retrying when Meta is busy. `what` names it in a failure."""
     client = _client()
     for attempt in range(RETRIES + 1):
         try:
-            response = client.responses.create(**request)
-            break
+            return client.responses.create(**request)
         except openai.RateLimitError:
             if attempt == RETRIES:
-                raise MetaError("SAM stayed busy (HTTP 429)")
+                raise MetaError(f"{what} stayed busy (HTTP 429)")
             time.sleep(2**attempt)  # too busy: wait 1, then 2, then 4 seconds
         except openai.APIStatusError as problem:
-            raise MetaError(f"SAM failed with HTTP {problem.status_code}")
+            raise MetaError(f"{what} failed with HTTP {problem.status_code}")
         except (openai.APITimeoutError, openai.APIConnectionError) as problem:
-            raise MetaError(f"SAM failed: {type(problem).__name__}")
-    return (response.output_text or "").strip()
+            raise MetaError(f"{what} failed: {type(problem).__name__}")
+
+
+def search(question: str, instructions: str, town: str) -> dict:
+    """Ask Muse Spark with Meta's own web search (POST /v1/responses, the
+    built-in web_search tool), near her town ("Portland, Oregon").
+
+    Returns {"text", "sources": [{"title", "url"}], "searched"}: the answer,
+    the pages it cites, and whether it really searched (the model may answer
+    from memory instead, which is no good for today's weather).
+    Costs $0.0025 per search, plus tokens.
+
+    Our code never visits a website: the search runs inside Meta's API.
+    Only her town is sent, never her name or her words.
+    """
+    settings = get_settings()
+    if not settings.model_api_key:
+        raise MetaError("no API key is set up in .env")
+    city, _, region = (part.strip() for part in town.partition(","))
+    location = {"type": "approximate", "country": "US", "city": city}
+    if region:
+        location["region"] = region
+    response = _respond({
+        "model": settings.chat_model,
+        "instructions": instructions,
+        "input": question,
+        "tools": [{"type": "web_search", "search_context_size": "low", "user_location": location}],
+        "include": ["web_search_call.action.sources"],  # the pages each search found
+        "reasoning": {"effort": "low"},
+        "max_tool_calls": 2,  # at most 2 searches for one answer
+        "max_output_tokens": 1500,  # reasoning and words together
+        "store": False,
+    }, "Web search")
+    searched = [item for item in response.output if getattr(item, "type", "") == "web_search_call"]
+    # Before searching, the model may say what it will do ("I'll check
+    # today's web sources…"): the answer is its last message.
+    messages = [item for item in response.output if getattr(item, "type", "") == "message"]
+    parts = [part for part in (getattr(messages[-1], "content", None) or [] if messages else [])
+             if getattr(part, "type", "") == "output_text"]
+    text = " ".join((part.text or "").strip() for part in parts).strip()
+    sources = []
+
+    def add(url: str, title: str = "") -> None:
+        if url and all(url != source["url"] for source in sources):
+            sources.append({"title": title, "url": url})
+
+    for part in parts:
+        for note in getattr(part, "annotations", None) or []:
+            if getattr(note, "type", "") == "url_citation":
+                add(note.url, getattr(note, "title", "") or "")
+    if not sources:  # no citation: the pages its searches found
+        for call in searched:
+            for found in getattr(getattr(call, "action", None), "sources", None) or []:
+                add(getattr(found, "url", "") or "")
+    return {"text": text, "sources": sources, "searched": bool(searched)}
 
 
 def transcribe(wav_bytes: bytes, keywords: list[str]) -> str:

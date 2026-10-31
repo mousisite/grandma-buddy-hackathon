@@ -436,6 +436,12 @@ function showActions(actions) {
         location.hash = "#/find/" + encodeURIComponent(action.thing);
       });
       row.appendChild(find);
+    } else if (action.type === "sources") {
+      // Where Buddy read today's weather or news (Meta's web search).
+      var from = document.createElement("p");
+      from.className = "sources";
+      from.textContent = "From the web: " + action.sites.join(", ");
+      row.appendChild(from);
     } else if (isCallLink(action.href)) {
       row.appendChild(callLink(action, "call-pill"));
     }

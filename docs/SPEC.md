@@ -135,6 +135,14 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - The safety net runs first on what she said. Her photo is never saved (and is sent to Meta with `store=false`). Buddy never reads labels, never says anything about medicines or health, and never describes people.
 - Done when: it works on 3 made-up test photos with the real SAM 3.1 (`scripts/check_find.py`), every Meta call has a mocked test, and the result screen is checked in a browser.
 
+### 14. Today's weather, news, and sports (P1)
+
+- "What's the weather today?", "Anything happening in town?", "How did the Blazers do?": Buddy looks it up on the web with Meta's web search (the Responses API's `web_search` tool) near her town, and says it in one or two warm sentences, with where it read it under its words ("From the web: weather.gov").
+- Home's Today list starts with today's weather ("Sunny, with a high of 62 and a low of 48.", from weather.gov), read aloud by a tap anywhere on its row. Every Today row is tappable as a whole, with a chevron on its link.
+- A family member types her town in Settings, under Names and phone numbers. Only the town is sent.
+- Only the weather, local news, and sports can be looked up (never health, medicine, or food), and every answer is checked by plain code first (docs/SAFETY.md section 8c).
+- Done when: the request and the checks are tested with a fake Meta, and `scripts/check_briefing.py` gets real answers with sources for all three.
+
 ### 13. Help and how Buddy works (P1)
 
 - A Help screen (sidebar on desktop; Settings, "Help and how Buddy works", on phones; or by voice: "How do you work?" opens it).

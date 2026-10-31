@@ -579,7 +579,7 @@ def check_home_hero(browser) -> None:
         assert not page.evaluate("document.documentElement.hasAttribute('data-calm')"), "Calm motion should start off"
         moving = page.evaluate("getComputedStyle(document.querySelector('.hero-orb .orb-blob')).animationName")
         assert moving != "none", "the orb should move on Home"
-        first_row = page.locator(".rows .row").first
+        first_row = page.locator(".today .row:not([hidden])").first  # no town here: no weather row
         assert first_row.locator(".row-title").text_content() == "Daily check-in"
         assert first_row.locator("[data-start-check-in]").text_content() == "Start"
         talk = page.get_by_role("button", name="Talk to Buddy", exact=True)
@@ -1053,6 +1053,44 @@ def check_greeting_and_theme(browser) -> None:
         page.close()
 
 
+WEATHER = {"text": "Sunny, with a high of 62 and a low of 48.", "sites": ["weather.gov"]}  # made up
+
+
+def check_today_rows(browser) -> None:
+    """Home's Today list on the demo week: today's weather (faked: the test
+    server has no key), read aloud by a tap anywhere on its row; a tap on a
+    row's words opens its screen, like its link. In voice mode, where Buddy
+    read the news shows under its words."""
+    page = browser.new_page(viewport={"width": 390, "height": 844}, permissions=["microphone"])
+    page.route("**/api/briefing/weather", lambda route: route.fulfill(json=WEATHER))
+    visit(page, "today")
+    page.wait_for_selector("#today-weather:not([hidden])")
+    assert page.text_content("#today-weather-text") == WEATHER["text"]
+    assert page.text_content("#today-weather-from") == "From weather.gov"
+    page.evaluate("window.spokenWords = []; var realSpeak = speak;"
+                  "window.speak = function (text, options) { spokenWords.push(text); return realSpeak(text, options); }; 0")
+    page.click("#today-weather-text")  # the words, not the button
+    page.wait_for_function("spokenWords.includes('Sunny, with a high of 62 and a low of 48.')")
+    page.click("#today-diary")  # a tap on the diary row's words opens the diary
+    wait_for_screen(page, "diary")
+
+    # "Anything happening in town?": the reply shows where Buddy read it.
+    page.route("**/api/transcribe", lambda route: route.fulfill(json={"transcript": "Anything happening in town?"}))
+    page.route("**/api/chat", lambda route: route.fulfill(json={
+        "reply": "There's a night market on Saturday, from 2 to 10.", "show": None,
+        "actions": [{"type": "sources", "sites": ["pdxpipeline.com", "jambase.com"]}]}))
+    visit(page, "talk")
+    page.click("#talk-button")
+    page.wait_for_selector("#talk-button[data-state='listening']")
+    page.wait_for_timeout(600)
+    page.click("#talk-button")
+    page.wait_for_selector("#actions .sources")
+    assert page.text_content("#actions .sources") == "From the web: pdxpipeline.com, jambase.com"
+    check_layout(page, "a reply with its sources at 390px")
+    page.screenshot(path=str(OUT / "talk-sources-390.png"))
+    page.close()
+
+
 def check_help(browser) -> None:
     """Help on the demo week: opened from Settings on a phone (the tab bar
     keeps Settings lit), the 4 Meta models from the app's settings, every
@@ -1291,6 +1329,7 @@ def main() -> int:
                 check_family(browser)
                 check_demo_reminder(browser)
                 check_help(browser)
+                check_today_rows(browser)
                 check_friend(browser, test_env["DATABASE_PATH"])
                 check_every_screen(browser)
                 check_buddy_states(browser)
@@ -1317,7 +1356,8 @@ def main() -> int:
             "(the email holds exactly the words on screen, its pills count matches the Pills ring, Copy, Yesterday), "
             "the demo week's done check-in and the hidden ?demo=reminder card (pops up after the first tap, said with "
             "her name, saves nothing), Help (from Settings and the sidebar, the 4 Meta models, "
-            "every feature with its models or No AI, questions open, Call Maria), the emergency screen never "
+            "every feature with its models or No AI, questions open, Call Maria), Home's weather row (read aloud by "
+            "a tap anywhere on it) and whole-row taps, a reply's web sources, the emergency screen never "
             "moves, Auto theme follows the computer and the evening, every screen at 390/768/1440px in light and "
             "dark, the orb's states and reduced motion look right, no layout problems. Screenshots in test-output/."
         )

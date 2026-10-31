@@ -72,6 +72,14 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
 
+- Oct 31: **Today's weather, news, and sports** (feature 14), with **Meta's web search** (Responses API `web_search`), a Meta capability the app didn't use yet.
+  - "What's the weather?", "Anything happening in town?", "How did the Blazers do?": a `look_up_today` tool (weather, news, or sports only; our code writes the question), answers checked by plain code (`app/briefing.py`: found on today's web, no links, no health or advice, 2 sentences), "From the web: …" under Buddy's words. Kept 3 hours, 30 searches a day at most; if a new look fails, today's last one is kept.
+  - Home: the weather is the first Today row (tap anywhere on it to hear it), and every Today row is tappable as a whole, with chevrons (a design upgrade from the review). Her town is a new profile field in Settings; the demo week has Portland, Oregon.
+  - Real calls (`scripts/check_briefing.py`, about 2 cents in all) found 3 things the fakes couldn't: the model's own "I'll check…" messages got glued onto the answer, one set of instructions made it answer all 3 topics at once, and citations can be missing (then the pages it searched are used, 3 sites at most). All fixed with tests first. Final real answers: frost then clouds, high 43, low 32; the Davis Street Night Market on Saturday; the Blazers lost to Memphis 124 to 103.
+  - 22 new tests (fake Meta), 567 pytest pass; the real advice check still gives no advice (guard 0 of 8). Browser check: the weather row, a tap anywhere on a row, sources under a reply. With no town yet, Home answers "nothing to show" instead of an error.
+
+- Oct 31: **Fix: other websites can no longer use Buddy.** Found by a plan review: any website open in her browser could send requests to `localhost:8000`, like "paint this memory" (costs money) or "mark this question asked". `app/security.py` refuses `/api` requests that browsers mark as from another site or port (Sec-Fetch-Site, Origin), and any host name but this computer's (DNS rebinding). Tests can no longer reach the internet through `requests` at all. Tests first: 14 new; 546 pytest pass. In a real browser, a body-less post from another site no longer marks a question asked, and Buddy's own page still can.
+
 - Oct 30, night: **Help and how Buddy works** (feature 13, the first of the final-week plan).
   - A Help screen: the 4 Meta models (read from the app's settings by `/api/how`, `app/how.py`), every feature with its models or "No AI", what Buddy never does, privacy in short, questions that open, and Call {family}. From the sidebar, the first row of Settings, or by voice ("How do you work?" through `open_screen`).
   - The app now refuses to start with a `-contributor` model in its settings.

@@ -43,6 +43,7 @@ PROFILE = {
     "family2_phone": "555-0144",
     "doctor_name": "Dr. Lee",
     "doctor_phone": "555-0199",
+    "city": "Portland, Oregon",  # for the weather and what's happening in town (a real city; nothing else about her)
 }
 
 # (name, label exactly as on the bottle, times)

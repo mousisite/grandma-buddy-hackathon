@@ -19,6 +19,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -50,6 +51,22 @@ def copy_the_app_data() -> Path:
     if pictures.exists():
         shutil.copytree(pictures, FOLDER / "memories")
     return FOLDER / "demo.db"
+
+
+def add_made_up_weather(database: Path) -> None:
+    """Home's weather row needs a look-up on the web, and this server has no
+    key: a made-up forecast for her town goes into the COPY (made now, so it
+    is fresh for 3 hours). Her real database is never touched."""
+    connection = sqlite3.connect(database)
+    connection.execute("UPDATE profile SET city = 'Portland, Oregon' WHERE city = ''")
+    town = connection.execute("SELECT city FROM profile WHERE id = 1").fetchone()[0]
+    connection.execute(
+        "INSERT OR REPLACE INTO briefings (topic, city, text, sources, made_at) VALUES ('weather', ?, ?, ?, ?)",
+        (town, "Sunny, with a high of 62 and a low of 48.", '["weather.gov"]',
+         datetime.now().isoformat(timespec="seconds")),
+    )
+    connection.commit()
+    connection.close()
 
 
 def start_server(database: Path, port: int) -> subprocess.Popen:
@@ -113,7 +130,17 @@ def close_ups(browser) -> list[str]:
         page.goto(f"http://localhost:{PORT}/#/", wait_until="networkidle")
         wait_for_screen(page, "today")
         page.wait_for_selector("#check-in-done:not([hidden])")
+        page.wait_for_selector("#today-weather:not([hidden])")
         saved.append(close_up(page, ".today", f"demo-fix-today-{width}.png"))
+
+        # Where Buddy read the news, under its words in voice mode (made-up reply).
+        page.goto(f"http://localhost:{PORT}/#/talk", wait_until="load")
+        wait_for_screen(page, "talk")
+        page.evaluate("say('There’s a night market in Old Town on Saturday, from 2 to 10.');"
+                      "showActions([{type: 'sources', sites: ['pdxpipeline.com', 'jambase.com']}])")
+        page.add_style_tag(content=".pill-banner { display: none !important; }")  # a pill may be due in the copy
+        page.wait_for_timeout(600)
+        saved.append(close_up(page, "[data-screen='talk']", f"demo-fix-sources-{width}.png"))
 
         page.goto(f"http://localhost:{PORT}/#/family", wait_until="networkidle")
         wait_for_screen(page, "family")
@@ -197,7 +224,9 @@ def welcome(browser) -> list[str]:
 if __name__ == "__main__":
     from playwright.sync_api import sync_playwright
 
-    server = start_server(copy_the_app_data(), PORT)
+    database = copy_the_app_data()
+    server = start_server(database, PORT)
+    add_made_up_weather(database)  # after the server made its tables
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()

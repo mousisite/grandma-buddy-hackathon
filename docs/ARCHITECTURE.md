@@ -59,13 +59,15 @@ grandma-buddy-hackathon/
     __init__.py
     main.py                  creates the FastAPI app, serves static/, includes the routes
     config.py                reads settings from .env (only place that does); refuses a `-contributor` model
+    security.py              only Buddy's own page may use /api: requests another website sends (Sec-Fetch-Site, Origin) and other host names are refused
     how.py                   "How Buddy works" for Help: every feature, the Meta models behind it (from the settings), what runs on this computer
     db.py                    SQLite connection, creates tables, small query helpers
-    meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), paint() (Muse Image), segment() (SAM 3.1), transcribe()
+    meta_client.py           ALL calls to Meta: chat(), structured() (a strict JSON form, with photos), paint() (Muse Image), segment() (SAM 3.1), search() (Muse Spark with Meta's web search), transcribe()
     safety.py                emergency, crisis, and medication mix-up rules with fixed messages
     prompts.py               system prompts for companion, diary, scam, notes, family
     family.py                the family update: one day in plain words (plain code, no AI) and its mailto: link
     memories.py              the Memory book: write the page (checked: only her names and numbers, no advice), paint it, the picture style
+    briefing.py              today's weather, a cheerful local story, or sports, looked up on the web for her town (our code writes the question), checked (no links, no health or advice, 2 sentences), kept 3 hours, 30 searches a day at most
     finder.py                Find my things: what she's looking for as a short noun phrase, SAM's answer line, the surest match, Spark's sentence (checked) or plain words
     voice.py                 Buddy's natural voice: Kokoro (kokoro-onnx) on this computer, the voices on offer, WAV making, a cache of recent words
     notes.py                 Doctor notes: facts straight from the logs (plain code); the AI only groups, checked
@@ -81,6 +83,7 @@ grandma-buddy-hackathon/
       family.py              /api/family/summary
       memories.py            /api/memories (the pages, a picture, save, paint again)
       find.py                /api/find (safety net first, then finder.find; the photo is never saved)
+      briefing.py            /api/briefing/{weather,news,sports} for Home's weather row
       voice.py               /api/voice (is the natural voice here, which voices), /api/speak (words in, WAV out)
       learned.py             /api/learned: what Buddy remembers and learned about her (Settings), forget, undo
       profile.py             /api/profile
@@ -108,6 +111,7 @@ grandma-buddy-hackathon/
     check_scam.py            hand-run: the SAFETY.md scam messages and one photo through the real AI (right verdicts?)
     check_notes.py           hand-run: the demo week's doctor notes grouped by the real AI (labels in her words?)
     check_memory.py          hand-run: two made-up memories written and painted by the real AI (about 3 cents), then screenshots
+    check_briefing.py        hand-run: 3 real web searches (weather, local news, sports) for the demo town, Meta's answers and what Buddy would say after its checks (about 1 cent)
     check_find.py            hand-run: Find my things end to end in a browser with the real SAM 3.1 and Muse Spark on 4 test photos (about 2 cents; 4 more the first time, to paint them), then screenshots; `--only desk-glasses` runs one look
     find_photos/             the 4 test photos for check_find.py, painted with Muse Image for this project (rooms and a desk only, no people)
     demo_screenshots.py      hand-run, free: every screen with the demo week at 390 and 1440px, on a COPY of the app's database (no AI), plus the welcome's 3 steps
@@ -137,6 +141,7 @@ grandma-buddy-hackathon/
 | `IMAGE_MODEL` | `muse-image-1.0` | paints the Memory book pictures (standard mode; Meta lists no `-contributor` version) |
 | `SAM_MODEL` | `sam-3.1` | finds her things in a photo (Find my things) |
 | `LANGUAGE` | `English` | the app's language, sent to speech-to-text as `languageBias` |
+| `ALLOWED_HOSTS` | `localhost,127.0.0.1,::1` | the names this computer answers to. Any other host name gets 400 (so a website's name pointed at this computer can't get in), and an `/api` request sent by another website or another port gets 403 (`app/security.py`) |
 | `DATABASE_PATH` | `data/grandma_buddy.db` | where the SQLite file lives. A relative path counts from the project folder, so the app and `scripts/seed_demo.py` always use the same file, whatever folder they're started from |
 
 ## Python packages (expected)
@@ -149,7 +154,9 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 
 | Table | Columns |
 |---|---|
-| `profile` (one row) | id, name, preferred_name, language, family_name, family_email, family_phone, family2_name, family2_phone (an optional second family member), doctor_name, doctor_phone, voice_on, voice_rate, text_size, calm_mode (no movement), chime (tone when listening starts and stops), theme ('auto', 'light', or 'dark'). Older databases get new columns on startup (`db.add_column`) |
+| `profile` (one row) | id, name, preferred_name, language, family_name, family_email, family_phone, family2_name, family2_phone (an optional second family member), doctor_name, doctor_phone, voice_on, voice_rate, text_size, calm_mode (no movement), chime (tone when listening starts and stops), theme ('auto', 'light', or 'dark'), city (her town, for the weather and local news). Older databases get new columns on startup (`db.add_column`) |
+| `briefings` | topic (weather, news, sports), city, text (after the checks), sources (site names, JSON), made_at. One per topic and town, kept 3 hours |
+| `web_searches` | day, count: at most 30 web searches a day |
 | `medications` | id, name, label_dose (exactly as on the label), times (JSON list like `["08:00","20:00"]`), notes, active, created_at |
 | `med_events` | id, medication_id, due_at, status (`due`, `snoozed`, or `taken`: only her answers are stored; `upcoming` and `missed` follow from the clock), snooze_until, acted_at. One row per pill per time (`med_events_once` unique index) |
 | `symptoms` (the diary) | id, created_at, description (her own words), body_area, pain_level (0 to 10, optional), since (her words, like "since Tuesday"), source (`check_in`, `diary`, `chat`, `safety_net`), conversation_id (the talk it came from; one entry per "Something hurts" talk) |
@@ -192,6 +199,7 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `POST /api/greeting` | `{"conversation_id"}` | `{"greeting"}`: at the start of a conversation (no talk in the last 2 hours), "Good afternoon, Rose!" plus a follow-up that's due (asked once) or a warm opener; plain words, no AI; saved in the conversation. Otherwise `""` |
 | `GET /api/learned` | | `{"facts": [{"id", "kind", "fact", "follow_up"}], "notes": [{"id", "note"}], "days_learned"}` for Settings |
 | `POST /api/learned/{facts or notes}/{id}/forget` and `/restore` | | "Forget this" and Undo |
+| `GET /api/briefing/{topic}` | | `{"text", "sites"}`: today's weather (or news, sports) for her town, kept 3 hours. Empty (`"text": ""`) when there is nothing to show: no town yet, nothing found, or the search failed with nothing kept from today (normal for Home, so no error status). 404 only for an unknown topic |
 | `GET /api/how` | | `{"models": [{"id", "name", "does"}], "features": [{"name", "what", "models": [ids], "here"}]}`: for Help, the Meta models from the settings and every feature with the models behind it (none: it runs on this computer) |
 | `GET /api/voice` | | `{"available", "default", "voices": [{"id", "name"}]}`: is Buddy's natural voice set up on this computer, and which voices she can choose (Heart, Bella, Nicole, Emma (British), Michael) |
 | `POST /api/speak` | `{"text", "voice", "speed"}` (a sentence, up to 600 characters; speed 0.6 to 1.4) | the words as a WAV (24 kHz mono). 503 when the natural voice isn't set up or fails: the page then uses the browser voice. The words are in the body, never the address, so they never show in the server log. The same words are made once (a cache of 64), and the model loads in the background when the app starts |
@@ -271,6 +279,7 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `offer_memory_page` | none | tells the screen to show "Save it in my memory book" |
 | `save_memory` | none | saves what was said in the talk for a Memory book page (her own words; Buddy's questions too, for context) and shows "Open my memory book". The page is written and painted afterward. Saving again is the same page. Ordinary talk and memory talks only |
 | `open_screen` | screen (`today`, `diary`, `pills`, `notes`, `family`, `scam`, `memories`) | tells the screen to show "Open …" |
+| `look_up_today` | topic (weather, news, or sports only) | looks it up with Meta's web search near her town (`briefing.look_up`): the checked words for the AI to say, and "From the web: …" under its reply |
 | `find_my_things` | thing | when she can't find something: tells the screen to show "Find my glasses", which opens Find my things with the thing filled in. Plain code makes the thing a short noun phrase first |
 
 **Structured outputs (`meta_client.structured()`)**

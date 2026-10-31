@@ -11,7 +11,7 @@ import json
 import re
 from datetime import date, datetime, timedelta
 
-from app import db, finder, guard, reminders, safety
+from app import briefing, db, finder, guard, meta_client, reminders, safety
 
 MOODS = ["great", "good", "okay", "low", "very_low"]
 SCREENS = ["today", "diary", "pills", "notes", "family", "scam", "memories", "help"]
@@ -251,6 +251,10 @@ TOOLS = [
          "room she takes.",
          {"thing": {"type": "string", "description": "What she is looking for, in a few words, like \"glasses\"."}},
          ["thing"]),
+    tool("look_up_today",
+         "Look up today's weather, one cheerful thing happening in her town, or how the local sports teams did, "
+         "on the web. Only these three; never anything about health, medicine, or food.",
+         {"topic": {"type": "string", "enum": sorted(briefing.QUESTIONS)}}, ["topic"]),
 ]
 
 
@@ -414,6 +418,25 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
         if not thing:
             return {"ok": False, "error": "Ask her what she's looking for."}, []
         return {"ok": True}, [{"type": "find", "thing": thing, "label": f"Find my {thing}"}]
+
+    if name == "look_up_today":
+        # Our code writes the question for one of three topics (app/briefing.py),
+        # so the AI can't search for anything else.
+        topic = args.get("topic")
+        if topic not in briefing.QUESTIONS:
+            return {"ok": False, "error": "Only the weather, local news, or sports can be looked up."}, []
+        town = (context["profile"].get("city") or "").strip()
+        if not town:
+            return {"ok": False, "error": "Her town isn't set up yet. A family member can add it in Settings, "
+                                          "under Names and phone numbers."}, []
+        try:
+            found = briefing.look_up(connection, topic, town)
+        except meta_client.MetaError as problem:
+            print(f"Looking up today's {topic} failed: {problem}")  # never her words
+            found = None
+        if not found:
+            return {"ok": False, "error": "Nothing good to share was found just now."}, []
+        return {"ok": True, "found": found["text"], "from": found["sites"]}, [{"type": "sources", "sites": found["sites"]}]
 
     if name == "open_screen":
         screen = args.get("screen")

@@ -9,13 +9,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import db
+from app import db, security
 from app.config import get_settings
 from app import voice
-from app.routes import checkin, companion, diary, family, find, how, learned, meds, memories, notes, profile, scam
+from app.routes import briefing, checkin, companion, diary, family, find, how, learned, meds, memories, notes, profile, scam
 from app.routes import voice as voice_routes
 
 # The folder with index.html, styles.css, and app.js.
@@ -62,6 +62,22 @@ app.include_router(voice_routes.router)
 app.include_router(learned.router)
 # Help: how Buddy works (each feature and its Meta model).
 app.include_router(how.router)
+# Today's weather, a local story, or sports, from the web (Meta's web search).
+app.include_router(briefing.router)
+
+
+@app.middleware("http")
+async def only_buddys_own_page(request, call_next):
+    """Refuse a request for another host name (400), and an /api request
+    that another website sent (403): app/security.py says why."""
+    host = request.headers.get("host", "")
+    if not security.allowed_host(host, get_settings().allowed_hosts):
+        return JSONResponse({"detail": "Grandma Buddy only answers on this computer."}, status_code=400)
+    if request.url.path.startswith("/api/") and not security.from_buddys_page(
+        request.headers, f"{request.url.scheme}://{host}"
+    ):
+        return JSONResponse({"detail": "Only Grandma Buddy's own page can do that."}, status_code=403)
+    return await call_next(request)
 
 
 @app.middleware("http")

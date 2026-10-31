@@ -731,6 +731,7 @@ h2:focus,
 
 .row-title {
   font-weight: 500;
+  text-wrap: pretty; /* no word left alone on a last line */
 }
 
 .row-meta {
@@ -745,6 +746,7 @@ h2:focus,
 .row-link {
   display: inline-flex;
   align-items: center;
+  gap: var(--s-1);
   min-height: var(--target);
   padding: 0 var(--s-3);
   border-radius: var(--r-pill);
@@ -3250,6 +3252,38 @@ label.group-row,
 
 @keyframes fade-in {
   from { opacity: 0; }
+}
+
+/* ---------- Today: whole rows, and the weather ---------- */
+
+/* A tap anywhere on a row does what its button or link says (screens.js). */
+.today .rows {
+  overflow: hidden;
+}
+
+.today .row:has(.row-link:not([hidden])) {
+  cursor: pointer;
+  transition: background-color var(--fast) var(--ease);
+}
+
+@media (hover: hover) {
+  .today .row:has(.row-link:not([hidden])):hover {
+    background: var(--tint);
+  }
+}
+
+.row-link-chevron {
+  width: 18px;
+  height: 18px;
+  margin-right: -4px;
+}
+
+/* Under Buddy's words: where today's weather or news was read. */
+.sources {
+  flex-basis: 100%;
+  color: var(--text-2);
+  font-size: var(--t-15);
+  text-align: center;
 }
 
 /* ---------- Help: how Buddy works ---------- */

@@ -152,7 +152,22 @@
       <!-- Today, as a clean list (screens.js fills in the details). -->
       <section class="today" aria-labelledby="today-title">
         <h2 id="today-title" class="list-title">Today</h2>
+        <!-- A tap anywhere on a row does what its button or link says
+             (screens.js), so the targets are big for shaky hands. -->
         <ul class="rows" role="list">
+          <!-- Today's weather in her town, from the web (Meta's web search,
+               app/briefing.py). Hidden until there is one. -->
+          <li id="today-weather" class="row" hidden>
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="M20 12h2"></path><path d="m19.07 4.93-1.41 1.41"></path><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"></path><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"></path></svg>
+            <span class="row-text">
+              <span id="today-weather-text" class="row-title"></span>
+              <span id="today-weather-from" class="row-meta"></span>
+            </span>
+            <button id="today-weather-say" class="row-link" type="button" aria-label="Hear today’s weather">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path></svg>
+              Hear it
+            </button>
+          </li>
           <li class="row">
             <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
             <span class="row-text">
@@ -170,7 +185,7 @@
             <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path><path d="m8.5 8.5 7 7"></path></svg>
             <span class="row-text"><span id="pills-summary" class="row-title">No pills set up yet</span></span>
             <button id="today-take" class="pill-button pill-button--ink pill-button--small" type="button" hidden>Take</button>
-            <a id="today-pills-link" class="row-link" href="#/pills">Pills</a>
+            <a id="today-pills-link" class="row-link" href="#/pills">Pills<svg class="icon row-link-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
           </li>
           <li class="row">
             <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path></svg>
@@ -178,12 +193,12 @@
               <span id="today-diary" class="row-title">Nothing noted today</span>
               <span id="today-diary-when" class="row-meta"></span>
             </span>
-            <a class="row-link" href="#/diary">Diary</a>
+            <a class="row-link" href="#/diary">Diary<svg class="icon row-link-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
           </li>
           <li class="row">
             <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>
             <span class="row-text"><span class="row-title">Questions for your next doctor visit</span></span>
-            <a class="row-link" href="#/notes">Notes</a>
+            <a class="row-link" href="#/notes">Notes<svg class="icon row-link-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
           </li>
         </ul>
       </section>
@@ -829,6 +844,10 @@
           <div class="field">
             <label for="set-doctor-phone">The doctor’s phone number</label>
             <input id="set-doctor-phone" name="doctor_phone" type="tel" autocomplete="off" maxlength="30">
+          </div>
+          <div class="field">
+            <label for="set-city">Her town<span class="group-hint">For today’s weather and what’s happening nearby. Only the town is looked up.</span></label>
+            <input id="set-city" name="city" type="text" autocomplete="off" maxlength="80" placeholder="Like “Portland, Oregon”">
           </div>
         </div>
         <button class="pill-button pill-button--ink" type="submit">Save profile</button>

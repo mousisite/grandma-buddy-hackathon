@@ -102,7 +102,7 @@ else:
 ```
 
 - Tool handlers live in `app/tools.py`, validate their arguments, and return small JSON results.
-- Tools may only touch our own database or tell the screen to show something. No tool sends messages, calls people, or contacts the internet.
+- Tools may only touch our own database, tell the screen to show something, or (`look_up_today` only) ask Meta's own web search about one of three topics our code words (weather, local news, sports). No tool sends messages, calls people, or visits a website: our code never fetches a web page.
 
 ## Structured outputs (scam check, doctor notes)
 
@@ -217,6 +217,31 @@ line = response.output_text  # "" when nothing matched
 - The mask's base85 encoding isn't documented, and Meta's `meta-sam-parser` has no published license, so we don't use masks: the page draws a halo around the box.
 - $0.0025 per image. Retries on 429 like chat.
 
+## Web search grounding: Responses API `web_search` (`meta_client.search`)
+
+Checked against Meta's search-grounding docs and with real calls (`scripts/check_briefing.py`), October 30, 2026. Not available on Chat Completions (`web_search_options` is a 400 there).
+
+```python
+response = client.responses.create(
+    model=settings.chat_model,                     # muse-spark-1.3
+    instructions=instructions,                     # this request only
+    input=question,                                # our code writes it (app/briefing.py)
+    tools=[{"type": "web_search", "search_context_size": "low",
+            "user_location": {"type": "approximate", "country": "US", "city": "Portland", "region": "Oregon"}}],
+    include=["web_search_call.action.sources"],    # the pages each search found
+    reasoning={"effort": "low"},
+    max_tool_calls=2,                              # caps built-in calls like web_search
+    max_output_tokens=1500,                        # reasoning + words
+    store=False,
+)
+```
+
+- Before searching, the model writes short messages of its own ("I'll check today's web sources…"). `response.output_text` glues ALL message texts together with no spaces, so use the LAST `message` item's `output_text` parts as the answer.
+- The answer's `url_citation` annotations (`url`, `title`, `start_index`, `end_index`) sit on that last message. Sometimes there are none: then the `web_search_call` items' `action.sources` (`{"type": "url", "url"}`) list the pages found (20+ is normal); name the first few sites only.
+- A `web_search_call` item with `action.type == "url"` is the model opening a page. No search call at all means it answered from memory: no good for today's weather, so we don't use it.
+- One set of instructions covering several topics made it answer all of them at once: give each question only its own rules.
+- `tool_choice` only "auto": the model decides whether to search. `$0.0025` per search plus tokens. No per-request domain filters on Responses.
+
 ## Docs to check when unsure
 
 - Chat Completions: https://dev.meta.ai/docs/protocols/chat-completions
@@ -224,3 +249,4 @@ line = response.output_text  # "" when nothing matched
 - Speech to text: https://dev.meta.ai/docs/speech-to-text
 - Transcribe API reference: https://dev.meta.ai/docs/api-reference/voice/transcribe
 - SAM 3.1: https://dev.meta.ai/docs/sam/reading-segmentation and https://dev.meta.ai/docs/api-reference/responses/create-response
+- Web search: https://dev.meta.ai/docs/search-grounding and https://dev.meta.ai/docs/protocols/responses

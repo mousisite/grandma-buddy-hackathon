@@ -30,6 +30,8 @@ class Settings:
     sam_model: str = "sam-3.1"  # finds her things in a photo ("Find my things")
     language: str = "English"  # the app's language, sent to speech-to-text as a hint
     database_path: str = "data/grandma_buddy.db"  # where the SQLite file lives
+    # The names this computer may be reached by (app/security.py).
+    allowed_hosts: tuple[str, ...] = ("localhost", "127.0.0.1", "::1")
 
 
 def get_settings() -> Settings:
@@ -46,6 +48,9 @@ def get_settings() -> Settings:
         sam_model=os.getenv("SAM_MODEL", "sam-3.1"),
         language=os.getenv("LANGUAGE", "English"),
         database_path=str(PROJECT_FOLDER / os.getenv("DATABASE_PATH", "data/grandma_buddy.db")),
+        allowed_hosts=tuple(
+            name.strip().lower() for name in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,::1").split(",") if name.strip()
+        ),
     )
     # Standard models only. In "-contributor" mode Meta may train on what she
     # says, and this app holds her health information, so it refuses to run.

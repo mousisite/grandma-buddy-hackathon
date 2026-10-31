@@ -20,6 +20,7 @@ I'm building this for my grandma. She is often lonely, struggles to use her phon
 - **Family updates.** A short daily summary for a family member she chooses.
 - **Memory book.** She tells Buddy a story from her life; it becomes a page in her own words with a painting, to share with her family.
 - **Find my things.** Can't find her glasses, keys, or TV remote? She says what she's looking for and takes a photo of the room. Buddy circles it with a soft glow and tells her where it is: "Your glasses are on the side table, next to the lamp."
+- **Today's weather and news.** "What's the weather today?" or "Anything happening in town?": Buddy looks it up on the web near her town and says it in a sentence or two, showing where it read it. Home starts its Today list with the weather. Never anything about health.
 - **Help and how Buddy works.** Shows every feature with the Meta model behind it (read from the app's own settings), what Buddy never does, privacy in plain words, and common questions.
 - **Safety net.** If she mentions emergency warning signs, crisis words, or a medication mix-up, a fixed screen with big Call 911, Call 988, or Call Poison Control buttons appears.
 
@@ -33,6 +34,7 @@ The AI listens, writes things down, reminds, and connects her to real people: fa
 - **Muse Spark 1.3** runs the conversation, calls tools to write diary entries, track pills, save doctor questions, remember her life, and open Find my things (function calling), returns scam verdicts, doctor notes, and Memory book pages as structured JSON, and looks at photos: messages she wants checked, and the room where she lost something, to say where it is in plain words.
 - **SAM 3.1** (Segment Anything) finds the thing she lost in her photo from a short text prompt ("glasses"), so Buddy can draw a glowing halo in its own orb colors right around it. Her photo is sent with `store=false` and is never saved.
 - **Muse Image** paints one soft watercolor picture for each Memory book page.
+- **Meta's web search** (the Responses API's built-in `web_search` tool, with Muse Spark) grounds "what's happening today" in today's web: the weather, a cheerful local event, and sports scores, with their sources shown. Only her town is sent, and only those three topics can be searched.
 
 Each model does the job it's best at, and plain Python rules (the safety net and the advice guard) check her words before any AI and Buddy's words after.
 
@@ -48,7 +50,7 @@ This repository was created on October 26, 2026, the hackathon's kickoff day. I 
 
 ## Privacy
 
-Her data stays in a database file on her own computer. The app uses Meta's standard models, which aren't trained on her conversations.
+Her data stays in a database file on her own computer. The app uses Meta's standard models, which aren't trained on her conversations. Only Buddy's own page can use the app: requests that another website sends to it are refused.
 
 ## Run it
 

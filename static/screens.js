@@ -8,6 +8,7 @@
 
 var SCREEN_LOADERS = {
   today: function () {
+    showTodayWeather();
     showCheckIn();
     showTodayDiary();
   },
@@ -710,6 +711,25 @@ function showCheckIn() {
     });
 }
 
+// Home's weather row: today's weather in her town, looked up on the web
+// with Meta's web search (kept 3 hours on the server), and where it came
+// from. Hidden when her town isn't set up or nothing was found.
+var todayWeather = "";
+
+function showTodayWeather() {
+  var row = document.getElementById("today-weather");
+  api("/api/briefing/weather")
+    .then(function (weather) {
+      todayWeather = weather.text;
+      row.hidden = !weather.text; // empty: no town yet, or nothing to share just now
+      setText(document.getElementById("today-weather-text"), weather.text);
+      setText(document.getElementById("today-weather-from"), "From " + weather.sites.join(", "));
+    })
+    .catch(function () {
+      row.hidden = true; // no connection to our own server
+    });
+}
+
 // Home's diary row: the latest thing she noted today, in her words.
 function showTodayDiary() {
   api("/api/diary?days=1")
@@ -1358,7 +1378,7 @@ function readMemory() {
 
 // The text entries on the form, named like the profile fields.
 var PROFILE_TEXT_FIELDS = ["name", "preferred_name", "family_name", "family_phone", "family_email", "family2_name",
-  "family2_phone", "doctor_name", "doctor_phone"];
+  "family2_phone", "doctor_name", "doctor_phone", "city"];
 var VOICE_RATES = ["0.75", "0.9", "1.1"]; // Slower, Normal, Faster
 
 // Big call buttons for the family member and the doctor, when their
@@ -1742,6 +1762,19 @@ function showHelp() {
     });
 }
 
+// A tap anywhere on a Today row does what its button or link says, so the
+// targets are big for shaky hands. (Keyboards use the button or link itself.)
+function tapWholeRow(event) {
+  var row = event.target.closest(".today .row");
+  if (!row || event.target.closest("a, button")) {
+    return;
+  }
+  var target = row.querySelector(".row-link:not([hidden])");
+  if (target) {
+    target.click();
+  }
+}
+
 function startScreens() {
   document.getElementById("pill-taken").addEventListener("click", function () { answerReminder("taken"); });
   document.getElementById("pill-snooze").addEventListener("click", function () { answerReminder("snooze"); });
@@ -1752,6 +1785,12 @@ function startScreens() {
     }
   });
   document.addEventListener("click", readWaitingReminder, true);
+  document.querySelector(".today").addEventListener("click", tapWholeRow);
+  document.getElementById("today-weather-say").addEventListener("click", function () {
+    if (todayWeather && talkState === "idle") {
+      speak(todayWeather);
+    }
+  });
   document.addEventListener("keydown", readWaitingReminder, true);
   document.getElementById("pill-form").addEventListener("submit", savePill);
   document.getElementById("pill-add-time").addEventListener("click", function () {

@@ -208,6 +208,23 @@ def init_db(db_path: str | None = None) -> None:
                 forgotten INTEGER NOT NULL DEFAULT 0
             );
 
+            -- What Buddy looked up on the web about today (weather, a local
+            -- story, sports) for her town, kept 3 hours (app/briefing.py).
+            CREATE TABLE IF NOT EXISTS briefings (
+                topic TEXT NOT NULL,
+                city TEXT NOT NULL,
+                text TEXT NOT NULL,
+                sources TEXT NOT NULL DEFAULT '[]',
+                made_at TEXT NOT NULL,
+                PRIMARY KEY (topic, city)
+            );
+
+            -- How many web searches were made each day, so they stay few.
+            CREATE TABLE IF NOT EXISTS web_searches (
+                day TEXT PRIMARY KEY,
+                count INTEGER NOT NULL DEFAULT 0
+            );
+
             -- Each pill reminder exists once per time per day.
             CREATE UNIQUE INDEX IF NOT EXISTS med_events_once ON med_events (medication_id, due_at);
             """
@@ -225,6 +242,8 @@ def init_db(db_path: str | None = None) -> None:
         # When she marked a doctor question asked, so Doctor notes can show
         # it with a check for a while: October 30.
         add_column(connection, "doctor_questions", "asked_at", "TEXT NOT NULL DEFAULT ''")
+        # Her town, for the weather and what's happening nearby: October 31.
+        add_column(connection, "profile", "city", "TEXT NOT NULL DEFAULT ''")
         # WAL mode lets one connection read while another writes. Writers
         # still take turns, so the companion saves after each round of tools
         # (app/companion.py) and never holds the lock while the AI thinks.
@@ -238,7 +257,7 @@ def init_db(db_path: str | None = None) -> None:
 
 PROFILE_TEXT_FIELDS = [
     "name", "preferred_name", "family_name", "family_email",
-    "family_phone", "family2_name", "family2_phone", "doctor_name", "doctor_phone",
+    "family_phone", "family2_name", "family2_phone", "doctor_name", "doctor_phone", "city",
 ]
 
 

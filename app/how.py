@@ -11,7 +11,8 @@ from app.config import Settings
 # in her words.
 MODELS = [
     ("chat_model", "Thinks and talks: Buddy's words, check-in questions, doctor-note topics, scam checks, "
-                   "Memory book pages, and where your things are."),
+                   "Memory book pages, and where your things are. It also looks up today's weather and news "
+                   "with Meta's web search."),
     ("transcribe_model", "Hears you: turns what you say into words."),
     ("image_model", "Paints the pictures in your Memory book."),
     ("sam_model", "Finds your glasses or keys in a photo of the room."),
@@ -69,6 +70,13 @@ FEATURES = [
         "what": "Finds your glasses or keys in a photo of the room, and tells you where they are.",
         "models": ["sam_model", "chat_model"],
         "here": "Your photo is never saved.",
+    },
+    {
+        "name": "Today's weather and news",
+        "what": "Buddy tells you today's weather, one cheerful thing happening in your town, or how your teams "
+                "did, and shows where it read it.",
+        "models": ["chat_model"],
+        "here": "Looked up with Meta's web search. Only your town is sent.",
     },
     {
         "name": "Family update",

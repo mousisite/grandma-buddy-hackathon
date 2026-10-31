@@ -167,12 +167,20 @@ How the checker keeps to these rules (`app/scam.py`):
 - Her photo is never saved: not in the database, not on disk, not in logs (the server only prints the kind of failure, never her words or photo). It is sent to Meta with `store: false`, so Meta doesn't keep it either.
 - The test photos (`scripts/find_photos/`) were painted with Muse Image for this project: rooms only, no people, no writing.
 
+## 8c. Today's weather, news, and sports (web search)
+
+- Buddy can look up only three things on the web: today's weather, one cheerful thing happening in her town, and how the local teams did. Our code writes each question (`app/briefing.py`), and the AI can only pick one of the three, so nothing about health, medicine, or food is ever searched.
+- The search runs inside Meta's own API (the Responses API's built-in `web_search`). Our code never visits a website. Only her town is sent (typed by a family member in Settings), never her name or her words. Her location is never tracked.
+- Before she hears it, plain code checks the answer: it must really come from today's web (a search ran, and sources are named); links are taken out; any sentence about health, medicine, or food, or one the advice guard flags, is left out; at most 2 sentences are kept. If nothing is left, Buddy has nothing to share. The local news never includes crime, accidents, deaths, illness, politics, or anything frightening (its instructions).
+- Under Buddy's words she sees where it was read ("From the web: weather.gov"). An answer is kept 3 hours; at most 30 searches are made a day. If a new look fails, the last one from today is kept, never yesterday's.
+
 ## 9. Privacy
 
 - Health data stays in `data/grandma_buddy.db` on this computer and never goes to GitHub.
 - The app uses standard Meta models only (never `-contributor`), so her conversations aren't used for training. It refuses to start if a `-contributor` model is ever put in its settings (`app/config.py`), and the Help screen lists the models it really uses.
 - Family updates go only to the person she chose, and only when she taps "Send": that opens her own email app with the update written (a `mailto:` link), and nothing is sent until she presses Send there. No email password is stored.
 - The family update is written by plain code from the logs, never by the AI, so it only says what happened: her mood, pills taken and missed (and, for today, which are due now or still to come), her diary entries in her own words, and each safety screen with a fixed sentence and its time. A crisis is named ("Buddy showed her the 988 Suicide & Crisis Lifeline. Please call her today."), never with her words.
+- Only Buddy's own page can use the app's `/api`. Another website open in her browser can't add, change, or read anything, or make Buddy call the AI (which costs money): such requests are refused by plain code (`app/security.py`), and so is any other host name than this computer's.
 - Demos, tests, and screenshots use made-up data only.
 
 ## 10. Test phrases

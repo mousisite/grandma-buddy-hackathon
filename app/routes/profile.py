@@ -21,6 +21,7 @@ MAX_LENGTH = {
     "family2_phone": 30,
     "doctor_name": 80,
     "doctor_phone": 30,
+    "city": 80,
 }
 PHONE = re.compile(r"^[0-9+()\-. ]*$")
 EMAIL = re.compile(r"^$|^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -37,6 +38,7 @@ FIELD_WORDS = {
     "family2_phone": "the second family member’s phone number",
     "doctor_name": "the doctor’s name",
     "doctor_phone": "the doctor’s phone number",
+    "city": "her town",
 }
 
 
