@@ -201,7 +201,10 @@
           </li>
           <li class="row">
             <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>
-            <span class="row-text"><span class="row-title">Questions for your next doctor visit</span></span>
+            <span class="row-text">
+              <span class="row-title">Questions for your next doctor visit</span>
+              <span id="today-questions" class="row-meta"></span>
+            </span>
             <a class="row-link" href="#/notes">Notes<svg class="icon row-link-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
           </li>
         </ul>
@@ -480,9 +483,10 @@
       <div id="memory-actions" class="form-actions memory-actions">
         <a id="memory-send" class="pill-button pill-button--ink pill-button--hero">Send to family</a>
         <button id="memory-print" class="pill-button pill-button--quiet pill-button--hero" type="button">Print</button>
+        <!-- "Read it aloud", not "Read it to me": that is the Home tile for letters. -->
         <button id="memory-read" class="text-button" type="button">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path></svg>
-          Read it to me
+          Read it aloud
         </button>
       </div>
       <p class="note memory-share-note">This opens your email with the story written in. To share the painting too, tap Print and save it as a PDF.</p>
@@ -605,8 +609,6 @@
           </h3>
           <ul id="read-scam-flags" class="verdict-list"></ul>
         </div>
-        <!-- The words on the paper, big, once she asks for them. -->
-        <p id="read-text" class="read-text" hidden></p>
         <div class="find-actions">
           <button id="read-words" class="pill-button pill-button--ink pill-button--hero" type="button">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
@@ -621,6 +623,9 @@
             Say it again
           </button>
         </div>
+        <!-- The words on the paper, big, once she asks for them. Under the
+             button she tapped, so "Stop reading" stays where her finger is. -->
+        <p id="read-text" class="read-text" hidden></p>
         <!-- "Check it for a scam", then call buttons (read.js adds them). -->
         <div id="read-more" class="actions verdict-actions">
           <button id="read-check-scam" class="call-pill call-pill--quiet" type="button">
@@ -665,7 +670,7 @@
         <ul class="rows help-list" role="list">
           <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path></svg><span class="row-text">What Buddy writes down (your diary, pills, and Memory book) is kept on this computer.</span></li>
           <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg><span class="row-text">What you say is sent to Meta’s AI so Buddy can understand and answer. Buddy uses Meta’s standard models only, so Meta doesn’t use your words to train its AI.</span></li>
-          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg><span class="row-text">Photos you show Buddy to check a message or find your things are never saved.</span></li>
+          <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg><span class="row-text">Photos you show Buddy to check a message, read a letter, or find your things are never saved.</span></li>
           <li class="row"><svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path><rect x="2" y="4" width="20" height="16" rx="2"></rect></svg><span class="row-text">Your family sees only the update you choose to send them.</span></li>
         </ul>
       </section>
@@ -684,6 +689,10 @@
           <details class="faq-item">
             <summary class="faq-question">What happens in an emergency?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
             <p class="faq-answer">If you tell Buddy about a warning sign, like chest pain or a fall, it shows a big Call 911 button right away, before any AI is asked. Buddy never calls by itself: you decide.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Can Buddy read my mail to me?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">Yes. Tap “Read it to me” on Home and take a photo of a letter, a bill, or a form. Buddy says what it is and what it says, or reads it word for word. A letter about your health is only read to you, never explained: your doctor is the right person to ask about it.</p>
           </details>
           <details class="faq-item">
             <summary class="faq-question">Does Buddy listen all the time?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>

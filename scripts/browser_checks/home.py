@@ -95,9 +95,23 @@ def check_wav(upload: bytes) -> None:
     assert data_size > 16000, f"recording too short: {data_size} bytes"  # over half a second
 
 
+def let_presses_settle(page) -> None:
+    """Wait until nothing just tapped is still moving. A pressed button is
+    squeezed (0.96) and springs back over 220ms after the press lets go (a
+    44px chip measures 42px meanwhile), and the circle of light it spreads
+    (.ripple, twice its size, gone after 700ms) widens its scrollWidth as it
+    grows. Measuring during either gives a false "too small" or "spills"."""
+    page.wait_for_function(
+        "!document.querySelector('[data-pressed], .ripple') && document.getAnimations().every(a => "
+        "!(a instanceof CSSTransition && a.transitionProperty === 'transform' && a.playState === 'running'))",
+        timeout=3000,
+    )
+
+
 def check_layout(page, where: str) -> None:
     """Fail if the page scrolls sideways, an icon is squashed, a target is
     too small, or words spill out."""
+    let_presses_settle(page)
     problems = page.evaluate(LAYOUT_PROBLEMS_JS)
     assert not problems, f"layout problems at {where}: {problems}"
 
@@ -728,6 +742,7 @@ ONE_LINE_JS = """sel => [...document.querySelectorAll(sel)].filter(b => b.offset
 def one_line_buttons(page, selector: str, where: str) -> None:
     """Every button's words on one line, none cut off ("Take a photo" must
     never wrap; the buttons hide overflow, so check_layout can't see it)."""
+    let_presses_settle(page)
     broken = page.evaluate(ONE_LINE_JS, selector)
     assert not broken, f"button words wrap or spill at {where}: {broken}"
 
@@ -906,9 +921,13 @@ def check_read(browser) -> None:
         one_line_buttons(page, ".read-result .find-actions .pill-button", f"read, a bill at {width}px")
         page.screenshot(path=str(OUT / f"read-bill-{width}-{theme}.png"), full_page=True)
 
-        # Word for word: the words show big, and the button says Stop while they are read.
+        # Word for word: the words show big under the button, which stays where
+        # her finger is and says Stop while they are read.
+        before = page.locator("#read-words").bounding_box()
         page.click("#read-words")
         assert page.text_content("#read-text") == READ_BILL["words"]
+        after = page.locator("#read-words").bounding_box()
+        assert abs(after["y"] - before["y"]) < 1, "the Stop button must not move under her finger"
         lines = page.evaluate("document.getElementById('read-text').innerText.split('\\n').length")
         assert lines == 9, f"the paper's 9 lines show as lines, not {lines}"
         said = page.evaluate("linesToSay(readAnswer.words)")
@@ -1236,10 +1255,14 @@ def check_today_rows(browser) -> None:
     page.wait_for_selector("#today-weather:not([hidden])")
     assert page.text_content("#today-weather-text") == WEATHER["text"]
     assert page.text_content("#today-weather-from") == "From weather.gov"
+    # Doctor notes names the memory page's own button apart from "Read it to me".
+    assert page.locator("#memory-read").text_content().strip() == "Read it aloud"
     page.evaluate("window.spokenWords = []; var realSpeak = speak;"
                   "window.speak = function (text, options) { spokenWords.push(text); return realSpeak(text, options); }; 0")
     page.click("#today-weather-text")  # the words, not the button
     page.wait_for_function("spokenWords.includes('Sunny, with a high of 62 and a low of 48.')")
+    # The doctor-notes row says how many questions are still to ask (the demo week has some).
+    page.wait_for_function("/^\\d+ questions? to ask$/.test(document.getElementById('today-questions').textContent)")
     page.click("#today-diary")  # a tap on the diary row's words opens the diary
     wait_for_screen(page, "diary")
 

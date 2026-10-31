@@ -82,7 +82,7 @@ grandma-buddy-hackathon/
       diary.py               /api/diary
       meds.py                /api/meds, /api/reminders
       scam.py                /api/scam-check
-      notes.py               /api/doctor-notes, /api/doctor-questions (add, asked, reopen)
+      notes.py               /api/doctor-notes, /api/doctor-questions (how many to ask, add, asked, reopen)
       family.py              /api/family/summary
       memories.py            /api/memories (the pages, a picture, save, paint again)
       find.py                /api/find (safety net first, then finder.find; the photo is never saved)
@@ -196,6 +196,7 @@ Buddy's natural voice adds `kokoro-onnx` 0.6.1 (MIT), `onnxruntime` (MIT), `nump
 | `POST /api/meds/read-label` (P2) | photo | suggested fields for a family member to confirm |
 | `POST /api/scam-check` | `{"text", "kind"}` or `{"image": "data:image/jpeg;base64,…", "kind": "photo"}`; `kind` is `text` (pasted), `voice` (read out loud, written down by `/api/transcribe` first), or `photo` | scam result (below) |
 | `GET /api/doctor-notes?days=7` | `days` is 7, 14, or 30 | doctor notes (below) |
+| `GET /api/doctor-questions` | | `{"to_ask"}`: how many questions are still to ask, for Home's doctor-notes row |
 | `POST /api/doctor-questions` | `{"question"}` | saved question |
 | `POST /api/doctor-questions/{id}/asked` and `/reopen` | | she asked it (it stays on the page with a check for the days shown; never deleted), or Undo |
 | `GET /api/family/summary?date=YYYY-MM-DD` | the day (today when left out; up to 30 days back) | `{"date", "subject", "text", "mailto", "to"}`: the update in plain words, and a `mailto:` link with it written (line breaks as `%0D%0A`) |

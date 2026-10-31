@@ -35,7 +35,7 @@ def mood_line(connection, start: str, end: str) -> str:
         (start, end),
     ).fetchone()
     if row is None:
-        return "Mood: No check-in today."
+        return "Mood: No check-in that day."  # "that day": the update can be yesterday's
     said_at = notes.time_words(datetime.fromisoformat(row["created_at"]))
     return f"Mood: {notes.MOOD_WORDS.get(row['mood'], row['mood'])} (at {said_at})"
 
@@ -97,7 +97,7 @@ def safety_lines(connection, start: str, end: str) -> list[str]:
         (start, end),
     ).fetchall()
     if not rows:
-        return ["Safety screens: none today."]
+        return ["Safety screens: none that day."]
     return ["Safety screens:"] + [
         f"  - {notes.time_words(datetime.fromisoformat(row['created_at']))}: {SAFETY_WORDS.get(row['kind'], 'Buddy showed a safety screen.')}"
         for row in rows

@@ -220,6 +220,16 @@ def test_mark_as_asked_keeps_it_on_the_page_with_a_check_and_undo_takes_it_back(
     assert client.get("/api/doctor-notes?days=7").json()["questions"] == [{**shown, "asked": False}]
 
 
+def test_home_can_ask_how_many_questions_are_still_to_ask(client, safe_test_setup):
+    # Home's "Questions for your next doctor visit" row says "2 to ask".
+    assert client.get("/api/doctor-questions").json() == {"to_ask": 0}
+    first = client.post("/api/doctor-questions", json={"question": "Can I keep walking every day?"}).json()
+    client.post("/api/doctor-questions", json={"question": "Is my knee okay to swim with?"})
+    assert client.get("/api/doctor-questions").json() == {"to_ask": 2}
+    client.post(f"/api/doctor-questions/{first['id']}/asked")
+    assert client.get("/api/doctor-questions").json() == {"to_ask": 1}
+
+
 def test_asking_about_a_question_that_is_not_there(client):
     assert client.post("/api/doctor-questions/999/asked").status_code == 404
 

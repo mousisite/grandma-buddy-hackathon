@@ -83,7 +83,7 @@ def test_her_mood_is_the_last_she_said_that_day(connection, clock):
 
 
 def test_no_check_in_says_so(connection, clock):
-    assert line_starting(connection, "Mood:") == "Mood: No check-in today."
+    assert line_starting(connection, "Mood:") == "Mood: No check-in that day."  # right for Yesterday too
 
 
 def test_pills_count_that_day_only_and_name_what_was_missed(connection, clock):
@@ -191,7 +191,7 @@ def test_a_crisis_screen_is_listed_but_never_with_her_words(connection, clock):
 
 
 def test_no_safety_screens_says_none(connection, clock):
-    assert "Safety screens: none today." in lines(connection)
+    assert "Safety screens: none that day." in lines(connection)
 
 
 def test_no_advice_words_ever(connection, clock):

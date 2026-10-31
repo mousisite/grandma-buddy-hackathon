@@ -1,6 +1,7 @@
 # app/routes/notes.py
 # Doctor notes (docs/SPEC.md feature 8) and the questions for her doctor.
 # - GET  /api/doctor-notes?days=7       the page (app/notes.py)
+# - GET  /api/doctor-questions          how many are still to ask (Home's row)
 # - POST /api/doctor-questions          add a question ("Add a question", or
 #                                       "Add to doctor notes" after a talk)
 # - POST /api/doctor-questions/{id}/asked   she asked it: shown with a check
@@ -24,6 +25,18 @@ def doctor_notes(days: int = 7):
         return notes.notes(connection, days)
     finally:
         connection.close()
+
+
+@router.get("/api/doctor-questions")
+def questions_to_ask():
+    """How many questions are still to ask, for Home's "Questions for your
+    next doctor visit" row ("2 to ask")."""
+    connection = db.get_connection()
+    try:
+        count = connection.execute("SELECT COUNT(*) FROM doctor_questions WHERE resolved = 0").fetchone()[0]
+    finally:
+        connection.close()
+    return {"to_ask": count}
 
 
 class Question(BaseModel):

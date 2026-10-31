@@ -135,12 +135,13 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - The safety net runs first on what she said. Her photo is never saved (and is sent to Meta with `store=false`). Buddy never reads labels, never says anything about medicines or health, and never describes people.
 - Done when: it works on 3 made-up test photos with the real SAM 3.1 (`scripts/check_find.py`), every Meta call has a mocked test, and the result screen is checked in a browser.
 
-### 15. Talking without tapping (P1)
+### 13. Help and how Buddy works (P1)
 
-- In voice mode Buddy listens on its own: her words show live under the orb as she says them; when she stops talking (Meta's realtime speech-to-text hears the end of her turn), Buddy answers, then listens again. No tapping between turns.
-- Buddy and she never talk at once: while Buddy thinks or speaks, only silence is sent. The talk button says what a tap does now: "Pause" while Buddy listens, "Stop and talk" while Buddy speaks (Buddy stops and listens).
-- It stops after a minute of quiet, when she taps Pause, leaves the talk screen, puts the page in the background, or a safety screen opens. Settings has "Talk without tapping" (on); turned off, or where it can't work, it is tap to talk as before.
-- Done when: the relay is tested with a fake Meta, `scripts/check_realtime.py --relay` hears two real turns through our relay, and the browser check covers live words, a turn, silence while Buddy speaks, listening again, Pause, and the fallback.
+- A Help screen (sidebar on desktop; Settings, "Help and how Buddy works", on phones; or by voice: "How do you work?" opens it).
+- "How Buddy works": the 4 Meta models with what each does, then every feature with the models behind it, or "No AI" for the parts that run on this computer only (the safety net, pill reminders, the family update). The model names come from the app's settings (`/api/how`), so the page always says what really runs.
+- "What Buddy never does", "Your privacy, in short", common questions that open one at a time, and a Call {family} button.
+- The app refuses to start with a `-contributor` model in its settings.
+- Done when: the page lists exactly the models in the settings (tested), the questions open, and it is checked in a browser at every width.
 
 ### 14. Today's weather, news, and sports (P1)
 
@@ -150,13 +151,12 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - Only the weather, local news, and sports can be looked up (never health, medicine, or food), and every answer is checked by plain code first (docs/SAFETY.md section 8c).
 - Done when: the request and the checks are tested with a fake Meta, and `scripts/check_briefing.py` gets real answers with sources for all three.
 
-### 13. Help and how Buddy works (P1)
+### 15. Talking without tapping (P1)
 
-- A Help screen (sidebar on desktop; Settings, "Help and how Buddy works", on phones; or by voice: "How do you work?" opens it).
-- "How Buddy works": the 4 Meta models with what each does, then every feature with the models behind it, or "No AI" for the parts that run on this computer only (the safety net, pill reminders, the family update). The model names come from the app's settings (`/api/how`), so the page always says what really runs.
-- "What Buddy never does", "Your privacy, in short", common questions that open one at a time, and a Call {family} button.
-- The app refuses to start with a `-contributor` model in its settings.
-- Done when: the page lists exactly the models in the settings (tested), the questions open, and it is checked in a browser at every width.
+- In voice mode Buddy listens on its own: her words show live under the orb as she says them; when she stops talking (Meta's realtime speech-to-text hears the end of her turn), Buddy answers, then listens again. No tapping between turns.
+- Buddy and she never talk at once: while Buddy thinks or speaks, only silence is sent. The talk button says what a tap does now: "Pause" while Buddy listens, "Stop and talk" while Buddy speaks (Buddy stops and listens).
+- It stops after a minute of quiet, when she taps Pause, leaves the talk screen, puts the page in the background, or a safety screen opens. Settings has "Talk without tapping" (on); turned off, or where it can't work, it is tap to talk as before.
+- Done when: the relay is tested with a fake Meta, `scripts/check_realtime.py --relay` hears two real turns through our relay, and the browser check covers live words, a turn, silence while Buddy speaks, listening again, Pause, and the fallback.
 
 ### 16. Read it to me (P1)
 

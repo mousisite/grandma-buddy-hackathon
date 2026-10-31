@@ -124,7 +124,10 @@ function showReadAnswer(answer) {
   document.getElementById("read-check-scam").hidden = unreadable || answer.kind === "pill_label";
   showReadCalls(answer.kind);
 
-  document.getElementById("read-result").hidden = false;
+  var result = document.getElementById("read-result");
+  // The card is named by what it is, or by Buddy's words when it has no title.
+  result.setAttribute("aria-labelledby", title.hidden ? "read-summary" : "read-kind");
+  result.hidden = false;
   (title.hidden ? summary : title).focus();
   speak(answer.spoken);
 }
@@ -148,21 +151,22 @@ function showReadCalls(kind) {
 
 // ---------- Word for word ----------
 
-// "Read it word for word": the words on the paper, big on the screen and
-// read aloud. While they are read, the button says "Stop reading".
+// "Read it word for word": the words on the paper, big on the screen (under
+// the button, so "Stop reading" stays where her finger is) and read aloud.
+// While they are read, the button says "Stop reading".
 function readWordForWord() {
   if (readingWords) {
     stopSpeaking();
     showReadingWords(false);
     return;
   }
-  var text = document.getElementById("read-text");
-  text.hidden = false;
+  // The words appear right under the button, and the page doesn't scroll:
+  // "Stop reading" stays under her finger, and she scrolls when she likes.
+  document.getElementById("read-text").hidden = false;
   if (voiceSettings.on) {
     showReadingWords(true);
     speak(linesToSay(readAnswer.words), { onEnd: function () { showReadingWords(false); } });
   }
-  text.scrollIntoView({ block: "nearest", behavior: isCalm() ? "auto" : "smooth" });
 }
 
 // The paper's lines, read one after another: a line without its own full
@@ -224,6 +228,14 @@ function startRead() {
   document.getElementById("read-words").addEventListener("click", readWordForWord);
   document.getElementById("read-check-scam").addEventListener("click", checkPaperForScam);
   document.getElementById("read-another").addEventListener("click", readAnother);
+  // Leaving the screen while the paper is read word for word stops the
+  // reading: those words belong to this screen, not the next one.
+  window.addEventListener("hashchange", function () {
+    if (readingWords && currentScreen() !== "read") {
+      stopSpeaking();
+      showReadingWords(false);
+    }
+  });
 }
 
 startRead();

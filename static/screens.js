@@ -11,6 +11,7 @@ var SCREEN_LOADERS = {
     showTodayWeather();
     showCheckIn();
     showTodayDiary();
+    showTodayQuestions();
   },
   diary: showDiary,
   pills: showPillsScreen,
@@ -741,6 +742,19 @@ function showTodayDiary() {
       setText(document.getElementById("today-diary-when"), today
         ? "Noted at " + new Date(today.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
         : "");
+    })
+    .catch(function () {
+      // No connection to our own server: keep what is shown.
+    });
+}
+
+// Home's doctor-notes row: how many questions are still to ask.
+function showTodayQuestions() {
+  api("/api/doctor-questions")
+    .then(function (questions) {
+      var count = questions.to_ask;
+      setText(document.getElementById("today-questions"),
+        count ? count + (count === 1 ? " question to ask" : " questions to ask") : "No questions yet");
     })
     .catch(function () {
       // No connection to our own server: keep what is shown.

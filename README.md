@@ -2,7 +2,7 @@
 
 A voice companion for older adults who live alone, built with Meta's Muse models during the Meta Global AI Developer Hackathon (Indie developer track, "Build for Your World").
 
-> Draft. Finish this on Day 9 with screenshots, run instructions, and the demo link (see `.claude/skills/demo-prep/SKILL.md`).
+> Screenshots and the demo video link come with the submission (see `.claude/skills/demo-prep/SKILL.md`).
 
 ## Why
 
@@ -55,7 +55,20 @@ Her data stays in a database file on her own computer. The app uses Meta's stand
 
 ## Run it
 
-Coming on Day 9.
+You need Python 3.12 or newer, Chrome or Edge, and a Meta Model API key (from [dev.meta.ai](https://dev.meta.ai)). In PowerShell, in the project folder:
+
+```powershell
+python -m venv .venv                                     # once: the project's Python environment
+.venv\Scripts\python -m pip install -r requirements.txt  # once: the packages
+.venv\Scripts\python -m pip install kokoro-onnx==0.6.1 --no-deps --ignore-requires-python  # once: Buddy's natural voice (optional)
+.venv\Scripts\python scripts\get_voice.py                # once: the voice model, about 354 MB (optional)
+.venv\Scripts\python scripts\seed_demo.py                # optional: a made-up week for "Rose", so every screen has something to show
+.venv\Scripts\python -m uvicorn app.main:app --reload    # start the app
+```
+
+Before the first start, copy `.env.example` to `.env` and put your key on its `MODEL_API_KEY=` line. Then open http://localhost:8000 in Chrome or Edge and allow the microphone. Without the natural voice, Buddy speaks with the browser's own voice (Edge has the warmest ones).
+
+Checks: `.venv\Scripts\python -m pytest` runs the tests (Meta is always faked), and `.venv\Scripts\python scripts\browser_checks\home.py` clicks through every screen in a real browser (no key needed). The `scripts\check_*.py` scripts each make a few real Meta calls by hand, and say what they cost.
 
 ## License
 

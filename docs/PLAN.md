@@ -36,8 +36,8 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 
 ### Day 6: Sat, Oct 31 (check-in and companion)
 - [x] Daily check-in on first open each day: feeling, anything hurting or different, morning pills. (Done early, Oct 28.)
-- [ ] Tools: `log_mood`, `add_doctor_question`, `show_call_buttons`, `suggest_calling_family`.
-- [ ] Lonely conversations end with a gentle nudge to call family. `/safety-check` passes.
+- [x] Tools: `log_mood`, `add_doctor_question`, `show_call_buttons`, `suggest_calling_family`. (Done early, Oct 28.)
+- [x] Lonely conversations end with a gentle nudge to call family. `/safety-check` passes. (Done early, Oct 28.)
 
 ### Day 7: Sun, Nov 1 (scam checker)
 - [x] `/api/scam-check` for spoken, pasted, and photographed messages. Scam test messages pass. (Done early, Oct 28.)
@@ -71,6 +71,16 @@ The coding agent updates the checkboxes and the status log as work gets done. If
 ## Status log
 
 Newest first. One line per finished piece of work: date, what changed, how it was tested.
+
+- Oct 30, night: **A fresh-eyes pass over the whole app** (code, screens, docs), after switching models.
+  - Home's doctor-notes row now says "2 questions to ask" or "No questions yet" (`GET /api/doctor-questions`, tested), so the Today list is alive on every row.
+  - Read it to me: the words now appear under the button she tapped, and the page no longer scrolls, so "Stop reading" stays under her finger (the browser check measures it). Leaving the screen stops the reading. The card is named for screen readers even when a photo couldn't be read.
+  - The memory page's "Read it to me" button is now "Read it aloud": two different things no longer share a name.
+  - The family update said "No check-in today." and "Safety screens: none today." for Yesterday too: now "that day" (tests first).
+  - Help: the privacy line names letters, and a new question, "Can Buddy read my mail to me?".
+  - README has a "Run it" section (a public repository is read before it is run). SPEC's features are in order (13 to 16), DESIGN's Home has five chips and the row's count, PLAN's Day 6 is ticked.
+  - Reviewed and left alone: the safety net, the advice guard, every prompt, the security middleware, the hands-free relay, the reminder rules. No advice or privacy gaps found.
+  - The browser check had a timing flake: it sometimes measured a chip while it was still springing back from its pressed squeeze (42px), or a button while the circle of light from a tap still widened it. It now waits for presses to settle before measuring (`let_presses_settle`).
 
 - Oct 30, night: **Read it to me** (feature 16): a photo of a letter, a bill, or a form, and Buddy says what it is and what it says, with Muse Spark's image input.
   - `app/reader.py` and `/api/read`: Spark fills a strict form (what kind of paper, who sent it, every word line by line, a short summary, the amount and the date); plain code decides what she hears (docs/SAFETY.md section 8d). A paper about her health is never explained: fixed words, read word for word only, Call Dr. Lee first. Every summary sentence passes the advice guard, gives no advice of Buddy's own, and has only numbers printed on the paper. Long numbers are hidden; phone numbers and links never appear in Buddy's words. Nothing is saved.
