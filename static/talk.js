@@ -478,6 +478,17 @@ function showActions(actions) {
         location.hash = "#/find/" + encodeURIComponent(action.thing);
       });
       row.appendChild(find);
+    } else if (action.type === "message") {
+      // "Send this to Maria": the Family screen, with her words in the box
+      // to read over and send (screens.js). Buddy never sends it itself.
+      var message = document.createElement("button");
+      message.type = "button";
+      message.className = "call-pill";
+      message.textContent = action.label;
+      message.addEventListener("click", function () {
+        location.hash = "#/family/message/" + encodeURIComponent(action.text);
+      });
+      row.appendChild(message);
     } else if (action.type === "sources") {
       // Where Buddy read today's weather or news (Meta's web search).
       var from = document.createElement("p");

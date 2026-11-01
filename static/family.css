@@ -150,3 +150,71 @@
 .plan-demo-title {
   font-weight: 650;
 }
+
+/* ---------- Her messages and her postcard ---------- */
+
+/* The postcard she sent: the painting, then her words in Newsreader, like
+   a page of her memory book. */
+.postcard {
+  display: grid;
+  gap: var(--s-3);
+  max-width: 36rem;
+  margin: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+/* The painting's place keeps its shape while the picture loads. */
+.postcard-picture {
+  overflow: hidden;
+  aspect-ratio: 3 / 2;
+  border-radius: var(--r-card);
+  background: var(--tint);
+}
+
+.postcard-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.postcard figcaption {
+  padding: 0 var(--s-2) var(--s-2);
+}
+
+.postcard-sentence {
+  margin: 0 0 var(--s-1);
+  font-family: var(--font-serif);
+  font-size: var(--t-24);
+  line-height: 1.35;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+/* "Write to Rose", under the thread. */
+.reply-form {
+  margin-top: var(--s-4);
+}
+
+.reply-form textarea {
+  min-height: 5rem;
+}
+
+/* "Play", under a voice message's time in the thread. */
+.entry-voice {
+  margin: var(--s-1) 0 var(--s-2);
+}
+
+/* "Try the demo as Maria", under the sign-in form in demo mode. */
+.family-demo {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-6);
+  padding: var(--s-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}

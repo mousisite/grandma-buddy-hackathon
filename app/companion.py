@@ -182,6 +182,13 @@ def answer(connection, profile: dict, conversation_id: str, text: str, mode: str
             add_buttons(buttons, [tools.OPEN_MEMORY_BOOK])
     memory_done = mode == "memory" and ((bool(context.get("memory_saved")) and not still_asking) or last_answer)
 
+    # "Tell Maria the tulips came up": the "Send this to Maria" button
+    # appears even if the AI forgot its tool, with her words (never the AI's).
+    if mode == "chat" and not any(button.get("type") == "message" for button in buttons):
+        asked = tools.message_she_asked_for(text, profile["family_name"])
+        if asked:
+            add_buttons(buttons, [tools.family_message_button(asked, [text], profile)])
+
     db.save_message(connection, conversation_id, "assistant", reply)
     connection.commit()
     return {

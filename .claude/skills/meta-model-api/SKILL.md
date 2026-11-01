@@ -136,6 +136,7 @@ Muse Spark accepts images. Send OpenAI-style content parts with a base64 data UR
 
 - Confirm the exact format on Meta's image understanding docs page before relying on it.
 - Shrink photos in the browser with a `<canvas>` (about 1600 px on the long side, JPEG) before uploading, so no extra Python package is needed.
+- A pill bottle label (`app/labels.py`): a strict form `{readable, name, label}` with low reasoning; the real check (`scripts/check_label.py`) read a drawn label exactly as printed, in its own capitals. The words only fill in the form, and a family member checks each one before it is saved.
 
 ## Speech-to-text: Muse Voice Transcribe (file upload)
 
@@ -241,6 +242,26 @@ answer = json.loads(await socket.recv())  # {"sessionId": ...}: the ONLY message
 - Real timing: connecting and the handshake took about 4 seconds (open it when the talk screen opens, before she speaks); live words every 0.3 seconds; each turn's `speechComplete` about 1 second after she stopped talking.
 - The key would be exposed in a browser, so the page talks to our relay and the relay to Meta. $0.18 per hour of sound.
 
+## Painting a picture: Muse Image (`meta_client.paint`)
+
+Checked with real calls (`scripts/seed_demo.py`, `scripts/check_messages.py`), October 29 to 31, 2026. The OpenAI Images format, `POST /v1/images/generations`:
+
+```python
+response = client.images.generate(
+    model=settings.image_model,  # muse-image-1.0, a standard model
+    prompt=prompt,               # a fixed style (memories.STYLE) plus the checked scene
+    n=1,
+    size=PICTURE_SIZE,           # "1536x1024", a landscape 3:2 page picture
+    extra_body={"tool_enablement": NO_LOOKUPS},  # Meta's extra: no image or web search while painting
+    timeout=PAINT_TIMEOUT_SECONDS,  # 180 seconds: painting takes longer than talking
+)
+picture = base64.b64decode(response.data[0].b64_json)  # WebP bytes by default
+```
+
+- About $0.01 per picture: paint once per Memory book page and once per postcard a day, never in a loop. 429 and 503 are worth a retry with a wait; anything else is a `MetaError`.
+- Plain code checks what came back is a picture file (`memories.PICTURE_KINDS`) before saving it, and every scene the AI wrote before painting it (no names, numbers, health words, or advice).
+- The prompt always asks for small faceless figures seen from behind, so no real person's likeness is ever made.
+
 ## Web search grounding: Responses API `web_search` (`meta_client.search`)
 
 Checked against Meta's search-grounding docs and with real calls (`scripts/check_briefing.py`), October 30, 2026. Not available on Chat Completions (`web_search_options` is a 400 there).
@@ -265,6 +286,7 @@ response = client.responses.create(
 - A `web_search_call` item with `action.type == "url"` is the model opening a page. No search call at all means it answered from memory: no good for today's weather, so we don't use it.
 - One set of instructions covering several topics made it answer all of them at once: give each question only its own rules.
 - `tool_choice` only "auto": the model decides whether to search. `$0.0025` per search plus tokens. No per-request domain filters on Responses.
+- The scam lookup (`app/scam.py` `searched`) passes `town=""`, so no `user_location` is sent (a number is the same everywhere): only the phone number or web address goes in the question, with `prompts.SCAM_LOOKUP` as the instructions, and plain code reads only the first word of the answer (REPORTED, CLEAR, UNKNOWN). Both uses share the day's budget of 30 searches (`briefing.take_search`).
 
 ## Docs to check when unsure
 

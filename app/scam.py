@@ -8,6 +8,11 @@
 # 2. Muse Spark reads the message (or a photo of it) and fills in a form
 #    (structured output): verdict, red flags in plain words, explanation.
 # 3. "What to do" is always fixed text from SAFETY.md, never the AI's words.
+# 4. A phone number or web address in the words is looked up on the web
+#    (Meta's web search, app/briefing.py's daily budget) at the same time:
+#    plain code reads one word of the answer (REPORTED, CLEAR, UNKNOWN) and
+#    shows fixed words and the sites. A report makes the verdict stronger,
+#    never weaker; the number or address is never repeated to her.
 #
 # The emergency safety net does NOT run on these words: they are someone
 # else's ("Grandma, I'm bleeding, send money" is a scam, not her emergency).
@@ -15,8 +20,9 @@
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 
-from app import db, guard, meta_client, prompts, tools
+from app import briefing, db, guard, meta_client, prompts, reminders, tools
 
 VERDICTS = ["looks_safe", "suspicious", "likely_scam"]  # weakest to strongest
 TITLES = {"likely_scam": "Likely scam", "suspicious": "Suspicious", "looks_safe": "Looks safe"}
@@ -108,6 +114,81 @@ def stronger(first: str | None, second: str | None) -> str | None:
     return max(ranked, key=VERDICTS.index) if ranked else None
 
 
+# ---------- Looking up a number or a web address (Meta's web search) ----------
+
+# A phone number as people write them: (555) 010-0199, 555-010-0199,
+# 1-800-555-0133, +1 555 010 0199. Never a bare code like 482913.
+PHONE = re.compile(r"(?<![\w.])(?:\+?1[\s.-]?)?(?:\(\d{3}\)\s?|\d{3}[\s.-])\d{3}[\s.-]\d{4}(?![\w.])")
+# The endings a web address can have here (the same list wherever one is
+# found or hidden). A web address, with or without https:// and www., never
+# the domain of an email address, and never a sentence with a missing space
+# ("back.Help"): the ending must be lowercase.
+TLDS = r"com|net|org|info|xyz|top|co|biz|us|io|me|online|site|shop|club|live|link|help"
+SITE = re.compile(rf"(?<![\w@.-])(?:https?://)?(?:www\.)?((?:[A-Za-z0-9-]+\.)+(?:{TLDS}))\b")
+MAX_CONTACTS = 2  # looked up together, in one search
+# The one word plain code reads from the web answer. CLEAR counts as nothing
+# found: a real company's name proves nothing about a message that uses it.
+LOOKUP_WORDS = {"REPORTED", "CLEAR", "UNKNOWN"}
+
+
+def contacts(text: str) -> dict:
+    """The phone numbers and web addresses in a message, as written, so they
+    can be looked up: {"numbers": [...], "sites": [...]}, at most 2 each."""
+    numbers = list(dict.fromkeys(" ".join(found.split()) for found in PHONE.findall(text)))[:MAX_CONTACTS]
+    sites = list(dict.fromkeys(found.lower() for found in SITE.findall(text)))[:MAX_CONTACTS]
+    return {"numbers": numbers, "sites": sites}
+
+
+def lookup_words(reported: bool, found: dict) -> str:
+    """Fixed words for what the web said, never the number or the address.
+    With both a number and a website, a report may concern either one."""
+    both = bool(found["numbers"] and found["sites"])
+    if reported:
+        if both:
+            return "Something in it (the phone number or the website) has been reported as a scam online."
+        return f"The {'phone number' if found['numbers'] else 'website'} in it has been reported as a scam online."
+    what = "phone number and the website" if both else "phone number" if found["numbers"] else "website"
+    return f"Nothing was found online about the {what} in it. That doesn’t make it safe."
+
+
+def named_sites(sources: list[dict], found: dict) -> list[str]:
+    """The sites the web answer came from, for the screen: never the
+    looked-up address itself (or a site under it), and never a host that
+    carries the looked-up number's digits, so the screen can't repeat them."""
+    digits = [re.sub(r"\D", "", number) for number in found["numbers"]]
+    sites = []
+    for source in sources:
+        host = briefing.site(source["url"])
+        if not host or host in sites:
+            continue
+        if any(host == site or host.endswith("." + site) for site in found["sites"]):
+            continue
+        if any(number and number in re.sub(r"\D", "", host) for number in digits):
+            continue
+        sites.append(host)
+    return sites[:briefing.MAX_SITES]
+
+
+def searched(found: dict) -> dict | None:
+    """Ask Meta's web search about the message's number or address (no town:
+    a number is the same everywhere). Only the number or address is sent,
+    never her name or the rest of the message. Returns
+    {"reported", "words", "sites"} with fixed words, or None when the search
+    failed, didn't really search, or its answer can't be read."""
+    what = " or ".join(found["numbers"] + found["sites"])
+    question = f"Is {what} reported as a scam, spam, fraud, or phishing? Search the web for it."
+    try:
+        answer = meta_client.search(question, prompts.SCAM_LOOKUP, "")
+    except meta_client.MetaError as problem:
+        print(f"Scam lookup failed: {problem}")  # never the message
+        return None
+    word = (answer["text"].split() or [""])[0].strip(".,:;!").upper()
+    if not answer["searched"] or word not in LOOKUP_WORDS:
+        return None
+    return {"reported": word == "REPORTED", "words": lookup_words(word == "REPORTED", found),
+            "sites": named_sites(answer["sources"], found)}
+
+
 # ---------- Cleaning up words ----------
 
 def excerpt(text: str) -> str:
@@ -119,7 +200,7 @@ def excerpt(text: str) -> str:
 def without_links_or_numbers(text: str) -> str:
     """The AI's words, without any link or phone number it copied from the
     message, so the screen never shows her something to tap or call."""
-    text = re.sub(r"https?://\S+|www\.\S+|\b[\w-]+\.(com|net|org|info|xyz|top|co)\b\S*", "the link", text)
+    text = re.sub(rf"https?://\S+|www\.\S+|\b[\w-]+\.({TLDS})\b\S*", "the link", text, flags=re.IGNORECASE)
     text = re.sub(r"\+?\d[\d\-\s().]{6,}\d", "the number", text)
     return " ".join(text.split())
 
@@ -154,22 +235,37 @@ def check(connection, profile: dict, text: str, image: str, kind: str) -> dict:
     record and returns what the screen shows."""
     family = profile.get("family_name") or "your family"
     rules, rule_flags = rules_verdict(text)
-    ai = ai_answer(text, image)
+    # A number or web address in the words (never in a photo) is looked up on
+    # the web meanwhile, in one of the day's 30 searches, while the AI reads.
+    found = contacts(text) if text and not image else {"numbers": [], "sites": []}
+    web = None
+    with ThreadPoolExecutor(max_workers=1) as searcher:
+        looking = None
+        if (found["numbers"] or found["sites"]) and briefing.take_search(connection, reminders.current_time()):
+            connection.commit()
+            looking = searcher.submit(searched, found)
+        ai = ai_answer(text, image)
+        if looking is not None:
+            web = looking.result()
+    # A report online makes it a likely scam (never weaker), with a fixed red flag first.
+    web_verdict = "likely_scam" if web and web["reported"] else None
+    web_flags = [web["words"]] if web_verdict else []
 
     if ai is None:
-        verdict = rules or "suspicious"
-        flags = rule_flags
-        explanation = RULES_EXPLANATION[rules] if rules else NOT_SURE.format(family=family)
+        verdict = stronger(rules, web_verdict) or "suspicious"
+        flags = web_flags + rule_flags
+        explanation = RULES_EXPLANATION[verdict] if (rules or web_verdict) else NOT_SURE.format(family=family)
     else:
-        verdict = stronger(ai["verdict"], rules)
+        verdict = stronger(stronger(ai["verdict"], rules), web_verdict)
         ai_flags = [without_links_or_numbers(flag) for flag in ai["red_flags"] if flag.strip()]
         flags = ai_flags or rule_flags
         explanation = without_links_or_numbers(ai["explanation"])
-        # The rules found more than the AI said, or the AI's words slipped
-        # into advice: then its words don't fit, so fixed words are used.
+        # The rules or the web found more than the AI said, or the AI's words
+        # slipped into advice: then its words don't fit, so fixed words are used.
         if verdict != ai["verdict"] or guard.check_reply(explanation) is not None:
             explanation = RULES_EXPLANATION.get(verdict, NOT_SURE.format(family=family))
             flags = flags if verdict == ai["verdict"] else rule_flags
+        flags = web_flags + flags
     flags = flags[:MAX_FLAGS]
 
     connection.execute(
@@ -191,5 +287,8 @@ def check(connection, profile: dict, text: str, image: str, kind: str) -> dict:
         "what_to_do": LOOKS_SAFE if verdict == "looks_safe" else [line.format(family=family) for line in ALWAYS],
         "if_you_paid": IF_YOU_PAID if verdict == "likely_scam" else [],
         "actions": actions,
+        # What the web said about the number or address in it (fixed words
+        # and the sites), or null when there was nothing to look up.
+        "lookup": web,
     }
 

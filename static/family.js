@@ -15,6 +15,7 @@ var VIEWS = ["family-signin", "family-join", "family-day"];
 var dayPoll = null;
 var herName = "She";
 var shownAlerts = null; // today's alerts last shown (their words), to notice a new one
+var shownMessages = null; // today's messages last shown, to notice a new one
 
 // Ask our own server (like app.js's api()). Rejects with .detail when it says no.
 function api(path, method, body) {
@@ -110,9 +111,25 @@ function join(event) {
     .catch(function (problem) { showProblem(form, status, problem); });
 }
 
+// "Try the demo as Maria": the made-up account, in demo mode only.
+function tryTheDemo() {
+  var status = document.getElementById("signin-status");
+  status.textContent = "Signing in as Maria…";
+  api("/api/family/demo-sign-in", "POST", {})
+    .then(function () {
+      status.textContent = "";
+      showDay();
+    })
+    .catch(function (problem) {
+      status.textContent = typeof problem.detail === "string" ? problem.detail
+        : "I couldn’t open the demo just now. Please try again in a moment.";
+    });
+}
+
 function signOut() {
   api("/api/family/sign-out", "POST", {}).catch(function () {}).then(function () {
     shownAlerts = null;
+    shownMessages = null;
     document.title = "Family · Grandma Buddy";
     show("family-signin");
   });
@@ -218,6 +235,55 @@ function drawDay(day, today) {
     });
   }
 
+  // The messages between her and the family that day, both ways, and the
+  // postcard she sent.
+  setText(document.getElementById("messages-title"), "Messages with " + herName);
+  setText(document.getElementById("reply-label"), "Write to " + herName);
+  setText(document.getElementById("reply-send"), "Send to " + herName);
+  var messages = document.getElementById("messages-list");
+  messages.textContent = "";
+  setText(document.getElementById("messages-note"), day.messages.length ? ""
+    : (today ? "No messages yet today." : "No messages that day."));
+  day.messages.forEach(function (message) {
+    var item = element("li", "entry");
+    var who = message.from === "family" ? (message.name || "Family") : herName;
+    item.appendChild(element("p", "entry-when", who + ", " + message.time));
+    if (message.voice) {
+      var play = element("button", "pill-button pill-button--quiet pill-button--small entry-voice", "Play");
+      play.type = "button";
+      play.setAttribute("aria-label", "Play " + who + "’s voice message");
+      play.addEventListener("click", function () {
+        var sound = new Audio(message.voice);
+        play.textContent = "Playing…";
+        sound.addEventListener("ended", function () { play.textContent = "Play again"; });
+        sound.play().catch(function () { play.textContent = "Play"; });
+      });
+      item.appendChild(play);
+    }
+    item.appendChild(element("p", "entry-words", message.text ? "“" + message.text + "”" : "A voice message"));
+    messages.appendChild(item);
+  });
+  var postcardPart = document.getElementById("postcard-part");
+  postcardPart.hidden = !day.postcard;
+  if (day.postcard) {
+    // The painting, made once and kept while it is the same one (the page
+    // asks again every 30 seconds).
+    var holder = document.getElementById("postcard-picture");
+    var picture = holder.querySelector("img");
+    if (!picture || picture.getAttribute("src") !== day.postcard.picture) {
+      holder.textContent = "";
+      picture = element("img", "postcard-img");
+      picture.id = "postcard-img";
+      picture.width = 1536;
+      picture.height = 1024;
+      picture.src = day.postcard.picture;
+      holder.appendChild(picture);
+    }
+    picture.alt = "Painting: " + day.postcard.scene;
+    setText(document.getElementById("postcard-sentence"), "“" + day.postcard.sentence + "”");
+    setText(document.getElementById("postcard-time"), "Sent at " + day.postcard.time + ", in her own words.");
+  }
+
   var memories = document.getElementById("memories-list");
   memories.textContent = "";
   setText(document.getElementById("memories-note"), !day.memories ? notShared("her memory book pages")
@@ -244,6 +310,8 @@ function drawDay(day, today) {
 
   if (today) {
     tellAboutNewAlerts(day.alerts.map(function (alert) { return alert.words; }));
+    tellAboutNewMessages(day.messages.filter(function (message) { return message.from !== "family"; })
+      .map(function (message) { return message.time + " " + message.text; }));
   }
 }
 
@@ -368,6 +436,98 @@ function tellAboutNewAlerts(words) {
   shownAlerts = words;
 }
 
+// "Write to Rose": sent to her Family screen as this family member's words.
+function reply(event) {
+  event.preventDefault();
+  var form = event.target;
+  var status = document.getElementById("reply-status");
+  var text = form.elements.text.value.trim();
+  if (!text) {
+    status.textContent = "Write a short message first.";
+    form.elements.text.focus();
+    return;
+  }
+  status.textContent = "Sending…";
+  api("/api/family/reply", "POST", { text: text })
+    .then(function () {
+      form.reset();
+      status.textContent = "Sent. Buddy will read it to " + herName + ".";
+      loadDay();
+    })
+    .catch(function (problem) {
+      if (problem.status === 401) {
+        show("family-signin");
+        return;
+      }
+      status.textContent = typeof problem.detail === "string" ? problem.detail
+        : "I couldn’t send that just now. Please try again in a moment.";
+    });
+}
+
+// "Record a voice message": tap, speak, tap "I'm done". The recording goes
+// to her Family screen as this family member's own voice.
+var recordingVoice = false;
+var VOICE_LIMIT_MS = 2 * 60 * 1000;
+var voiceTimer = null;
+
+function recordVoice() {
+  var status = document.getElementById("reply-status");
+  var label = document.getElementById("reply-voice-label");
+  if (!recordingVoice) {
+    startRecording()
+      .then(function () {
+        recordingVoice = true;
+        label.textContent = "I’m done";
+        status.textContent = "Recording… say a few words, then tap “I’m done”.";
+        voiceTimer = setTimeout(recordVoice, VOICE_LIMIT_MS);
+      })
+      .catch(function () {
+        status.textContent = "I can’t use the microphone here. Allow it at the top of the window, or write a message instead.";
+      });
+    return;
+  }
+  clearTimeout(voiceTimer);
+  recordingVoice = false;
+  label.textContent = "Record a voice message";
+  status.textContent = "Sending your voice…";
+  stopRecording()
+    .then(function (wav) {
+      var form = new FormData();
+      form.append("audio", wav, "voice.wav");
+      return fetch("/api/family/voice", { method: "POST", body: form }).then(function (response) {
+        if (response.status === 401) {
+          show("family-signin");
+          throw new Error("signed out");
+        }
+        if (!response.ok) {
+          throw new Error("refused");
+        }
+      });
+    })
+    .then(function () {
+      status.textContent = "Sent. Buddy will play it to " + herName + ".";
+      loadDay();
+    })
+    .catch(function () {
+      status.textContent = "I couldn’t send that recording just now. Please try again, or write a message.";
+    });
+}
+
+// A new message from her since the last look at today: a notification too.
+function tellAboutNewMessages(lines) {
+  if (shownMessages !== null && notifyWanted()) {
+    lines.forEach(function (line) {
+      if (shownMessages.indexOf(line) === -1) {
+        var note = new Notification(herName + " sent a message", {
+          body: line.replace(/^\S+ \S+ /, ""), tag: "buddy-message-" + line,
+        });
+        note.addEventListener("click", function () { window.focus(); note.close(); });
+      }
+    });
+  }
+  shownMessages = lines;
+}
+
 function showNotifySwitch() {
   var box = document.getElementById("notify-switch");
   var status = document.getElementById("notify-status");
@@ -402,6 +562,8 @@ function changeNotify() {
 
 function start() {
   document.getElementById("signin-form").addEventListener("submit", signIn);
+  document.getElementById("reply-form").addEventListener("submit", reply);
+  document.getElementById("reply-voice").addEventListener("click", recordVoice);
   document.getElementById("join-form").addEventListener("submit", join);
   document.getElementById("show-join").addEventListener("click", function () { show("family-join"); });
   document.getElementById("show-signin").addEventListener("click", function () { show("family-signin"); });
@@ -431,11 +593,13 @@ function start() {
     }
   });
   showNotifySwitch();
+  document.getElementById("family-demo-signin").addEventListener("click", tryTheDemo);
   api("/api/family/me")
     .then(function (me) {
       if (me.signed_in) {
         showDay();
       } else {
+        document.getElementById("family-demo").hidden = !(me.demo && me.demo_account);
         show("family-signin");
       }
     })

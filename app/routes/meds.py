@@ -11,6 +11,7 @@ import json
 import re
 
 from fastapi import APIRouter, Body, HTTPException
+from pydantic import BaseModel
 
 from app import db, reminders, safety
 
@@ -40,6 +41,32 @@ def clean_pill(pill: dict) -> dict:
     if not all(isinstance(t, str) and TIME.match(t) for t in times):
         refuse("times", "Please check the times of day.")
     return {"name": name.strip(), "label_dose": label.strip(), "times": sorted(set(times))}
+
+
+class LabelRequest(BaseModel):
+    image: str  # "data:image/jpeg;base64,..."
+
+
+@router.post("/api/meds/label")
+def read_label(request: LabelRequest):
+    """A pill from a photo of its bottle: the name and the label as printed,
+    to fill in the form (app/labels.py). Only a suggestion: the family
+    member checks both and saves with POST /api/meds as always. Nothing
+    is stored here, and the photo is never saved."""
+    from app import labels, meta_client
+    from app.routes.find import MAX_IMAGE, PHOTO
+
+    image = request.image.strip()
+    if not image or len(image) > MAX_IMAGE or not PHOTO.fullmatch(image):
+        raise HTTPException(status_code=400, detail="That photo didn’t work. Please try another photo, or type it in.")
+    try:
+        read = labels.read_label(image)
+    except ValueError as problem:
+        raise HTTPException(status_code=400, detail=str(problem))
+    except meta_client.MetaError as problem:
+        print(f"Reading a pill label failed: {problem}")  # never the label
+        raise HTTPException(status_code=503, detail=labels.NOT_NOW)
+    return {"name": read["name"], "label": read["label"], "note": labels.CHECK_IT}
 
 
 @router.get("/api/meds")

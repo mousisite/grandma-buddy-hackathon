@@ -48,8 +48,20 @@ def main() -> int:
             tab.locator("#box").screenshot(path=str(OUT / name), omit_background=background is None)
             tab.close()
         browser.close()
-    print("Icons drawn: " + ", ".join(name for name, *_ in ICONS))
+    favicon()
+    print("Icons drawn: " + ", ".join(name for name, *_ in ICONS) + ", favicon.ico")
     return 0
+
+
+def favicon() -> None:
+    """/favicon.ico, with no new package: an ICO container holding the 192px
+    PNG of the orb (browsers accept a PNG inside an ICO)."""
+    import struct
+
+    png = (OUT / "buddy-192.png").read_bytes()
+    header = struct.pack("<HHH", 0, 1, 1)  # reserved, type 1 (icon), one picture
+    entry = struct.pack("<BBBBHHII", 192, 192, 0, 0, 1, 32, len(png), 6 + 16)  # size, colors, planes, bits, bytes, offset
+    (OUT / "favicon.ico").write_bytes(header + entry + png)
 
 
 if __name__ == "__main__":

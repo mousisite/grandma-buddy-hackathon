@@ -287,11 +287,15 @@ h2:focus,
   background: var(--primary);
   color: var(--on-primary);
   font-weight: 600;
+  /* Parked above the page until the keyboard reaches it. Invisible too, so
+     a full-page capture of a scrolled page never shows it either. */
   transform: translateY(-200%);
+  opacity: 0;
 }
 
 .skip-link:focus-visible {
   transform: none;
+  opacity: 1;
 }
 
 /* ---------- Layout: phone first ---------- */
@@ -1908,6 +1912,23 @@ textarea::placeholder {
   line-height: 1.4;
 }
 
+/* What the web said about a number or address in the message. */
+.verdict-lookup {
+  display: grid;
+  gap: var(--s-1);
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-card);
+  background: var(--tint);
+  font-size: var(--t-17);
+  line-height: 1.5;
+}
+
+.verdict-lookup-from {
+  color: var(--text-2);
+  font-size: var(--t-15);
+}
+
 .verdict-heading {
   margin-bottom: var(--s-2);
   color: var(--text-2);
@@ -2001,6 +2022,153 @@ textarea::placeholder {
 #update-send:not([href]) {
   opacity: 0.55;
   pointer-events: none;
+}
+
+/* ---------- Message Maria, and today's postcard (the Family screen) ---------- */
+
+.family-message,
+.postcard-part {
+  display: grid;
+  gap: var(--s-4);
+  max-width: 65ch;
+  margin-top: var(--s-12);
+}
+
+.message-form {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.message-label {
+  font-weight: 600;
+}
+
+/* Her message, big enough to read over before she sends it. */
+#message-text {
+  width: 100%;
+  min-height: 7.5rem;
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--t-20);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+#message-text::placeholder {
+  color: var(--text-2);
+}
+
+/* What she sent today, each in its own quiet card. */
+.sent-list {
+  display: grid;
+  gap: var(--s-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sent-message {
+  display: grid;
+  gap: var(--s-1);
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+
+.sent-when {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--t-15);
+}
+
+/* A family member's message sits on the tint; hers on the surface. */
+.sent-message--family {
+  border-color: transparent;
+  background: var(--tint);
+}
+
+/* "Maria will hear your voice too. Just the words" under the box. */
+.message-voice-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.sent-with-voice {
+  margin: 0;
+  font-size: var(--t-15);
+}
+
+/* "Hear Maria", under a voice message's time. */
+.sent-voice {
+  justify-self: start;
+  margin: var(--s-1) 0;
+}
+
+.sent-words--quiet {
+  color: var(--text-2);
+}
+
+.sent-new {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: var(--t-13);
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.sent-words {
+  margin: 0;
+  font-size: var(--t-17);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* The postcard: the painting on top (the Memory book's wash and shimmer
+   while it is painted), her words under it in Newsreader, like a page of
+   the book. */
+.postcard {
+  display: grid;
+  gap: var(--s-4);
+  margin: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.postcard-words {
+  display: grid;
+  gap: var(--s-2);
+  padding: 0 var(--s-2) var(--s-2);
+}
+
+.postcard-sentence {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--t-24);
+  line-height: 1.35;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.postcard-meta {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--t-15);
 }
 
 /* ---------- Doctor notes ---------- */
@@ -2193,6 +2361,36 @@ textarea::placeholder {
 .call-list .call-pill {
   justify-content: flex-start;
   padding: 0 var(--s-6);
+}
+
+/* Settings, Her data: the demo week's own box, in demo mode. */
+.demo-reset {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}
+
+/* "I checked this against the bottle": a big box under a field Buddy
+   filled in from a photo of the bottle (the Add a pill form). */
+.checked-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--target);
+  margin-top: var(--s-2);
+  font-size: var(--t-17);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.checked-row input {
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--primary);
 }
 
 /* ---------- Settings: grouped rows ---------- */
@@ -3605,7 +3803,9 @@ label.group-row,
   list-style: none;
 }
 
-@media (min-width: 520px) {
+/* One column on phones (two narrow columns squeezed the words); two from
+   a tablet, where each card has room. */
+@media (min-width: 768px) {
   .help-models {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

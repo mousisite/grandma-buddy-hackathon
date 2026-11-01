@@ -19,8 +19,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-# A throwaway database, set BEFORE the app reads its settings.
+# A throwaway database, set BEFORE the app reads its settings. The test
+# client calls itself "testserver", which app/security.py must allow.
 os.environ["DATABASE_PATH"] = str(Path(tempfile.mkdtemp()) / "check_scam.db")
+os.environ["ALLOWED_HOSTS"] = "testserver,localhost,127.0.0.1,::1"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
@@ -55,6 +57,8 @@ def show(label: str, body: dict) -> None:
     print(f"{label}")
     print(f"  {body['title']}: {body['explanation']}")
     print(f"  Warning signs: {body['red_flags']}")
+    if body.get("lookup"):
+        print(f"  On the web: {body['lookup']['words']} (from {', '.join(body['lookup']['sites']) or 'no named site'})")
     print(f"  Buttons: {[a['label'] for a in body['actions']]}\n")
 
 

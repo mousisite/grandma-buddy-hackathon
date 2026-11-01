@@ -74,6 +74,45 @@ def add_made_up_weather(database: Path) -> None:
     connection.close()
 
 
+def add_made_up_messages(database: Path) -> None:
+    """Today's data for a demo week seeded on an earlier day, and for a
+    server with no key to paint with: today's check-in (done), her messages,
+    this morning's talk, and today's postcard (ready, not yet sent, with the
+    tulips painted by Muse Image in scripts/check_messages.py) go into the
+    COPY. Her real database is never touched."""
+    from scripts.seed_demo import MESSAGES, TODAY_TALK, at
+
+    connection = sqlite3.connect(database)
+    now = datetime.now()
+    if connection.execute("SELECT COUNT(*) FROM family_messages").fetchone()[0] == 0:
+        connection.executemany(
+            "INSERT INTO family_messages (created_at, text, sender, sender_name, read_at) VALUES (?, ?, ?, ?, ?)",
+            [(at(now, days_ago, clock), text, who, "Maria" if who == "family" else "",
+              at(now, days_ago, clock) if seen else "") for days_ago, clock, who, text, seen in MESSAGES])
+        connection.executemany("INSERT INTO messages (conversation_id, created_at, role, content) VALUES ('demo-today', ?, ?, ?)",
+                               [(at(now, 0, clock), role, words) for clock, role, words in TODAY_TALK])
+    today = now.date().isoformat()
+    # Today's check-in, done (the Today close-up shows its check), when the
+    # demo week was seeded on an earlier day.
+    if connection.execute("SELECT 1 FROM check_ins WHERE day = ?", (today,)).fetchone() is None:
+        connection.execute("INSERT INTO check_ins (day, started_at, skipped) VALUES (?, ?, 0)", (today, at(now, 0, "09:00")))
+        connection.execute("INSERT INTO moods (created_at, mood, note, conversation_id) VALUES (?, 'great', '', 'demo-mood-today')",
+                           (at(now, 0, "09:01"),))
+    if connection.execute("SELECT 1 FROM postcards WHERE day = ?", (today,)).fetchone() is None:
+        made = connection.execute(
+            "INSERT INTO postcards (day, created_at, updated_at, sentence, scene, status, said_until) "
+            "VALUES (?, ?, ?, ?, ?, 'ready', ?)",
+            (today, at(now, 0, "10:30"), at(now, 0, "10:31"), TODAY_TALK[0][2],
+             "A garden gate with red tulips blooming beside it in gentle spring morning light.", at(now, 0, "10:21")),
+        ).lastrowid
+        pictures = database.parent / "memories"
+        pictures.mkdir(exist_ok=True)
+        shutil.copyfile(ROOT / "scripts" / "memory_photos" / "tulips.webp", pictures / f"postcard-{made}.webp")
+        connection.execute("UPDATE postcards SET picture = ? WHERE id = ?", (f"postcard-{made}.webp", made))
+    connection.commit()
+    connection.close()
+
+
 def start_server(database: Path, port: int) -> subprocess.Popen:
     env = dict(os.environ, DATABASE_PATH=str(database), MODEL_API_KEY="")  # no AI calls
     server = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(port)], cwd=ROOT,
@@ -104,6 +143,12 @@ def screens(browser) -> list[str]:
             wait_for_screen(page, name)
             if name == "settings":
                 page.evaluate("document.getElementById('learned-setup').open = true")
+            if name == "family":  # today's postcard (from the copy) has faded in, scrolled into view once so it is drawn
+                page.wait_for_function("!!document.querySelector('#postcard:not([hidden]) .memory-img.shown') || "
+                                       "document.getElementById('postcard-note').textContent !== ''")
+                page.evaluate("document.getElementById('postcard').scrollIntoView()")
+                page.wait_for_timeout(400)
+                page.evaluate("window.scrollTo(0, 0)")
             if name in ("memories", "memory"):
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")  # pictures load as she scrolls
                 page.wait_for_function("[...document.querySelectorAll('.memory-img')].every(i => i.classList.contains('shown'))")
@@ -200,6 +245,14 @@ def close_ups(browser) -> list[str]:
         wait_for_screen(page, "family")
         page.wait_for_function("document.getElementById('update-text').textContent.includes('Pills: ')")
         saved.append(close_up(page, ".family-update", f"demo-fix-family-{width}.png"))
+        # Message Maria, with the demo week's message sent today, and the
+        # postcard (today's, if an API key painted one; else yesterday's words
+        # stay on the family page and Try again shows here).
+        page.wait_for_function("document.getElementById('sent-note').textContent !== ''")  # the demo week's message, or none
+        saved.append(close_up(page, ".family-message", f"demo-message-{width}.png"))
+        page.wait_for_function("document.getElementById('postcard-note').textContent !== '' || "
+                               "!!document.querySelector('#postcard:not([hidden]) .memory-img.shown')", timeout=120000)
+        saved.append(close_up(page, ".postcard-part", f"demo-postcard-{width}.png"))
 
         page.goto(f"http://localhost:{PORT}/#/notes", wait_until="networkidle")
         wait_for_screen(page, "notes")
@@ -285,7 +338,8 @@ if __name__ == "__main__":
     photos()  # the made-up papers for Read it to me (made once, no AI)
     database = copy_the_app_data()
     server = start_server(database, PORT)
-    add_made_up_weather(database)  # after the server made its tables
+    add_made_up_weather(database)
+    add_made_up_messages(database)  # after the server made its tables
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()

@@ -24,6 +24,39 @@ function startHerData() {
   document.getElementById("delete-no").addEventListener("click", function () {
     dialog.close();
   });
+  // "Reset the demo week", in demo mode only (the server says).
+  var resetBox = document.getElementById("demo-reset-box");
+  var reset = document.getElementById("demo-reset");
+  var resetStatus = document.getElementById("demo-reset-status");
+  // Plain fetch: app.js (which defines api) loads after this file.
+  fetch("/api/demo")
+    .then(function (response) { return response.json(); })
+    .then(function (state) {
+      resetBox.hidden = !state.demo;
+    })
+    .catch(function () {});
+  reset.addEventListener("click", function () {
+    askFirst("Reset the demo week?",
+      "A copy of what is here is saved first. Then Buddy is filled with Rose’s made-up week again, ending today.",
+      "Yes, reset it", function () {
+        document.getElementById("confirm-dialog").close();
+        reset.disabled = true;
+        resetStatus.textContent = "Resetting…";
+        api("/api/demo/reset", "POST", {})
+          .then(function (done) {
+            resetStatus.textContent = "The demo week is back, ending today." +
+              (done.painting ? " The Memory book pictures are being painted (about a minute)." : "");
+            try { localStorage.removeItem("checkin-seen"); } catch (e) {}
+            setTimeout(function () { window.location.replace("/"); }, 1500); // Home, loaded afresh
+          })
+          .catch(function (problem) {
+            reset.disabled = false;
+            resetStatus.textContent = typeof problem.detail === "string" ? problem.detail
+              : "I couldn’t reset it just now. Please try again.";
+          });
+      });
+  });
+
   yes.addEventListener("click", function () {
     yes.disabled = true;
     status.textContent = "Deleting…";

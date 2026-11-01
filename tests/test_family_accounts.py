@@ -115,7 +115,7 @@ def test_signing_in_and_out(client, connection):
     join(client)
     client.post("/api/family/sign-out")
     # "Am I signed in?" is a plain question, not an error (so the browser logs nothing).
-    assert client.get("/api/family/me").json() == {"signed_in": False}
+    assert client.get("/api/family/me").json()["signed_in"] is False
     signed_in = client.post("/api/family/sign-in", json={"email": MARIA["email"], "password": MARIA["password"]})
     assert signed_in.status_code == 200 and signed_in.json()["name"] == "Maria"
     assert client.get("/api/family/me").json()["signed_in"] is True
@@ -136,7 +136,7 @@ def test_a_wrong_password_is_refused_and_five_tries_lock_for_fifteen_minutes(cli
 def test_a_session_ends_after_thirty_days(client, clock, connection):
     join(client)
     clock["now"] = NOW + timedelta(days=31)
-    assert client.get("/api/family/me").json() == {"signed_in": False}
+    assert client.get("/api/family/me").json()["signed_in"] is False
 
 
 def test_removing_an_account_from_roses_settings_ends_its_session(client, connection):
@@ -144,7 +144,7 @@ def test_removing_an_account_from_roses_settings_ends_its_session(client, connec
     listed = client.get("/api/family/accounts").json()
     assert [account["name"] for account in listed] == ["Maria"]
     assert client.delete(f"/api/family/accounts/{listed[0]['id']}").status_code == 200
-    assert client.get("/api/family/me").json() == {"signed_in": False}
+    assert client.get("/api/family/me").json()["signed_in"] is False
     assert client.get("/api/family/accounts").json() == []
 
 

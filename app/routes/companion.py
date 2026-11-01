@@ -169,6 +169,12 @@ def greeting(request: GreetingRequest):
         words = prompts.greeting(name, reminders.part_of_day(now), due["follow_up"] if due else "", now.toordinal())
         if due:
             connection.execute("UPDATE facts SET asked_at = ? WHERE id = ?", (now.isoformat(timespec="seconds"), due["id"]))
+        # A family member wrote to her: say so (plain words), never read it
+        # here. The Family screen shows and reads it, as their words.
+        waiting = db.unread_family_messages(connection, (now.date() - timedelta(days=7)).isoformat())
+        if waiting:
+            who = waiting[0]["sender_name"] or "Your family"
+            words += f" {who} sent you {'a message' if len(waiting) == 1 else 'messages'}. It’s on your Family screen."
         db.save_message(connection, request.conversation_id, "assistant", words, at=now)
         connection.commit()
         return {"greeting": words}

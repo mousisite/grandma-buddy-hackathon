@@ -17,6 +17,7 @@ var SAY_IT_WORDS = { idle: "Say it", listening: "I’m done", working: "One mome
 var SAY_IT_LIMIT_MS = 20 * 1000; // she can say a name and a number in this
 var sayingIt = null; // the "Say it" button that is listening
 var sayItTimer = null;
+var lastSaidWav = null; // the last recording, for a form that sends her voice along (the Family screen)
 
 function sayItStatus(button, words) {
   document.getElementById(button.getAttribute("data-say-it")).textContent = words;
@@ -62,7 +63,10 @@ function stopSayingIt() {
   sayingIt = null;
   setSayIt(button, "working");
   stopRecording()
-    .then(sendForTranscript)
+    .then(function (wav) {
+      lastSaidWav = wav;
+      return sendForTranscript(wav);
+    })
     .then(function (result) {
       var words = (result.transcript || "").trim();
       if (!words) {

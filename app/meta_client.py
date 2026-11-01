@@ -217,7 +217,8 @@ def _respond(request: dict, what: str):
 
 def search(question: str, instructions: str, town: str) -> dict:
     """Ask Muse Spark with Meta's own web search (POST /v1/responses, the
-    built-in web_search tool), near her town ("Portland, Oregon").
+    built-in web_search tool), near her town ("Portland, Oregon"), or
+    anywhere when town is "".
 
     Returns {"text", "sources": [{"title", "url"}], "searched"}: the answer,
     the pages it cites, and whether it really searched (the model may answer
@@ -225,20 +226,23 @@ def search(question: str, instructions: str, town: str) -> dict:
     Costs $0.0025 per search, plus tokens.
 
     Our code never visits a website: the search runs inside Meta's API.
-    Only her town is sent, never her name or her words.
+    Only her town is sent for the briefing, and only a phone number or web
+    address out of a message for the scam lookup: never her name or her words.
     """
     settings = get_settings()
     if not settings.model_api_key:
         raise MetaError("no API key is set up in .env")
-    city, _, region = (part.strip() for part in town.partition(","))
-    location = {"type": "approximate", "country": "US", "city": city}
-    if region:
-        location["region"] = region
+    web_search = {"type": "web_search", "search_context_size": "low"}
+    if town.strip():  # the scam lookup sends no town: a number is the same everywhere
+        city, _, region = (part.strip() for part in town.partition(","))
+        web_search["user_location"] = {"type": "approximate", "country": "US", "city": city}
+        if region:
+            web_search["user_location"]["region"] = region
     response = _respond({
         "model": settings.chat_model,
         "instructions": instructions,
         "input": question,
-        "tools": [{"type": "web_search", "search_context_size": "low", "user_location": location}],
+        "tools": [web_search],
         "include": ["web_search_call.action.sources"],  # the pages each search found
         "reasoning": {"effort": "low"},
         "max_tool_calls": 2,  # at most 2 searches for one answer

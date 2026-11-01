@@ -15,8 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from app import db, security
 from app.config import get_settings
 from app import voice
-from app.routes import (billing, briefing, checkin, companion, data, diary, family, family_accounts, find, how,
-                        learned, listen, meds, memories, notes, profile, read, scam)
+from app.routes import (billing, briefing, checkin, companion, data, demo, diary, family, family_accounts, find, how,
+                        learned, listen, meds, memories, messages, notes, profile, read, scam)
 from app.routes import voice as voice_routes
 
 # The folder with index.html, styles.css, and app.js.
@@ -75,6 +75,10 @@ app.include_router(family_accounts.router)
 app.include_router(billing.router)
 # Her data: export everything as one zip, or delete everything.
 app.include_router(data.router)
+# Message Maria (her own words, safety net first) and the daily painted postcard.
+app.include_router(messages.router)
+# The demo week: is it loaded, and start it over (demo mode only).
+app.include_router(demo.router)
 
 
 @app.middleware("http")
@@ -141,6 +145,12 @@ def terms():
 def family_page():
     """The family page: sign in, and her day as she shares it."""
     return FileResponse(STATIC_DIR / PAGES["/family"])
+
+
+@app.get("/favicon.ico")
+def favicon():
+    """The tab icon browsers ask for by name: Buddy's orb (scripts/make_icons.py)."""
+    return FileResponse(STATIC_DIR / "icons" / "favicon.ico", media_type="image/x-icon")
 
 
 @app.get("/sw.js")

@@ -20,6 +20,9 @@
   </script>
   <link rel="preload" href="/static/fonts/Figtree.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="/static/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/buddy-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/buddy-180.png">
   <link rel="stylesheet" href="/static/styles.css">
   <link rel="stylesheet" href="/static/landing.css">
 </head>
@@ -44,9 +47,13 @@
         <li>what she says to Buddy (her voice, to be turned into words, and the words, to be answered), along with Buddy’s recent replies and the facts Buddy remembers about her life, so it can answer like a friend;</li>
         <li>a message or a photo she asks Buddy to check for a scam, a photo of a letter she asks Buddy to read, or a photo of the room where she lost something, while it is being looked at;</li>
         <li>the story she tells for her memory book, and a description of the scene to paint;</li>
+        <li>a phone number or web address out of a message she checks, to ask the web whether it is a known scam: only the number or address, never the rest of the message, and never her town;</li>
+        <li>what she said to Buddy that day, with every line about her health left out by the app first, so that one cheerful line can become the day’s postcard, and a description of the scene to paint;</li>
+        <li>a photo of a pill bottle, only when a family member takes one to fill in the pill form, while it is being read;</li>
+        <li>a voice message a family member records for her, to be written down so the words show under it (the recording itself stays on her computer, and is part of her data to export or delete).</li>
         <li>her town (typed by a family member), for today’s weather and local news. Never her name, her address, or her location.</li>
       </ul>
-      <p>The app uses Meta’s standard models only, which Meta doesn’t use to train its AI. It refuses to start with any other kind. Photos are never saved by the app, and the photo of a room is sent with a setting that asks Meta not to keep it either. The pill labels your family typed are never sent to the AI at all: Buddy reads them word for word from its own file.</p>
+      <p>The app uses Meta’s standard models only, which Meta doesn’t use to train its AI. It refuses to start with any other kind. Photos are never saved by the app, and the photo of a room is sent with a setting that asks Meta not to keep it either. The pill labels in her reminders are never sent to the AI: Buddy reads them word for word from its own file. A photo of a bottle only fills in the form, and a family member checks every word before it is saved.</p>
       <p>What Meta does with what it receives is covered by Meta’s own terms for its Model API.</p>
 
       <h2>What is never kept</h2>
@@ -60,6 +67,7 @@
       <h2>What her family sees</h2>
       <p>Only what she chooses to send. The family update is written by the app from her day, in plain words. “Send” opens her own email app with the update filled in, and nothing goes anywhere until she presses Send there. The same is true of a memory book page. The app stores no email password. The doctor notes print on paper; they are not sent anywhere.</p>
       <p>A safety screen is named in the update with a fixed sentence and its time, never with her words.</p>
+      <p>On her Family screen she can also send a message, in her own words, and the day’s painted postcard, to the family page for the people she gave an account. Each goes only when she taps Send, and a message that needs a safety screen is never sent.</p>
 
       <h2>Who can use the app</h2>
       <p>Only the app’s own page, on her computer, can ask it to do anything. A request from another website open in her browser is refused, so no other site can read her diary or make Buddy spend your API credit.</p>

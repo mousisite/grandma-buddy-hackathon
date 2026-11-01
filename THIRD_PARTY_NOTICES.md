@@ -32,6 +32,8 @@ Meta has no text-to-speech model, so Buddy speaks with an open voice model that 
 
 `scripts/memory_photos/bench.webp` (made by `scripts/check_photo_memory.py` the first time it runs) is a made-up "old photo" painted with Meta's Muse Image for this project: two small figures seen from behind on a park bench, no faces, no real person. It tests the person check for a memory page from an old photo.
 
+`scripts/memory_photos/tulips.webp` is the postcard Meta's Muse Image painted for this project in `scripts/check_messages.py` (red tulips by a garden gate, two small figures far away, no faces, no writing). `scripts/demo_screenshots.py` uses it as today's postcard in its copy of the demo data, so no painting is bought for screenshots.
+
 `static/landing/` holds 5 screenshots of the app on the landing page, taken by `scripts/landing_shots.py` from a freshly seeded demo week (`scripts/seed_demo.py`): made-up people, pills, and stories only. The painting on the memory page screen was made with Meta's Muse Image for this project, from the seed's made-up story. `scripts/read_docs/` holds 3 made-up papers (a bill, a clinic letter, a prize letter) drawn by `scripts/check_read.py` as small web pages: the companies, the people, and the numbers are invented.
 
 ## Fonts used by the app

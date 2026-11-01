@@ -20,9 +20,20 @@ def test_todays_times_include_later_times_and_ones_from_the_last_two_hours():
     assert reminders.todays_times(["20:00", "08:00"], at(9)) == [at(8), at(20)]
 
 
-def test_a_time_that_passed_long_ago_gets_no_reminder():
-    # A pill added at noon: no 8 AM reminder, so it can never count as missed.
+def test_a_pill_added_today_gets_no_reminder_for_a_time_that_already_passed():
+    # A pill added at noon: no 8 AM reminder today, so it can never count as not taken.
     assert reminders.todays_times(["08:00", "20:00"], at(12)) == [at(20)]
+    assert reminders.todays_times(["08:00", "20:00"], at(12), since=at(11, 30).isoformat()) == [at(20)]
+
+
+def test_a_daily_pill_set_up_before_today_gets_every_time_today():
+    # Her pills repeat every day: at noon, this morning's 8 AM dose is there
+    # (not taken, unless she marks it), and tonight's is still to come.
+    since = at(7, day=20).isoformat()
+    assert reminders.todays_times(["08:00", "20:00"], at(12), since=since) == [at(8), at(20)]
+    assert reminders.todays_times(["08:00", "20:00"], at(15), since=since) == [at(8), at(20)]
+    # Just after midnight, last night's late pill is still offered too, with today's.
+    assert reminders.todays_times(["23:30", "08:00"], at(0, 30, day=28), since=since) == [at(23, 30), at(8, day=28), at(23, 30, day=28)]
 
 
 # ---------- What a reminder is right now ----------

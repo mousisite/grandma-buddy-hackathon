@@ -22,6 +22,9 @@
   </script>
   <link rel="preload" href="/static/fonts/Figtree.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="/static/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/buddy-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/buddy-180.png">
   <link rel="stylesheet" href="/static/styles.css">
   <link rel="stylesheet" href="/static/landing.css">
   <link rel="stylesheet" href="/static/family.css">
@@ -51,6 +54,12 @@
           <button class="pill-button pill-button--ink pill-button--hero" type="submit">Sign in</button>
         </form>
         <p class="note family-switch">New here? <button id="show-join" class="text-link" type="button">Join with an invite code</button></p>
+        <!-- Demo mode with the demo week loaded (family.js): one tap into
+             the made-up account, so anyone can see the page and the plan. -->
+        <div id="family-demo" class="family-demo" hidden>
+          <p class="note">This is the demo. See the page as Rose’s daughter would, with a made-up week and the no-card Family plan.</p>
+          <button id="family-demo-signin" class="pill-button pill-button--quiet pill-button--hero" type="button">Try the demo as Maria</button>
+        </div>
       </section>
 
       <!-- ========== Join with a code ========== -->
@@ -122,6 +131,46 @@
           </li>
         </ul>
 
+        <!-- Messages she sent from her Family screen, and the postcard she
+             sent that day (family.js). Hers to send: always shown. -->
+        <section class="family-part" aria-labelledby="messages-title">
+          <h2 id="messages-title" class="family-heading">Messages with her</h2>
+          <p id="messages-note" class="note"></p>
+          <ol id="messages-list" class="entries" role="list"></ol>
+          <!-- Written here, shown on her Family screen as your words, and
+               read to her by Buddy ("Maria wrote: …"). Never through the AI. -->
+          <form id="reply-form" class="family-form reply-form" novalidate>
+            <div class="field">
+              <label for="reply-text" id="reply-label">Write to her</label>
+              <textarea id="reply-text" name="text" rows="2" maxlength="1000" autocomplete="off"
+                        placeholder="Like “Can’t wait to see the tulips. I’ll bring Leo on Sunday.”"></textarea>
+            </div>
+            <p id="reply-status" class="form-status" role="status" aria-live="polite"></p>
+            <div class="form-actions">
+              <button id="reply-send" class="pill-button pill-button--ink" type="submit">Send to her</button>
+              <!-- Tap, speak, tap again: the recording (a small WAV) goes to
+                   her Family screen as your voice, and Buddy plays it to her. -->
+              <button id="reply-voice" class="pill-button pill-button--quiet" type="button">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+                <span id="reply-voice-label">Record a voice message</span>
+              </button>
+            </div>
+          </form>
+          <p class="note">Buddy shows it on her Family screen as your words and reads it to her. She can answer from there.</p>
+        </section>
+
+        <section id="postcard-part" class="family-part" aria-labelledby="postcard-title" hidden>
+          <h2 id="postcard-title" class="family-heading">Her postcard</h2>
+          <figure class="postcard">
+            <!-- The painting is added here by family.js once there is one. -->
+            <div id="postcard-picture" class="postcard-picture"></div>
+            <figcaption>
+              <p id="postcard-sentence" class="postcard-sentence"></p>
+              <p id="postcard-time" class="note"></p>
+            </figcaption>
+          </figure>
+        </section>
+
         <section class="family-part" aria-labelledby="diary-title">
           <h2 id="diary-title" class="family-heading">Her diary, in her words</h2>
           <p id="diary-note" class="note"></p>
@@ -191,6 +240,7 @@
     </footer>
   </div>
 
+  <script src="/static/recorder.js"></script>
   <script src="/static/family.js"></script>
 </body>
 </html>

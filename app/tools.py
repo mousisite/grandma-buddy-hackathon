@@ -260,11 +260,65 @@ TOOLS = [
          "room she takes.",
          {"thing": {"type": "string", "description": "What she is looking for, in a few words, like \"glasses\"."}},
          ["thing"]),
+    tool("offer_family_message",
+         "Show a button to send her family member a short message in her own words, when she asks you to tell "
+         "them something or wants to send them a message. Put her message in it, in her words. She reads it over "
+         "and taps Send herself; Buddy never sends anything by itself.",
+         {"message": {"type": "string", "description": "Her message, in her own words."}}, ["message"]),
     tool("look_up_today",
          "Look up today's weather, one cheerful thing happening in her town, or how the local sports teams did, "
          "on the web. Only these three; never anything about health, medicine, or food.",
          {"topic": {"type": "string", "enum": sorted(briefing.QUESTIONS)}}, ["topic"]),
 ]
+
+
+# ---------- A message for her family (docs/SAFETY.md 9c) ----------
+
+MAX_MESSAGE = 1000
+
+
+def her_own_words(message: str, said: list[str]) -> bool:
+    """True when the message is her words in her order: one stretch of what
+    she said in her last few messages. So the AI can pick her message out
+    of "Tell Maria the tulips came up", but never reorder her words, drop
+    a "not", or write one for her."""
+    hers = " " + " ".join(words_in(" ".join(said))) + " "
+    theirs = " ".join(words_in(message))
+    return bool(theirs) and f" {theirs} " in hers
+
+
+# "Tell Maria…": how she asks Buddy to pass something on. Plain code's
+# safety net under the AI's tool (the real AI once said "I've got your note
+# ready" without calling it): the button appears anyway, with her words.
+LEAD_IN = r"^(?:(?:please|buddy|can you|could you|would you|will you)[,\s]+)*"
+
+
+def message_she_asked_for(text: str, family_name: str) -> str:
+    """The message she asked Buddy to pass on ("Tell Maria the tulips came
+    up" -> "The tulips came up"), or "" when she didn't ask for one."""
+    names = [name for name in (family_name.strip(), "my family", "my daughter", "my son") if name]
+    who = "|".join(re.escape(name) for name in names)
+    asks = [
+        rf"{LEAD_IN}(?:tell|text|message)\s+(?:{who})\s+(?:that\s+|to\s+)?(?P<m>.+)$",
+        rf"{LEAD_IN}let\s+(?:{who})\s+know\s+(?:that\s+)?(?P<m>.+)$",
+        rf"{LEAD_IN}send\s+(?:{who})\s+(?:a\s+)?(?:message|note|text)[:,]?\s+(?:saying\s+|that\s+)?(?P<m>.+)$",
+        rf"{LEAD_IN}send\s+(?:a\s+)?(?:message|note|text)\s+to\s+(?:{who})[:,]?\s+(?:saying\s+|that\s+)?(?P<m>.+)$",
+    ]
+    for ask in asks:
+        found = re.match(ask, text.strip(), re.IGNORECASE)
+        if found:
+            message = found.group("m").strip(" ,.:;")
+            if len(words_in(message)) >= 2:
+                return message[0].upper() + message[1:]
+    return ""
+
+
+def family_message_button(message: str, said: list[str], profile: dict) -> dict:
+    """ "Send this to Maria", with her words: the AI's pick when it is her
+    own words, otherwise her whole last message."""
+    text = message if her_own_words(message, said) else said[-1]
+    who = profile["family_name"].strip() or "my family"
+    return {"type": "message", "label": f"Send this to {who}", "text": text[:MAX_MESSAGE]}
 
 
 # ---------- Buttons the screen can show ----------
@@ -427,6 +481,13 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
         if not thing:
             return {"ok": False, "error": "Ask her what she's looking for."}, []
         return {"ok": True}, [{"type": "find", "thing": thing, "label": f"Find my {thing}"}]
+
+    if name == "offer_family_message":
+        said = db.her_recent_words(connection, context["conversation_id"], limit=3)
+        if not said:
+            return {"ok": False, "error": "She hasn't said what to send yet."}, []
+        message = " ".join(str(args.get("message", "")).split())
+        return {"ok": True}, [family_message_button(message, said, profile)]
 
     if name == "look_up_today":
         # Our code writes the question for one of three topics (app/briefing.py),

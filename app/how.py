@@ -10,11 +10,10 @@ from app.config import Settings
 # Each Meta model the app uses: which setting holds it, and what it does,
 # in her words.
 MODELS = [
-    ("chat_model", "Thinks and talks: Buddy's words, check-in questions, doctor-note topics, scam checks, "
-                   "Memory book pages, where your things are, and what a letter says. It also looks up today's "
-                   "weather and news with Meta's web search."),
-    ("transcribe_model", "Hears you: turns what you say into words, live, and hears when you've finished."),
-    ("image_model", "Paints the pictures in your Memory book."),
+    ("chat_model", "Thinks and talks: Buddy's words, scam checks, doctor notes, memory book pages, what a letter "
+                   "says, and today's weather and news from the web."),
+    ("transcribe_model", "Hears you, live, and hears when you've finished."),
+    ("image_model", "Paints your memory book pages and the daily postcard."),
     ("sam_model", "Finds your glasses or keys in a photo of the room."),
 ]
 
@@ -48,6 +47,13 @@ FEATURES = [
         "here": "Runs on this computer. The labels your family typed never go to the AI.",
     },
     {
+        "name": "A pill from a photo of its bottle",
+        "what": "A family member takes a photo of the bottle, and Buddy fills in the name and the label as printed.",
+        "models": ["chat_model"],
+        "here": "Only a suggestion: the family member checks each one against the bottle before it is saved, and "
+                "always types the times. Buddy never changes a label.",
+    },
+    {
         "name": "Daily check-in and diary",
         "what": "Buddy asks how you feel, and writes down what hurts in your own words.",
         "models": ["transcribe_model", "chat_model"],
@@ -62,9 +68,10 @@ FEATURES = [
     },
     {
         "name": "Check a message",
-        "what": "Checks a text, an email, a letter, or a photo of one for the tricks scammers use.",
+        "what": "Checks a text, an email, a letter, or a photo of one for the tricks scammers use, and looks up any "
+                "phone number or web address in it on the web.",
         "models": ["chat_model"],
-        "here": "",
+        "here": "Plain rules set a floor the AI can't lower. A number or address is never read back to you.",
     },
     {
         "name": "Memory book",
@@ -98,6 +105,15 @@ FEATURES = [
         "what": "A short note about your day for the family member you chose. You send it yourself.",
         "models": [],
         "here": "Written on this computer from what Buddy wrote down.",
+    },
+    {
+        "name": "Message your family, and the daily postcard",
+        "what": "Say a message for your family, read it over, and send it to their family page; when they write back, "
+                "Buddy reads it to you, or plays their own voice. Once a day, one cheerful thing you said becomes a "
+                "painted postcard to send them.",
+        "models": ["chat_model", "image_model", "transcribe_model"],
+        "here": "Your message is checked for emergency words first, and only you tap Send. The postcard's words are "
+                "yours, word for word: the AI only picks the line and paints the picture.",
     },
 ]
 

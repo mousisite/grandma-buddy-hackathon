@@ -62,7 +62,7 @@ PAGE_SCHEMA = {
 # A picture file starts with its type's own bytes. Anything else is not saved.
 PICTURE_KINDS = {b"RIFF": "webp", b"\x89PNG": "png", b"\xff\xd8\xff": "jpg"}
 MEDIA_TYPES = {"webp": "image/webp", "png": "image/png", "jpg": "image/jpeg"}
-PICTURE_NAME = re.compile(r"^(photo-)?\d+\.(webp|png|jpg)$")  # a painting, or her own photo
+PICTURE_NAME = re.compile(r"^(photo-|postcard-)?\d+\.(webp|png|jpg)$")  # a painting, her own photo, or a postcard
 
 # A page from an old photo: what Spark fills in, and the fixed words used
 # instead when its description breaks a rule or it can't look.

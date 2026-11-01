@@ -8,6 +8,7 @@
 
 var SCREEN_LOADERS = {
   today: function () {
+    showTodayMessage();
     showTodayWeather();
     showCheckIn();
     showTodayDiary();
@@ -18,6 +19,9 @@ var SCREEN_LOADERS = {
   notes: showNotes,
   family: function () {
     showFamilyCalls();
+    showMessageComposer();
+    showSentMessages();
+    showPostcard();
     showFamilyUpdate();
   },
   memories: showMemories,
@@ -319,7 +323,7 @@ var PILL_STATUS = {
   due: function () { return "Time to take it now"; },
   snoozed: function (r) { return "Reminding you again at " + clockTime(r.snooze_until); },
   taken: function (r) { return "Taken at " + clockTime(r.acted_at); }, // shown with a check icon
-  missed: function () { return "Missed. Please check the label or call your pharmacist about what to do."; },
+  missed: function () { return "Not taken. Please check the label or call your pharmacist about what to do."; },
 };
 
 // Today's pills on the Pills screen: a "2 of 3 taken" ring, then one group
@@ -504,11 +508,63 @@ function addTimeInput(value) {
   return input;
 }
 
+// A photo of the bottle: shrunk on this device, read by Buddy
+// (/api/meds/label), and the name and the label filled in as printed. Each
+// must then be checked against the bottle before the pill can be saved.
+function readPillPhoto(event) {
+  var file = event.target.files[0];
+  event.target.value = ""; // so the same photo can be chosen again
+  if (!file) {
+    return;
+  }
+  var form = document.getElementById("pill-form");
+  var status = document.getElementById("pill-photo-status");
+  var button = document.getElementById("pill-photo");
+  button.disabled = true;
+  status.textContent = "Buddy is reading the label…";
+  shrinkPhoto(file)
+    .then(function (photo) {
+      return api("/api/meds/label", "POST", { image: photo });
+    })
+    .then(function (read) {
+      form.elements.name.value = read.name;
+      form.elements.label_dose.value = read.label;
+      form.setAttribute("data-from-photo", "");
+      form.elements.name_checked.checked = false;
+      form.elements.label_checked.checked = false;
+      document.getElementById("pill-name-check").hidden = false;
+      document.getElementById("pill-label-check").hidden = false;
+      status.textContent = read.note;
+      form.elements.name.focus();
+    })
+    .catch(function (problem) {
+      status.textContent = typeof problem.detail === "string" ? problem.detail
+        : "I couldn’t read that photo just now. Please try again, or type it in.";
+    })
+    .then(function () {
+      button.disabled = false;
+    });
+}
+
+// Filled in from a photo: both boxes must be ticked before saving.
+function pillPhotoUnchecked(form) {
+  if (!form.hasAttribute("data-from-photo")) {
+    return null;
+  }
+  return !form.elements.name_checked.checked ? form.elements.name_checked
+    : !form.elements.label_checked.checked ? form.elements.label_checked : null;
+}
+
 // Back to "Add a pill" with empty boxes and one time.
 function resetPillForm() {
   var form = document.getElementById("pill-form");
   editingPill = null;
   form.reset();
+  form.removeAttribute("data-from-photo");
+  document.getElementById("pill-name-check").hidden = true;
+  document.getElementById("pill-label-check").hidden = true;
+  document.getElementById("pill-photo-status").textContent =
+    "Or take a photo of the bottle: Buddy fills in the name and the label as printed, and you check them. The photo goes to Buddy’s AI to read, and isn’t kept.";
   clearProblem(form);
   form.querySelectorAll(".time-input").forEach(function (input, index) {
     if (index > 0) {
@@ -560,6 +616,13 @@ function savePill(event) {
     // Never drop a half-typed time: that dose would get no reminder.
     showProblem(unfinished, "Please finish this time, or clear it.");
     status.textContent = "Please finish this time, or clear it.";
+    return;
+  }
+  var unchecked = pillPhotoUnchecked(form);
+  if (unchecked) {
+    // Buddy's reading is only a suggestion: a person checks it against the bottle.
+    status.textContent = "Please check the name and the label against the bottle, then tick both boxes.";
+    unchecked.focus();
     return;
   }
   var pill = { name: form.elements.name.value, label_dose: form.elements.label_dose.value, times: times };
@@ -1087,8 +1150,19 @@ function showVerdict(result, photo) {
   verdict.innerHTML = VERDICT_ICONS[result.verdict] || "";
   verdict.appendChild(document.createTextNode(result.title));
   setText(document.getElementById("scam-explanation"), result.explanation);
-  fillList("scam-flags", result.red_flags);
-  document.getElementById("scam-flags-block").hidden = result.red_flags.length === 0;
+  var lookup = document.getElementById("scam-lookup");
+  lookup.textContent = "";
+  if (result.lookup) {
+    lookup.appendChild(element("span", "verdict-lookup-words", result.lookup.words));
+    if (result.lookup.sites.length) {
+      lookup.appendChild(element("span", "verdict-lookup-from", "From the web: " + result.lookup.sites.join(", ")));
+    }
+  }
+  lookup.hidden = !result.lookup;
+  // The web's words are on their own line above, so not again in the list.
+  var flags = result.red_flags.filter(function (flag) { return !result.lookup || flag !== result.lookup.words; });
+  fillList("scam-flags", flags);
+  document.getElementById("scam-flags-block").hidden = flags.length === 0;
   fillList("scam-todo", result.what_to_do);
   fillList("scam-paid-list", result.if_you_paid);
   document.getElementById("scam-paid").hidden = result.if_you_paid.length === 0;
@@ -1113,7 +1187,7 @@ function showVerdict(result, photo) {
   document.getElementById("scam-compose").hidden = true;
   document.getElementById("scam-result").hidden = false;
   verdict.focus();
-  scamSpoken = result.title + ". " + result.explanation;
+  scamSpoken = result.title + ". " + result.explanation + (result.lookup ? " " + result.lookup.words : "");
   speak(scamSpoken);
 }
 
@@ -1410,7 +1484,7 @@ function showMemoryPage() {
       }
       var send = document.getElementById("memory-send");
       send.href = page.mailto;
-      setText(send, "Send to " + (profile.family_name || "family"));
+      setText(send, "Email to " + (profile.family_name || "family"));
       document.getElementById("memory-read").hidden = !voiceSettings.on; // it would stay silent
       pollMemories([page], "memory", showMemoryPage);
     })
@@ -1475,7 +1549,7 @@ function showFamilyUpdate() {
   var name = profile.family_name || "family";
   box.setAttribute("aria-busy", "true");
   setText(document.getElementById("update-title"), (back ? "Yesterday’s" : "Today’s") + " update for " + name);
-  setText(send, "Send to " + name);
+  setText(send, "Email to " + name);
   api("/api/family/summary?date=" + updateDay(back))
     .then(function (update) {
       familyUpdate = update;
@@ -1505,6 +1579,365 @@ function copyUpdate() {
     })
     .catch(function () {
       toast("I couldn’t copy it. Please select the words and copy them yourself.", true);
+    });
+}
+
+// ---------- Message Maria (app/routes/messages.py) ----------
+
+var messagePending = false; // a message on its way: one tap sends it once
+
+function familyName() {
+  return profile.family_name || "family";
+}
+
+// The composer's names, and words handed over from a talk: the "Send this
+// to Maria" button under Buddy's words opens #/family/message/<her words>.
+function showMessageComposer() {
+  var form = document.getElementById("message-form");
+  setText(document.getElementById("message-send"), "Send to " + familyName());
+  setText(document.getElementById("postcard-send"), "Send postcard to " + familyName());
+  var parts = location.hash.replace(/^#\/?/, "").split("/");
+  if (parts[1] === "message") {
+    var words = "";
+    try { words = decodeURIComponent(parts.slice(2).join("/")); } catch (e) {}
+    history.replaceState(null, "", "#/family"); // Back or a reload doesn't fill it in again
+    if (words) {
+      form.elements.text.value = words;
+      readMessageBack(words);
+      form.elements.text.focus();
+    }
+  }
+}
+
+// Buddy reads her message back, so she hears exactly what will be sent.
+function readMessageBack(words) {
+  speak("Here’s your message for " + familyName() + ": " + words + ". Tap Send to send it, or say it again.");
+}
+
+var messageVoice = null; // the recording Say it kept, to send along with her words
+
+// "Say it" (sayit.js): her words, after the safety net, go into the box,
+// and her recording waits to go with them. (Registered in startScreens:
+// sayit.js loads after this file.)
+function fillMessageFromWords(form, words) {
+  form.elements.text.value = words;
+  messageVoice = lastSaidWav;
+  showMessageVoiceNote();
+  readMessageBack(words);
+}
+
+function showMessageVoiceNote() {
+  var note = document.getElementById("message-voice-note");
+  note.hidden = !messageVoice;
+  setText(document.getElementById("message-voice-words"), familyName() + " will hear your voice too.");
+}
+
+function dropMessageVoice() {
+  messageVoice = null;
+  showMessageVoiceNote();
+  document.getElementById("message-text").focus();
+}
+
+// "Send to Maria": the safety net first (a message that needs a safety
+// screen shows it and is never sent), then it is on the family page.
+function sendMessage(event) {
+  event.preventDefault();
+  var form = event.target;
+  var status = document.getElementById("message-status");
+  var text = form.elements.text.value.trim();
+  if (!text) {
+    status.textContent = "Say or type your message first.";
+    form.elements.text.focus();
+    return;
+  }
+  if (messagePending) {
+    return;
+  }
+  messagePending = true;
+  stopSpeaking();
+  status.textContent = "Sending…";
+  var sending;
+  if (messageVoice) {
+    // Her words (read over in the box) and her voice, together.
+    var parts = new FormData();
+    parts.append("text", text);
+    parts.append("audio", messageVoice, "voice.wav");
+    sending = fetch("/api/messages/voice", { method: "POST", body: parts }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (answer) {
+        if (!response.ok) {
+          var refused = new Error("Refused");
+          refused.detail = answer.detail;
+          throw refused;
+        }
+        return answer;
+      });
+    });
+  } else {
+    sending = api("/api/messages", "POST", { text: text });
+  }
+  sending
+    .then(function (answer) {
+      if (answer.show) {
+        status.textContent = "";
+        openSafetyScreen(answer.show, answer.reply, answer.actions); // talk.js: never sent
+        return;
+      }
+      form.elements.text.value = "";
+      messageVoice = null;
+      showMessageVoiceNote();
+      form.elements.text.focus(); // ready for another, and the status line is read out
+      status.textContent = "Sent to " + familyName() + " at " + answer.message.time + ".";
+      toast("Sent to " + familyName());
+      speak("Sent. " + familyName() + " will see it on the family page.");
+      showSentMessages();
+    })
+    .catch(function (problem) {
+      status.textContent = typeof problem.detail === "string" ? problem.detail
+        : "I couldn’t send that just now. Please try again in a moment.";
+    })
+    .then(function () {
+      messagePending = false;
+    });
+}
+
+var shownSent = ""; // the thread on screen, redrawn only on a change
+var seenNow = {}; // family messages first seen on this page: still marked New, so the mark doesn't vanish on the next look
+
+// Today's messages both ways, newest first, plus any of the family's she
+// hasn't seen. A new one from the family is marked New and read to her as
+// their words ("Maria wrote: …"), then counts as seen.
+function showSentMessages() {
+  var list = document.getElementById("sent-list");
+  var note = document.getElementById("sent-note");
+  api("/api/messages")
+    .then(function (answer) {
+      setText(note, answer.messages.length ? "Messages today:" : "No messages yet today.");
+      var drawn = JSON.stringify(answer.messages);
+      if (drawn === shownSent) {
+        return;
+      }
+      shownSent = drawn;
+      list.textContent = "";
+      answer.messages.slice().reverse().forEach(function (message) {
+        var family = message.from === "family";
+        var item = element("li", "sent-message" + (family ? " sent-message--family" : ""));
+        var when = element("p", "sent-when");
+        when.appendChild(element("span", "sent-from", (family ? message.name : "You") + ", " + message.time));
+        if (message.unread || seenNow[message.id]) {
+          when.appendChild(element("span", "sent-new", "New"));
+        }
+        item.appendChild(when);
+        if (message.voice && family) {
+          item.appendChild(hearButton(message));
+        } else if (message.voice) {
+          item.appendChild(element("p", "sent-words--quiet sent-with-voice", "With your voice"));
+        }
+        if (message.text) {
+          item.appendChild(element("p", "sent-words", "“" + message.text + "”"));
+        } else if (message.voice) {
+          item.appendChild(element("p", "sent-words sent-words--quiet", "A voice message"));
+        }
+        list.appendChild(item);
+      });
+      var waiting = answer.messages.filter(function (message) { return message.unread; });
+      if (waiting.length) {
+        tellAboutMessages(waiting);
+        waiting.forEach(function (message) {
+          seenNow[message.id] = true;
+          api("/api/messages/" + message.id + "/read", "POST", {}).catch(function () {});
+        });
+      }
+    })
+    .catch(function () {
+      setText(note, "");
+    });
+}
+
+// "Hear Maria": plays a family member's own voice. Buddy's own voice stops
+// first, so the two never talk over each other.
+var playingVoice = null;
+
+function hearButton(message) {
+  var button = element("button", "pill-button pill-button--quiet pill-button--small sent-voice", "Hear " + message.name);
+  button.type = "button";
+  button.setAttribute("aria-label", "Hear " + message.name + "’s voice message");
+  button.addEventListener("click", function () { playVoice(message, button); });
+  return button;
+}
+
+function playVoice(message, button) {
+  stopSpeaking();
+  if (playingVoice) {
+    playingVoice.pause();
+  }
+  var sound = new Audio(message.voice);
+  playingVoice = sound;
+  if (button) {
+    button.textContent = "Playing…";
+  }
+  var done = function () {
+    if (button) {
+      button.textContent = "Hear " + message.name + " again";
+    }
+  };
+  sound.addEventListener("ended", done);
+  sound.addEventListener("error", function () {
+    if (button) {
+      button.textContent = "Hear " + message.name;
+    }
+    toast("I couldn’t play that just now. Please try again.", true);
+  });
+  sound.play().catch(function () {
+    done(); // the browser wants a tap first: the button is right there
+  });
+}
+
+// New messages from the family: Buddy says who wrote (and reads the words),
+// and plays a voice message after that, in their own voice.
+function tellAboutMessages(waiting) {
+  var voices = waiting.filter(function (message) { return message.voice; });
+  var lines = waiting.map(function (message) {
+    return message.voice ? message.name + " sent you a voice message." : message.name + " wrote: " + message.text;
+  });
+  var playFirst = function () {
+    if (voices.length) {
+      playVoice(voices[0], document.querySelector(".sent-voice"));
+    }
+  };
+  if (voiceSettings.on && buddyMaySpeak()) {
+    speak(lines.join(" "), { onEnd: playFirst });
+  } else {
+    playFirst();
+  }
+}
+
+// Home's first row when a family member wrote and she hasn't seen it yet.
+function showTodayMessage() {
+  var row = document.getElementById("today-message");
+  api("/api/messages")
+    .then(function (answer) {
+      row.hidden = !answer.unread;
+      if (answer.unread) {
+        var who = answer.latest_unread.name || "your family";
+        var voice = Boolean(answer.latest_unread.voice);
+        setText(document.getElementById("today-message-title"),
+          answer.unread === 1 ? "A " + (voice ? "voice " : "") + "message from " + who : answer.unread + " messages from " + who);
+        setText(document.getElementById("today-message-text"),
+          answer.latest_unread.text ? "“" + answer.latest_unread.text + "”" : "Tap Family to hear it");
+      }
+    })
+    .catch(function () {
+      // No connection to our own server: keep what is shown.
+    });
+}
+
+// ---------- Today's postcard (app/postcards.py) ----------
+
+var postcardRequests = 0; // so an older answer never replaces a newer one
+var shownPostcard = ""; // the postcard on screen, so a fresh look redraws only on a change
+
+// Ask for today's postcard. The first time each day Buddy makes it then and
+// there (Muse Spark picks, Muse Image paints), so the wash shimmers
+// meanwhile. A postcard already on screen stays while Buddy looks again
+// (the screen's loader runs more than once), so nothing flickers.
+function showPostcard() {
+  var mine = ++postcardRequests;
+  var card = document.getElementById("postcard");
+  var picture = document.getElementById("postcard-picture");
+  var note = document.getElementById("postcard-note");
+  var send = document.getElementById("postcard-send");
+  var again = document.getElementById("postcard-again");
+  if (!shownPostcard) {
+    card.hidden = false;
+    picture.setAttribute("data-status", "painting");
+    picture.textContent = "";
+    picture.appendChild(element("p", "memory-picture-words", "Painting today’s postcard…"));
+    setText(document.getElementById("postcard-sentence"), "");
+    setText(document.getElementById("postcard-meta"), "");
+    note.textContent = "";
+    send.hidden = true;
+  }
+  again.hidden = true;
+  again.disabled = true; // one request at a time
+  api("/api/postcard/today")
+    .then(function (answer) {
+      if (mine !== postcardRequests) {
+        return;
+      }
+      again.disabled = false;
+      if (answer.postcard) {
+        // Drawn again when the postcard changes, or once her family member's
+        // name is known (the profile can arrive after the first look).
+        if (JSON.stringify(answer.postcard) + "|" + familyName() !== shownPostcard) {
+          drawPostcard(answer.postcard);
+        }
+        return;
+      }
+      shownPostcard = "";
+      card.hidden = true;
+      note.textContent = answer.why;
+      again.hidden = answer.status !== "failed";
+      if (answer.status === "painting") {
+        setTimeout(function () { // someone else asked first: look again soon
+          if (currentScreen() === "family" && mine === postcardRequests) {
+            showPostcard();
+          }
+        }, 5000);
+      }
+    })
+    .catch(function () {
+      if (mine !== postcardRequests) {
+        return;
+      }
+      again.disabled = false;
+      shownPostcard = "";
+      card.hidden = true;
+      note.textContent = "I couldn’t get today’s postcard just now. Please try again in a moment.";
+      again.hidden = false;
+    });
+}
+
+function drawPostcard(postcard) {
+  shownPostcard = JSON.stringify(postcard) + "|" + familyName();
+  var picture = document.getElementById("postcard-picture");
+  picture.setAttribute("data-status", "ready");
+  picture.textContent = "";
+  var image = element("img", "memory-img");
+  image.alt = "Painting: " + postcard.scene;
+  image.width = 1536;
+  image.height = 1024;
+  image.addEventListener("load", function () { image.classList.add("shown"); });
+  image.addEventListener("error", function () { image.remove(); });
+  image.src = postcard.picture;
+  picture.appendChild(image);
+  document.getElementById("postcard").hidden = false;
+  setText(document.getElementById("postcard-sentence"), "“" + postcard.sentence + "”");
+  setText(document.getElementById("postcard-meta"), postcard.shared
+    ? "Sent to " + familyName() + " at " + postcard.shared_time + "."
+    : "Something you said today, in your own words.");
+  document.getElementById("postcard-send").hidden = postcard.shared;
+  document.getElementById("postcard-again").hidden = true;
+}
+
+// "Send to Maria": the family page shows it from now on.
+function sendPostcard() {
+  var button = document.getElementById("postcard-send");
+  var note = document.getElementById("postcard-note");
+  button.disabled = true;
+  api("/api/postcard/today/send", "POST", {})
+    .then(function (answer) {
+      drawPostcard(answer.postcard);
+      note.textContent = "";
+      document.getElementById("postcard-sentence").focus(); // the Send button she tapped is gone
+      toast("Postcard sent to " + familyName());
+      speak("Your postcard is on " + familyName() + "’s family page now.");
+    })
+    .catch(function (problem) {
+      note.textContent = typeof problem.detail === "string" ? problem.detail
+        : "I couldn’t send it just now. Please try again in a moment.";
+    })
+    .then(function () {
+      button.disabled = false;
     });
 }
 
@@ -1851,6 +2284,10 @@ function startScreens() {
   });
   document.addEventListener("keydown", readWaitingReminder, true);
   document.getElementById("pill-form").addEventListener("submit", savePill);
+  document.getElementById("pill-photo").addEventListener("click", function () {
+    document.getElementById("pill-photo-input").click();
+  });
+  document.getElementById("pill-photo-input").addEventListener("change", readPillPhoto);
   document.getElementById("pill-add-time").addEventListener("click", function () {
     var input = addTimeInput("");
     if (input) {
@@ -1882,6 +2319,12 @@ function startScreens() {
     choice.addEventListener("change", showFamilyUpdate);
   });
   document.getElementById("update-copy").addEventListener("click", copyUpdate);
+  // Message Maria, and today's postcard.
+  SAY_IT_FILL["message-form"] = fillMessageFromWords;
+  document.getElementById("message-form").addEventListener("submit", sendMessage);
+  document.getElementById("message-voice-off").addEventListener("click", dropMessageVoice);
+  document.getElementById("postcard-send").addEventListener("click", sendPostcard);
+  document.getElementById("postcard-again").addEventListener("click", showPostcard);
 
   // Doctor notes.
   document.querySelectorAll('input[name="notes-days"]').forEach(function (choice) {

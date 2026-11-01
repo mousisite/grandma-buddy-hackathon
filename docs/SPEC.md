@@ -62,10 +62,10 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - At each time, a calm card pops up at the top of whatever screen is open (never red) and Buddy reads it aloud with her name: "Rose, it's time for your evening Metformin. The label says: ...". The card shows Buddy's small orb, each label exactly as typed, and two big buttons: "I took it" and "Remind me in 10 minutes". A reminder that comes before her first tap on the page (browsers stay silent until then) is read right after that tap.
 - For the demo video, `?demo=reminder` in the address (for example `http://localhost:8000/?demo=reminder`) pops up the card for her next pill 2 seconds after the first tap, as if it were due now. It saves nothing: her real reminders don't change, so it can be shown again and again.
 - She can also say "I took my pills" to the companion.
-- Missed doses (no answer after 2 hours) are logged and appear in the family update.
+- Missed doses (no answer after 2 hours) are logged and appear in the family update. A daily pill repeats every day: on the days after it was set up, every time of the day is there, and a dose she never marked shows as "Not taken" on her Pills screen, even if Buddy wasn't open at the time (a pill added today only gets the times from then on).
 - The app only repeats what the label says. It never suggests doses or changes.
-- Optional (P2): take a photo of the pill bottle and Muse Spark reads the label to pre-fill the form. A family member must confirm every field before saving.
-- Done when: a reminder fires on time while the app is open, and taken and missed doses are logged correctly.
+- **A photo of the bottle** (in Set up pills, "Take a photo of the bottle"): Muse Spark reads the name and the label as printed into the form; a box under each says "I checked this against the bottle", and Save waits until both are ticked. The times are always typed by the family. A photo Buddy can't read, or Buddy being down, says so kindly and leaves the form to be typed.
+- Done when: a reminder fires on time while the app is open, taken and missed doses are logged correctly, and the bottle photo fills the form (tested with Meta faked: trimmed to the form's limits, nothing stored, bad photos refused kindly) with the browser check proving Save waits for both boxes.
 
 ### 5. Daily check-in (P1)
 
@@ -91,7 +91,8 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - She reads a strange text or email out loud, pastes it, or takes a photo of it (Muse Spark can read images).
 - Result: **Likely scam**, **Suspicious**, or **Looks safe**, with the red flags in plain words and what to do.
 - Always: never share passwords, bank numbers, or Social Security numbers; hang up and call the real number yourself; call family before sending money.
-- Done when: the scam test messages in `docs/SAFETY.md` get the right verdicts.
+- A phone number or web address in the message is looked up on the web while the AI reads it: "The phone number in it has been reported as a scam online." (and the verdict becomes Likely scam) or "Nothing was found online about the website in it. That doesn't make it safe.", with the sites named. The number or address itself is never read back to her; a photo is never looked up.
+- Done when: the scam test messages in `docs/SAFETY.md` get the right verdicts, and the lookup can only make a verdict stronger, never repeats the number, counts toward the day's searches, and is skipped for photos and when the web is down (all tested with Meta faked).
 
 ### 8. Doctor visit notes (P1)
 
@@ -107,7 +108,7 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 
 - A daily summary: mood, pills taken or missed, new diary entries, and any safety-net events.
 - The pills line counts the same reminders as the Pills screen, those still to come included: "Pills: 2 of 3 taken. Still to come: Metformin at 6:00 PM." Each pill not taken is named with its time: missed, due now, or still to come.
-- "Send to {family}" opens her email app with the summary already written (a `mailto:` link), so no email passwords are stored. A "Copy" button is there too.
+- "Email to {family}" opens her email app with the summary already written (a `mailto:` link), so no email passwords are stored. A "Copy" button is there too.
 - Done when: the summary for a demo day is accurate and the email opens pre-filled.
 
 ### 10. Memory book (P1)
@@ -205,6 +206,15 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 - "Her data" in Settings, for a family member: **Export everything** (one zip: a whole copy of the database, her memory book pictures and photos, and a README; never `.env`, never backups) and **Delete everything** (a sheet that asks for the word DELETE, typed; then every table emptied, ids from 1 again, the file shrunk, pictures, photos, and old backups gone, this device's remembered choices cleared, and Buddy opens on the welcome).
 - Done when: export and delete are tested (the zip's contents, the exact word, the empty tables and the shrunk file, another website refused), the manifest's icons exist and the service worker never caches `/api`, and the browser check covers the worker on duty with the shell kept, the offline note, a real download, and the delete sheet ending on the welcome.
 
+### 22. Message Maria and the daily postcard (P1)
+
+- On the Family screen (and from Home's "Message Maria" chip, by her family member's name): she says a message (or types it), Buddy reads it back, and she taps **Send to Maria**. The safety net runs on it first; a message that needs a safety screen shows it and is never sent. It lands on the family page under "Messages from Rose" (with a notification for a family member who asked for them), and "Sent today" shows it under the box. Nothing is emailed or texted: the family page is where it goes, and Buddy never sends anything by itself.
+- In a talk, "Tell Maria the tulips came up" makes Buddy show **Send this to Maria** with her words; it opens the Family screen with them in the box, to read over and send. The words are always hers (`tools.her_own_words`), never the AI's.
+- **Maria writes back** from the family page ("Write to Rose"). Her Family screen shows the thread both ways, newest first; a new one from the family is marked New, Buddy reads it to her as their words ("Maria wrote: …"), and it then counts as seen. Home's Today list starts with "A message from Maria" while one waits, and Buddy's greeting says a message is waiting (without reading it). Unseen messages from the last 7 days stay on her screen until she has seen them.
+- **A voice message.** On the family page, "Record a voice message": tap, speak, tap "I'm done". The recording (a small WAV, kept on this computer) reaches her Family screen as **Hear Maria**; Buddy says "Maria sent you a voice message." and plays it, in Maria's own voice. Muse Voice Transcribe writes down what it heard so the words show under it too (the voice still arrives when it can't). Home says "A voice message from Maria" while one waits. Her voice goes the other way too: after "Say it", her recording travels with the words she read over ("Maria will hear your voice too", or "Just the words"), and Maria's page plays it.
+- **Today's postcard**: once a day, one cheerful thing she said to Buddy that day, word for word, with a picture painted for it in the Memory book's style. Plain code drops every line about health first; Muse Spark only picks the line and describes a scene; plain code checks both; Muse Image paints, once a day. It is made the first time the Family screen is opened that day (the wash shimmers meanwhile). "Nothing nice to paint yet today" until she has talked; **Try again** when painting didn't work. **Send to Maria** puts it on the family page as "Her postcard"; before that the family doesn't see it.
+- Done when: the message route runs the safety net first and never sends a flagged message, the tool offers only her words, a family member's reply or voice message needs a sign-in and reaches her as theirs (new until seen, named in the greeting and on Home; the recording kept, served, exported, and deleted with her data), the postcard is one painting a day from a checked line and scene (health lines never reach the picker, a bad pick or scene makes no postcard, a failed painting keeps nothing), the family page shows messages and only a sent postcard, `scripts/seed_demo.py` adds messages, yesterday's postcard, and a morning talk for today's, and the browser check covers the chip, Say it, Send, an emergency message, Try again, the postcard, Send to Maria, the talk button, and Maria's page with a notification.
+
 ## Not building (out of scope)
 
 - Any medical advice: saying how serious a symptom is, what causes it, or what to do about it
@@ -218,10 +228,11 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 
 ## Demo story (3 minutes maximum)
 
-1. Morning check-in by voice. She mentions her knee hurts. The companion asks two follow-ups and writes it in her diary.
-2. Pill reminder pops up and is read aloud. She taps "I took it".
-3. She asks "Should I take something for it?" The companion doesn't give advice. It offers to call her doctor and adds the question to her doctor notes.
+1. Morning check-in, hands-free: Buddy asks, she just talks, her words appear as she says them. She mentions her knee hurts; two follow-ups, and it's in her diary.
+2. The pill reminder pops up and is read aloud with the label word for word. She taps "I took it".
+3. She asks "Should I take something for it?" No advice: Buddy offers to call her doctor and adds the question to her doctor notes.
 4. The safety net: "my chest feels tight" goes straight to the Call 911 screen, with no AI involved.
-5. She reads a fake "your grandson is in jail, send gift cards" text. Verdict: likely scam.
-6. Print the doctor notes. Show the family update.
-7. Close on why: built for my grandma, and built during the hackathon.
+5. "Read it to me": a photo of a bill, Buddy says what it is and the amount due. Then a "your grandson is in jail, send gift cards" text: likely scam, and the web lookup says the number in it is reported.
+6. "Find my things": a photo of the room, a glowing halo around her glasses, "on the side table, next to the lamp".
+7. "Tell Maria the tulips came up": the Send this to Maria button, her words read back, sent to Maria's family page. Today's postcard, painted from what she said, sent too; Maria's page shows her day, the message, and the postcard.
+8. Close on why: built for my grandma, during the hackathon, with Muse Spark, Voice Transcribe, Muse Image, SAM, and Meta's web search each doing the job it's best at.

@@ -9,6 +9,8 @@
 import json
 import os
 import re
+import shutil
+import sqlite3
 import struct
 from datetime import datetime, timedelta
 import subprocess
@@ -572,6 +574,38 @@ def check_pills(page, problems: list[str]) -> None:
     page.screenshot(path=str(OUT / "pills-desktop.png"), full_page=True)
     check_layout(page, "Pills screen, desktop")
 
+    # A pill from a photo of its bottle (Buddy's reading faked: no key): the
+    # name and the label are filled in, and Save waits until each is checked
+    # against the bottle. The times are typed as always.
+    page.route("**/api/meds/label", lambda route: route.fulfill(json={
+        "name": "Metformin", "label": "500 mg tablet, take 1 by mouth twice daily with meals",
+        "note": "From the photo. Please check both against the bottle before saving."}))
+    picture = OUT / "pill-photo-sample.png"
+    page.screenshot(path=str(picture), clip={"x": 0, "y": 0, "width": 300, "height": 200})
+    page.set_input_files("#pill-photo-input", str(picture))
+    page.wait_for_function("document.getElementById('pill-name').value === 'Metformin'")
+    assert page.input_value("#pill-label") == "500 mg tablet, take 1 by mouth twice daily with meals"
+    assert page.is_visible("#pill-name-check") and page.is_visible("#pill-label-check")
+    assert page.text_content("#pill-photo-status") == "From the photo. Please check both against the bottle before saving."
+    page.fill("#pill-form .time-input", "20:00")
+    page.click("#pill-save")
+    page.wait_for_selector("#pill-status:has-text('tick both boxes')")
+    assert page.evaluate("document.activeElement.name") == "name_checked", "the cursor goes to the first box to tick"
+    assert page.locator("#pills-list .pill-label:has-text('twice daily with meals')").count() == 0, "not saved until checked"
+    page.check("#pill-name-check input")
+    page.check("#pill-label-check input")
+    page.wait_for_timeout(300)
+    page.screenshot(path=str(OUT / "pills-photo-desktop.png"), clip={"x": 0, "y": 0, "width": 1280, "height": 900})
+    page.click("#pill-save")
+    page.wait_for_selector("#pills-list .pill-label:has-text('500 mg tablet, take 1 by mouth twice daily with meals')")
+    assert page.is_hidden("#pill-name-check"), "a fresh form has no boxes to tick"
+    page.unroute("**/api/meds/label")
+    # The real route with no key: a kind line, and nothing filled in.
+    page.set_input_files("#pill-photo-input", str(picture))
+    page.wait_for_selector("#pill-photo-status:has-text('just now')")
+    assert page.input_value("#pill-name") == ""
+    problems.remove("Failed to load resource: the server responded with a status of 503 (Service Unavailable)")
+
 
 def check_home_hero(browser) -> None:
     """Home opens on the greeting, the date, and the whole orb (above the
@@ -657,6 +691,22 @@ def check_check_in(browser) -> None:
 GRANDSON_SCAM = "Grandma it's me, I'm in jail, send $2,000 in gift cards and don't tell mom"
 
 
+# A checked message whose phone number the web knows (what /api/scam-check
+# answers, faked: the test server has no key and never searches).
+LOOKUP_RESULT = {
+    "verdict": "likely_scam", "title": "Likely scam",
+    "red_flags": ["The phone number in it has been reported as a scam online.", "Asks for private information"],
+    "explanation": "This message has the warning signs of a scam.",
+    "what_to_do": ["Don't click links, reply, or call numbers in the message.",
+                   "Hang up. Call the real number yourself (from the back of your card or a bill), or call Maria first.",
+                   "Never share passwords, codes, bank numbers, or your Social Security number."],
+    "if_you_paid": ["Call your bank or card company right away."],
+    "actions": [{"type": "call", "label": "Call Maria", "href": "tel:555-0100"}],
+    "lookup": {"reported": True, "words": "The phone number in it has been reported as a scam online.",
+               "sites": ["bbb.org", "scamadviser.com"]},
+}
+
+
 def check_scam(browser) -> None:
     """Check a message, with the real /api/scam-check. The test server has no
     API key, so the AI is "down" and the plain rules answer (as they would
@@ -715,6 +765,21 @@ def check_scam(browser) -> None:
             assert page.is_visible("#scam-checked-photo")
             page.wait_for_timeout(500)  # the card has finished rising in
             page.screenshot(path=str(OUT / "scam-photo-390.png"), full_page=True)
+
+            # What the web said about a number in it (a faked answer: the test
+            # server has no key): the fixed words and the sites, read with the verdict.
+            page.click("#scam-another")
+            page.route("**/api/scam-check", lambda route: route.fulfill(json=LOOKUP_RESULT))
+            page.fill("#scam-text", "Hi, this is Dana from the bank. Please call (555) 010-0199 to confirm your details.")
+            page.click("#scam-check")
+            page.wait_for_selector("#scam-result:not([hidden])")
+            assert page.text_content("#scam-lookup") == ("The phone number in it has been reported as a scam online."
+                                                          "From the web: bbb.org, scamadviser.com")
+            assert "010-0199" not in (page.text_content("#scam-result") or ""), "the number is never repeated"
+            page.wait_for_timeout(500)
+            check_layout(page, "scam verdict with a web lookup at 390px")
+            page.screenshot(path=str(OUT / "scam-lookup-390.png"), full_page=True)
+            page.unroute("**/api/scam-check")
         page.close()
 
 
@@ -1212,6 +1277,240 @@ def check_family_accounts(browser) -> None:
     rose.close()
 
 
+def seed_todays_postcard(database: str) -> int:
+    """A finished postcard for today in the test server's database (the
+    test server has no key, so Buddy can't paint one): her words and the
+    tulips Muse Image painted in the real check as its picture. Returns its id."""
+    connection = sqlite3.connect(database)
+    try:
+        day = datetime.now().date().isoformat()
+        connection.execute("DELETE FROM postcards WHERE day = ?", (day,))
+        made = connection.execute(
+            "INSERT INTO postcards (day, created_at, updated_at, sentence, scene, status, said_until) "
+            "VALUES (?, ?, ?, ?, ?, 'ready', ?)",
+            (day, f"{day}T10:30:00", f"{day}T10:31:00", "The tulips came up this morning, the red ones by the gate",
+             "Red tulips by a garden gate in morning light.", f"{day}T10:21:00"),
+        ).lastrowid
+        pictures = Path(database).parent / "memories"
+        pictures.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / "scripts" / "memory_photos" / "tulips.webp", pictures / f"postcard-{made}.webp")
+        connection.execute("UPDATE postcards SET picture = ? WHERE id = ?", (f"postcard-{made}.webp", made))
+        connection.commit()
+        return made
+    finally:
+        connection.close()
+
+
+def check_messages(browser, database: str) -> None:
+    """Message Maria and the postcard, on the demo week. Rose's side: Home's
+    "Message Maria" chip, the Family screen's composer (Say it with the fake
+    microphone, Buddy's words kept, Send), what she sent today, a message
+    that needs the emergency screen is never sent, the postcard Buddy
+    couldn't paint (no key: "Try again"), today's postcard once it is there,
+    Send to Maria, and the "Send this to Maria" button under Buddy's words.
+    Maria's side: the message and the postcard on the family page, and a
+    notification for a new message."""
+    # An earlier check may have opened her Family screen, which counts the
+    # demo week's message from Maria as seen: make it new again.
+    connection = sqlite3.connect(database)
+    connection.execute("UPDATE family_messages SET read_at = '' WHERE sender = 'family' AND created_at >= ?",
+                       (datetime.now().date().isoformat(),))
+    connection.commit()
+    connection.close()
+
+    rose = browser.new_page(viewport={"width": 390, "height": 844}, permissions=["microphone"])
+    problems: list[str] = []
+    rose.on("pageerror", lambda err: problems.append(str(err)))
+    rose.goto(f"http://localhost:{PORT}/#/", wait_until="networkidle")
+    wait_for_screen(rose, "today")
+    rose.wait_for_function("document.getElementById('chip-message-label').textContent === 'Message Maria'")
+    # The demo week: Maria wrote this morning and she hasn't seen it: Home says so first.
+    rose.wait_for_selector("#today-message:not([hidden])")
+    assert rose.text_content("#today-message-title") == "A message from Maria"
+    assert "bring Leo on Sunday" in (rose.text_content("#today-message-text") or "")
+    rose.click("#chip-message")
+    wait_for_screen(rose, "family")
+    rose.wait_for_function("document.getElementById('message-send').textContent === 'Send to Maria'")
+    # The thread, newest first: Maria's marked New (and read to her), hers as "You".
+    rose.wait_for_selector("#sent-list .sent-message--family .sent-new")
+    thread = rose.text_content("#sent-list") or ""
+    assert "Maria, 10:40 AM" in thread and "bring Leo on Sunday" in thread and "You, 10:25 AM" in thread, thread
+    assert "The red tulips are up, come and see them on Sunday" in thread
+    # Seen now: nothing waits on Home any more.
+    rose.wait_for_function("fetch('/api/messages').then(r => r.json()).then(a => a.unread === 0)")
+    # The demo week's postcard for today is there, ready to send (the test
+    # server has no key to paint with, so the week brings its own).
+    rose.wait_for_selector("#postcard:not([hidden]) .memory-img.shown")
+    assert rose.is_visible("#postcard-send") and rose.is_hidden("#postcard-again")
+
+    # "Say it": the fake microphone, the faked speech-to-text, her words in the box.
+    rose.route("**/api/transcribe", lambda route: route.fulfill(json={"transcript": "Leo rode his bike all the way to the corner today, I clapped"}))
+    rose.click("#message-form [data-say-it]")
+    rose.wait_for_selector("#message-form [data-say-it][data-state='listening']")
+    rose.wait_for_timeout(600)
+    rose.click("#message-form [data-say-it]")
+    rose.wait_for_function("document.getElementById('message-text').value === 'Leo rode his bike all the way to the corner today, I clapped'")
+    # Her recording goes along with the words, unless she asks for just the words.
+    rose.wait_for_selector("#message-voice-note:not([hidden])")
+    assert rose.text_content("#message-voice-words") == "Maria will hear your voice too."
+    rose.click("#message-send")
+    rose.wait_for_selector(".toast:has-text('Sent to Maria')")
+    rose.wait_for_function("document.getElementById('message-status').textContent.startsWith('Sent to Maria at ')")
+    assert rose.input_value("#message-text") == "", "the box is empty again after sending"
+    rose.wait_for_function("document.querySelector('#sent-list .sent-words').textContent.includes('Leo rode his bike')")
+    assert rose.locator("#sent-list .sent-message").count() == 3
+    assert rose.is_hidden("#message-voice-note") and rose.locator("#sent-list .sent-with-voice").count() == 1
+
+    # A message that needs a safety screen shows it, and is never sent.
+    rose.fill("#message-text", "my chest feels tight today")
+    rose.click("#message-send")
+    rose.wait_for_selector("#safety-screen[open][data-kind='emergency']")
+    assert rose.get_attribute("#safety-actions a", "href") == "tel:911"
+    rose.click("#safety-close")
+    assert rose.locator("#sent-list .sent-message").count() == 3, "never sent"
+    assert rose.input_value("#message-text") == "my chest feels tight today"  # hers to change or clear
+    rose.fill("#message-text", "")
+
+    # Today's postcard: the picture, her words, Send postcard to Maria.
+    rose.wait_for_selector("#postcard:not([hidden]) .memory-img.shown")
+    assert rose.text_content("#postcard-sentence") == "“The tulips came up this morning, the red ones by the gate”"
+    assert rose.text_content("#postcard-meta") == "Something you said today, in your own words."
+    rose.wait_for_selector("#postcard-send:not([hidden])")
+    rose.wait_for_selector(".toast", state="detached")  # "Sent to Maria" has faded
+    rose.wait_for_timeout(700)  # the painting has faded in
+    check_layout(rose, "Family screen with a postcard at 390px")
+    rose.screenshot(path=str(OUT / "family-postcard-390.png"), full_page=True)
+    rose.click("#postcard-send")
+    rose.wait_for_selector(".toast:has-text('Postcard sent to Maria')")
+    rose.wait_for_function("document.getElementById('postcard-meta').textContent.startsWith('Sent to Maria at ')")
+    assert rose.is_hidden("#postcard-send")
+
+    # "Send this to Maria" under Buddy's words (a faked reply): the Family
+    # screen opens with her words in the box, ready to read over and send.
+    rose.route("**/api/chat", lambda route: route.fulfill(json={
+        "reply": "What a lovely thing to tell her. Tap the button to send it.",
+        "show": None,
+        "actions": [{"type": "message", "label": "Send this to Maria", "text": "The tulips came up, come and see them Sunday"}],
+    }))
+    rose.route("**/api/transcribe", lambda route: route.fulfill(json={"transcript": "Tell Maria the tulips came up, come and see them Sunday"}))
+    # No greeting here: the day's one follow-up question belongs to check_friend.
+    rose.route("**/api/greeting", lambda route: route.fulfill(json={"greeting": ""}))
+    rose.goto(f"http://localhost:{PORT}/#/", wait_until="networkidle")
+    wait_for_screen(rose, "today")
+    rose.click("#start-talk")
+    rose.wait_for_selector("#talk-button[data-state='listening']")
+    rose.wait_for_timeout(600)
+    rose.click("#talk-button")
+    rose.wait_for_selector("#actions button:has-text('Send this to Maria')")
+    rose.click("#actions button:has-text('Send this to Maria')")
+    wait_for_screen(rose, "family")
+    rose.wait_for_function("document.getElementById('message-text').value === 'The tulips came up, come and see them Sunday'")
+    assert rose.evaluate("location.hash") == "#/family", "her words leave the address once they are in the box"
+    rose.unroute("**/api/chat")
+
+    # Desktop, dark: the whole Family screen.
+    wide = browser.new_page(viewport={"width": 1440, "height": 900}, color_scheme="dark")
+    wide.add_init_script("localStorage.setItem('theme', 'dark')")
+    visit(wide, "family")
+    wide.wait_for_selector("#postcard:not([hidden]) .memory-img.shown")
+    wide.wait_for_function("document.getElementById('update-text').textContent.startsWith('Hi Maria,')")
+    wide.wait_for_timeout(700)  # the painting has faded in
+    check_layout(wide, "Family screen at 1440px, dark")
+    wide.screenshot(path=str(OUT / "family-postcard-1440-dark.png"), full_page=True)
+    wide.close()
+
+    # Maria's family page: the message she sent and today's postcard, and a
+    # notification when a new message arrives while the page is open.
+    maria = browser.new_page(viewport={"width": 390, "height": 844}, permissions=["microphone"])
+    maria.add_init_script(NOTIFICATION_STUB)
+    maria.goto(f"http://localhost:{PORT}/family", wait_until="networkidle")
+    maria.wait_for_selector("#family-signin:not([hidden])")
+    maria.fill("#signin-email", "maria@example.com")
+    maria.fill("#signin-password", "rose-garden-2026")
+    maria.click("#signin-form button[type=submit]")
+    maria.wait_for_selector("#family-day:not([hidden])")
+    maria.wait_for_function("document.getElementById('messages-title').textContent === 'Messages with Rose'")
+    maria.wait_for_selector("#messages-list .entry")
+    shown = maria.text_content("#messages-list") or ""
+    assert "Rose, " in shown and "Leo rode his bike all the way to the corner today, I clapped" in shown, shown
+    assert maria.locator("#messages-list .entry-voice").count() == 1, "Rose's voice came with her words: Play"
+    assert "Maria, 10:40 AM" in shown and "bring Leo on Sunday" in shown, "the thread shows both ways"
+    assert "chest" not in shown, "a message that needed a safety screen never reaches the family"
+    # Maria writes back: on her thread at once, and new on Rose's Family screen.
+    assert maria.text_content("#reply-send") == "Send to Rose"
+    maria.fill("#reply-text", "Come for tea on Sunday, Mom")
+    maria.click("#reply-send")
+    maria.wait_for_function("document.getElementById('reply-status').textContent === 'Sent. Buddy will read it to Rose.'")
+    maria.wait_for_function("document.getElementById('messages-list').textContent.includes('Come for tea on Sunday, Mom')")
+    assert maria.input_value("#reply-text") == ""
+    rose.reload(wait_until="networkidle")
+    wait_for_screen(rose, "family")
+    rose.wait_for_selector("#sent-list .sent-message--family .sent-new")
+    assert "Come for tea on Sunday, Mom" in (rose.text_content("#sent-list .sent-message--family") or "")
+
+    # A voice message: Maria records with the (fake) microphone, tap and tap
+    # again. The recording is kept and plays back (the test server has no
+    # key, so no words come with it); on Rose's screen, "Hear Maria", new.
+    maria.click("#reply-voice")
+    maria.wait_for_function("document.getElementById('reply-voice-label').textContent === 'I’m done'")
+    maria.wait_for_timeout(700)
+    maria.click("#reply-voice")
+    maria.wait_for_function("document.getElementById('reply-status').textContent === 'Sent. Buddy will play it to Rose.'")
+    maria.wait_for_selector("#messages-list .entry-voice")
+    voice_type = maria.evaluate("fetch('/api/family/dashboard').then(r => r.json())"
+                                ".then(day => fetch(day.messages.filter(m => m.voice).pop().voice))"
+                                ".then(r => r.headers.get('content-type'))")
+    assert voice_type == "audio/wav", voice_type
+    rose.reload(wait_until="networkidle")
+    wait_for_screen(rose, "family")
+    rose.wait_for_selector("#sent-list .sent-message--family .sent-voice")
+    assert rose.text_content("#sent-list .sent-message--family .sent-voice") in ("Hear Maria", "Playing…", "Hear Maria again")
+    check_layout(rose, "Family screen with a voice message at 390px")
+    rose.screenshot(path=str(OUT / "family-voice-390.png"), full_page=True)
+    maria.wait_for_selector("#postcard-part:not([hidden])")
+    maria.wait_for_function("document.getElementById('postcard-img').naturalWidth > 0")
+    assert maria.text_content("#postcard-sentence") == "“The tulips came up this morning, the red ones by the gate”"
+    assert (maria.text_content("#postcard-time") or "").startswith("Sent at ")
+    maria.wait_for_timeout(700)  # the picture is decoded (it decodes in the background)
+    check_layout(maria, "the family page with a message and a postcard at 390px")
+    maria.screenshot(path=str(OUT / "family-page-postcard-390.png"), full_page=True)
+    maria.click("#notify-switch")
+    maria.wait_for_function("localStorage.getItem('buddy-family-notify') === 'on'")
+
+    def with_a_new_message(route):
+        body = route.fetch().json()
+        body["messages"].append({"time": "4:12 PM", "text": "Come for tea on Sunday", "from": "her", "name": ""})
+        route.fulfill(json=body)
+
+    maria.route("**/api/family/dashboard*", with_a_new_message)
+    maria.evaluate("loadDay()")
+    maria.wait_for_function("window.notified.some(n => n.title === 'Rose sent a message')")
+    note = maria.evaluate("window.notified.find(n => n.title === 'Rose sent a message')")
+    assert note["body"] == "Come for tea on Sunday", note
+    maria.unroute("**/api/family/dashboard*")
+    # Yesterday: the demo week's message and postcard.
+    maria.click("#family-day label:has-text('Yesterday')")
+    maria.wait_for_function("document.getElementById('messages-list').textContent.includes('Leo rode his bike all the way to the corner and back')")
+    maria.wait_for_function("document.getElementById('postcard-sentence').textContent.includes('smelled of toast')")
+    maria.close()
+
+    # Maria's page on a desktop, with the message and the postcard.
+    wide_maria = browser.new_page(viewport={"width": 1440, "height": 900})
+    wide_maria.goto(f"http://localhost:{PORT}/family", wait_until="networkidle")
+    wide_maria.wait_for_selector("#family-signin:not([hidden])")
+    wide_maria.fill("#signin-email", "maria@example.com")
+    wide_maria.fill("#signin-password", "rose-garden-2026")
+    wide_maria.click("#signin-form button[type=submit]")
+    wide_maria.wait_for_selector("#postcard-part:not([hidden])")
+    wide_maria.wait_for_function("document.getElementById('postcard-img').naturalWidth > 0")
+    wide_maria.wait_for_timeout(700)
+    check_layout(wide_maria, "the family page with a message and a postcard at 1440px")
+    wide_maria.screenshot(path=str(OUT / "family-page-postcard-1440.png"), full_page=True)
+    wide_maria.close()
+    rose.close()
+    assert not problems, problems
+
+
 def check_billing(browser) -> None:
     """The Family plan on the family page, in demo mode (the test server has
     no Stripe key): Maria signs in, sees the Free plan, taps Start, gets the
@@ -1266,6 +1565,12 @@ def check_installable(browser) -> None:
     page = browser.new_context(viewport={"width": 390, "height": 844}).new_page()  # the worker allowed here
     visit(page, "today")
     assert page.evaluate("document.querySelector('link[rel=manifest]').href.endsWith('/static/manifest.webmanifest')")
+    # The tab icon, by the name browsers ask for and as a link, on every page.
+    assert page.evaluate("fetch('/favicon.ico').then(r => r.ok && r.headers.get('content-type'))") == "image/x-icon"
+    for address in ("/", "/family", "/about", "/privacy", "/terms"):
+        icons = page.evaluate(f"fetch('{address}').then(r => r.text()).then(t => "
+                              "(t.match(/rel=\"icon\"/g) || []).length + (t.includes('apple-touch-icon') ? 10 : 0))")
+        assert icons >= 12, f"{address} should link the tab icon and the Apple icon, got {icons}"
     assert page.evaluate("navigator.serviceWorker.ready.then(r => !!r.active)"), "the service worker is on duty"
     page.wait_for_function("caches.keys().then(names => names.includes('buddy-shell-v1'))")
     kept = page.evaluate("caches.open('buddy-shell-v1').then(c => c.keys()).then(keys => keys.map(k => new URL(k.url).pathname))")
@@ -1279,6 +1584,49 @@ def check_installable(browser) -> None:
     page.context.set_offline(False)
     page.wait_for_selector("#offline-note[hidden]", state="attached")
     page.close()
+
+
+def check_demo_buttons(browser) -> None:
+    """Demo mode (the test server has no Stripe key) on the demo week: the
+    family page offers "Try the demo as Maria" and it opens her day; Settings,
+    Her data, offers "Reset the demo week", which asks first, then starts the
+    week over (a backup first) and comes back to Home with Rose's week."""
+    judge = browser.new_page(viewport={"width": 1440, "height": 900})
+    judge.goto(f"http://localhost:{PORT}/family", wait_until="networkidle")
+    judge.wait_for_selector("#family-demo:not([hidden])")
+    check_layout(judge, "the family page's sign-in with the demo button at 1440px")
+    judge.screenshot(path=str(OUT / "family-demo-1440.png"), full_page=True)
+    judge.click("#family-demo-signin")
+    judge.wait_for_selector("#family-day:not([hidden])")
+    judge.wait_for_function("document.getElementById('day-title').textContent === 'Rose’s day'")
+    judge.wait_for_function("document.getElementById('plan-name').textContent.includes('plan')")  # the plan card is there
+    judge.close()
+    phone = browser.new_page(viewport={"width": 390, "height": 844})
+    phone.goto(f"http://localhost:{PORT}/family", wait_until="networkidle")
+    phone.wait_for_selector("#family-demo:not([hidden])")
+    check_layout(phone, "the family page's sign-in with the demo button at 390px")
+    phone.screenshot(path=str(OUT / "family-demo-390.png"), full_page=True)
+    phone.close()
+
+    rose = browser.new_page(viewport={"width": 390, "height": 844})
+    visit(rose, "settings")
+    rose.evaluate("document.getElementById('data-setup').open = true")
+    rose.wait_for_selector("#demo-reset-box:not([hidden])")
+    rose.eval_on_selector("#data-setup", "details => details.scrollIntoView()")
+    rose.wait_for_timeout(400)
+    check_layout(rose, "Settings, Her data with the demo reset at 390px")
+    rose.screenshot(path=str(OUT / "settings-demo-reset-390.png"), full_page=True)
+    rose.click("#demo-reset")
+    rose.wait_for_selector("#confirm-dialog[open]")
+    assert rose.text_content("#confirm-title") == "Reset the demo week?"
+    rose.click("#confirm-yes")
+    rose.wait_for_function("document.getElementById('demo-reset-status').textContent.startsWith('The demo week is back')")
+    rose.wait_for_timeout(2500)  # the page goes back to Home on its own
+    rose.wait_for_load_state("networkidle")
+    wait_for_screen(rose, "today")  # Home, with the week again
+    rose.wait_for_function("document.getElementById('greeting').textContent.includes('Rose')")
+    rose.wait_for_selector("#today-message:not([hidden])")  # Maria's message is new again
+    rose.close()
 
 
 def check_her_data(browser, database: str) -> None:
@@ -1524,7 +1872,7 @@ def check_family(browser) -> None:
     visit(page, "family")
     page.wait_for_function("document.getElementById('update-text').textContent.startsWith('Hi Maria,')")
     assert page.text_content("#update-title") == "Today’s update for Maria"
-    assert page.text_content("#update-send") == "Send to Maria"
+    assert page.text_content("#update-send") == "Email to Maria"
     shown = page.text_content("#update-text") or ""
     assert "Mood: " in shown and "Pills: " in shown and "Diary: " in shown and "Safety screens" in shown, shown
     # The pills count is the Pills screen's ring, pills still to come included.
@@ -2003,11 +2351,13 @@ def main() -> int:
                 check_landing(browser)
                 check_family_accounts(browser)
                 check_billing(browser)
+                check_messages(browser, test_env["DATABASE_PATH"])
                 check_today_rows(browser)
                 check_friend(browser, test_env["DATABASE_PATH"])
                 check_every_screen(browser)
                 check_buddy_states(browser)
                 check_installable(browser)
+                check_demo_buttons(browser)
                 check_her_data(browser, test_env["DATABASE_PATH"])  # last: it wipes the demo week
             finally:
                 browser.close()
@@ -2024,7 +2374,8 @@ def main() -> int:
             "one Talk to Buddy, the daily check-in (first Today row, Start, check_in mode with its own talk), Settings saves choices at once and names a refused "
             "entry, theme, text size, and Calm motion work, \"Something hurts\" talks in diary mode, the Memory book "
             "(chip, empty book, memory talk in memory mode, Save it in my memory book), pill reminders "
-            "work (card, I took it, remind me, ring, round check, change, remove, undo), Check a message (paste, "
+            "work (card, I took it, remind me, ring, round check, change, remove, undo, a pill from a photo of its bottle "
+            "with both boxes to tick before saving), Check a message (paste, "
             "read aloud, photo, verdict card, fixed what-to-do, works with the AI down), Find my things (chip, \"What "
             "are you looking for?\" first, quick pick, photo, halo and sentence, nothing found, safety net first, the "
             "Find my glasses button), a Memory book page from an old photo (Buddy's words about it open the memory talk, the "
@@ -2036,6 +2387,13 @@ def main() -> int:
             "another browser, her day as she shares it, Yesterday's missed pill, a notification for a new alert, sign out "
             "and in, a wrong password, the pill reminder as a notification while Buddy is hidden, Remove ending the "
             "session), the Family plan in demo mode (no card fields, start, cancel at the end of the period), the "
+            "Message Maria and the postcard (the Home chip by name, Say it into the box, Send, what she sent today, an "
+            "emergency message shown the screen and never sent, Try again when Buddy couldn't paint, today's postcard "
+            "sent to Maria, the Send this to Maria button under Buddy's words, Maria's page with the message, the "
+            "postcard, Maria writing back and Rose seeing it as New, read aloud and then seen, Home's row for a waiting message, "
+            "and a notification for a new message), the "
+            "demo mode's buttons (Try the demo as Maria opens her day and the no-card plan; Reset the demo week asks "
+            "first, then Home shows the week again), the tab icon on every page, the "
             "welcome (Step 1 of 3, Back on top), Doctor notes on the demo week "
             "(sections, Mark as asked and Undo in place, Add a question, 14 days, prints on one page), the family update "
             "(the email holds exactly the words on screen, its pills count matches the Pills ring, Copy, Yesterday), "

@@ -12,7 +12,7 @@
 from datetime import date, datetime
 from urllib.parse import quote
 
-from app import db, notes, reminders
+from app import db, notes, postcards, reminders
 
 # Fixed words for each safety screen. A crisis is named, but never with her
 # words or what matched (docs/SAFETY.md 7b: only the kind and the time).
@@ -197,6 +197,14 @@ def day_facts(connection, day: date, profile: dict) -> dict:
         "memories": None,  # her stories are hers, like her diary: shared with it
         "talked": {"yes": False, "last_time": ""},
         "alerts": [],
+        # Her messages to the family (she tapped Send) and the postcard she
+        # sent that day: hers to send, so they are always shown (SAFETY.md 9c).
+        "messages": [{"time": notes.time_words(datetime.fromisoformat(row["created_at"])), "text": row["text"],
+                      "from": "family" if row["sender"] == "family" else "her",
+                      "name": row["sender_name"] if row["sender"] == "family" else "",
+                      "voice": f"/api/messages/{row['id']}/voice" if row["voice"] else ""}
+                     for row in db.family_messages_on(connection, day.isoformat())],
+        "postcard": postcards.shared_on(connection, day.isoformat()),
     }
     last_talk = connection.execute(
         "SELECT created_at FROM messages WHERE role = 'user' AND created_at >= ? AND created_at < ? ORDER BY created_at DESC LIMIT 1",

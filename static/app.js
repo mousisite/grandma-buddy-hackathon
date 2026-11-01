@@ -145,6 +145,8 @@ function useProfile(saved) {
   profile = saved;
   voiceSettings.on = saved.voice_on !== false;
   voiceSettings.rate = saved.voice_rate || 0.9;
+  // Home's "Message Maria" chip, by name once her family member is set up.
+  document.getElementById("chip-message-label").textContent = "Message " + (saved.family_name || "family");
   showGreeting();
   applyTheme();
   applyCalm();

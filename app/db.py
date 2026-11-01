@@ -145,6 +145,37 @@ def init_db(db_path: str | None = None) -> None:
                 red_flags TEXT NOT NULL DEFAULT '[]'
             );
 
+            -- Messages between her and her family (docs/SPEC.md feature 22):
+            -- hers from the Family screen (her own words, after the safety net,
+            -- once she tapped Send), and theirs from the family page (sender
+            -- 'family', with the family member's name). read_at: when she saw one
+            -- of theirs on her Family screen.
+            CREATE TABLE IF NOT EXISTS family_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL DEFAULT '',
+                text TEXT NOT NULL,
+                sender TEXT NOT NULL DEFAULT 'her',
+                sender_name TEXT NOT NULL DEFAULT '',
+                read_at TEXT NOT NULL DEFAULT '',
+                voice TEXT NOT NULL DEFAULT ''
+            );
+
+            -- One painted postcard a day (app/postcards.py): a cheerful sentence
+            -- of hers, kept word for word, and the picture painted for it.
+            -- shared_at is set when she sends it to the family page.
+            CREATE TABLE IF NOT EXISTS postcards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                day TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT '',
+                sentence TEXT NOT NULL DEFAULT '',
+                scene TEXT NOT NULL DEFAULT '',
+                picture TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'painting',
+                said_until TEXT NOT NULL DEFAULT '',
+                shared_at TEXT NOT NULL DEFAULT ''
+            );
+
             -- Every time the safety net showed an emergency/crisis screen.
             CREATE TABLE IF NOT EXISTS safety_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -309,6 +340,12 @@ def init_db(db_path: str | None = None) -> None:
         add_column(connection, "memories", "photo", "TEXT NOT NULL DEFAULT ''")
         add_column(connection, "memories", "people", "INTEGER NOT NULL DEFAULT 0")
         add_column(connection, "memories", "photo_scene", "TEXT NOT NULL DEFAULT ''")
+        # Messages from the family too, and whether she has seen them: October 31, later the same day.
+        add_column(connection, "family_messages", "sender", "TEXT NOT NULL DEFAULT 'her'")
+        add_column(connection, "family_messages", "sender_name", "TEXT NOT NULL DEFAULT ''")
+        add_column(connection, "family_messages", "read_at", "TEXT NOT NULL DEFAULT ''")
+        # A voice message's recording, kept in data/voice-messages/ (app/voice_messages.py).
+        add_column(connection, "family_messages", "voice", "TEXT NOT NULL DEFAULT ''")
         # WAL mode lets one connection read while another writes. Writers
         # still take turns, so the companion saves after each round of tools
         # (app/companion.py) and never holds the lock while the AI thinks.
@@ -368,6 +405,73 @@ def her_recent_words(connection: sqlite3.Connection, conversation_id: str, limit
         (conversation_id, last_safety, limit),
     ).fetchall()
     return [row["content"] for row in reversed(rows)]
+
+
+def her_words_on(connection: sqlite3.Connection, day: str, limit: int = 30) -> list[sqlite3.Row]:
+    """What she said to Buddy on one day ("2026-10-31") in ordinary talk,
+    as (id, created_at, content), oldest first: the newest `limit` lines.
+    For the day's postcard (app/postcards.py): a check-in ("…-check-in") or
+    a "Something hurts" talk ("…-diary-…") is about her health, so nothing
+    said there counts. Crisis words are never stored, so they are never here."""
+    rows = connection.execute(
+        "SELECT id, created_at, content FROM messages WHERE role = 'user' AND created_at >= ? AND created_at < ? "
+        "AND conversation_id NOT LIKE '%-check-in' AND conversation_id NOT LIKE '%-diary-%' "
+        "ORDER BY id DESC LIMIT ?",
+        (day + "T00:00:00", day + "T23:59:59", limit),
+    ).fetchall()
+    return list(reversed(rows))
+
+
+def add_family_message(connection: sqlite3.Connection, text: str, at: datetime,
+                       sender: str = "her", sender_name: str = "") -> int:
+    """A message between her and her family, at the app's clock
+    (reminders.current_time, so tests can set it): hers (sender "her", her
+    own words after the safety net), or a family member's ("family", with
+    their name), which is unread until she sees it."""
+    return connection.execute(
+        "INSERT INTO family_messages (created_at, text, sender, sender_name) VALUES (?, ?, ?, ?)",
+        (at.isoformat(timespec="seconds"), text, sender, sender_name),
+    ).lastrowid
+
+
+MESSAGE_FIELDS = "id, created_at, text, sender, sender_name, read_at, voice"
+
+
+def family_messages_on(connection: sqlite3.Connection, day: str) -> list[sqlite3.Row]:
+    """The messages between her and her family on one day, both ways, oldest first."""
+    return connection.execute(
+        f"SELECT {MESSAGE_FIELDS} FROM family_messages WHERE created_at >= ? AND created_at < ? ORDER BY id",
+        (day + "T00:00:00", day + "T23:59:59"),
+    ).fetchall()
+
+
+def messages_for_her(connection: sqlite3.Connection, day: str, since_day: str) -> list[sqlite3.Row]:
+    """What her Family screen shows: today's messages both ways, plus any
+    of the family's she hasn't seen yet from the last few days, oldest first."""
+    return connection.execute(
+        f"SELECT {MESSAGE_FIELDS} FROM family_messages WHERE (created_at >= ? AND created_at < ?) "
+        "OR (sender = 'family' AND read_at = '' AND created_at >= ?) ORDER BY created_at, id",
+        (day + "T00:00:00", day + "T23:59:59", since_day + "T00:00:00"),
+    ).fetchall()
+
+
+def unread_family_messages(connection: sqlite3.Connection, since_day: str) -> list[sqlite3.Row]:
+    """The family's messages she hasn't seen yet, newest first."""
+    return connection.execute(
+        f"SELECT {MESSAGE_FIELDS} FROM family_messages WHERE sender = 'family' AND read_at = '' AND created_at >= ? "
+        "ORDER BY created_at DESC, id DESC",
+        (since_day + "T00:00:00",),
+    ).fetchall()
+
+
+def mark_message_read(connection: sqlite3.Connection, message_id: int, at: datetime) -> bool:
+    """She has seen a family member's message. False when there is no such message."""
+    changed = connection.execute(
+        "UPDATE family_messages SET read_at = ? WHERE id = ? AND sender = 'family' AND read_at = ''",
+        (at.isoformat(timespec="seconds"), message_id),
+    ).rowcount
+    exists = connection.execute("SELECT 1 FROM family_messages WHERE id = ? AND sender = 'family'", (message_id,)).fetchone()
+    return bool(changed or exists)
 
 
 def her_last_words(connection: sqlite3.Connection, minutes: int = 10, limit: int = 3) -> list[sqlite3.Row]:

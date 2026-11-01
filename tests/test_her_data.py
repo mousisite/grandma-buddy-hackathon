@@ -101,7 +101,7 @@ def test_delete_everything_leaves_an_empty_app(client, her_data):
     assert not her_data["backup"].exists()
     # The app is as on the first day: no name, so it opens on the welcome.
     assert client.get("/api/profile").json()["preferred_name"] == ""
-    assert client.get("/api/family/me").json() == {"signed_in": False}
+    assert client.get("/api/family/me").json()["signed_in"] is False
 
 
 def test_delete_shrinks_the_file(client, her_data):

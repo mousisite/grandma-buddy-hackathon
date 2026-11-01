@@ -13,7 +13,7 @@ from datetime import date as calendar_date, timedelta
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from app import accounts, db, family, reminders
+from app import accounts, db, demo, family, reminders
 
 router = APIRouter()
 
@@ -141,18 +141,45 @@ def signed_in_account(request: Request, connection) -> dict:
     return account
 
 
+def demo_account(connection):
+    """The made-up family account the demo week adds (app/demo.py), or None."""
+    return connection.execute("SELECT id, name, email FROM family_accounts WHERE email = ?",
+                              (demo.FAMILY_ACCOUNT["email"],)).fetchone()
+
+
 @router.get("/api/family/me")
 def me(request: Request):
     """ "Am I signed in?": a plain answer either way (not a 401, which the
-    browser would log as an error on every visit)."""
+    browser would log as an error on every visit). Signed out, it also says
+    whether a judge can try the page as Maria (demo mode, the demo week loaded)."""
     connection = db.get_connection()
     try:
         account = accounts.signed_in(connection, request.cookies.get(COOKIE))
+        if account is None:
+            return {"signed_in": False, "demo": demo.demo_mode(), "demo_account": demo_account(connection) is not None}
     finally:
         connection.close()
-    if account is None:
-        return {"signed_in": False}
     return {"signed_in": True, "name": account["name"], "email": account["email"]}
+
+
+@router.post("/api/family/demo-sign-in")
+def demo_sign_in(request: Request, response: Response):
+    """ "Try the demo as Maria": signs into the demo week's made-up family
+    account, in demo mode only (no Stripe key), so a judge can see the
+    family page and the no-card plan. 404 otherwise, or without the demo week."""
+    if not demo.demo_mode():
+        raise HTTPException(status_code=404, detail="Not in demo mode.")
+    connection = db.get_connection()
+    try:
+        account = demo_account(connection)
+        if account is None:
+            raise HTTPException(status_code=404, detail="The demo week isn’t loaded. Run scripts/seed_demo.py first.")
+        token = accounts.open_session(connection, account["id"])
+        connection.commit()
+    finally:
+        connection.close()
+    set_session_cookie(response, request, token)
+    return {"name": account["name"], "email": account["email"]}
 
 
 @router.get("/api/family/dashboard")

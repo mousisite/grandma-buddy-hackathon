@@ -74,6 +74,19 @@ def searches_today(connection, now: datetime) -> int:
     return row["count"] if row else 0
 
 
+def take_search(connection, now: datetime) -> bool:
+    """One of today's web searches (at most 30 a day, for the briefing and
+    the scam lookup together): counted and allowed, or False when today's
+    are used up. The caller commits."""
+    if searches_today(connection, now) >= MAX_SEARCHES_A_DAY:
+        return False
+    connection.execute(
+        "INSERT INTO web_searches (day, count) VALUES (?, 1) ON CONFLICT (day) DO UPDATE SET count = count + 1",
+        (now.date().isoformat(),),
+    )
+    return True
+
+
 def look_up(connection, topic: str, town: str) -> dict | None:
     """Today's weather, news, or sports for her town: {"text", "sites"}, or
     None when there is nothing good to share (no town, nothing found on the
@@ -91,12 +104,8 @@ def look_up(connection, topic: str, town: str) -> dict | None:
     last = {"text": kept["text"], "sites": json.loads(kept["sources"])} if kept and made.date() == now.date() else None
     if last and now - made < FRESH_FOR:
         return last
-    if searches_today(connection, now) >= MAX_SEARCHES_A_DAY:
+    if not take_search(connection, now):
         return last
-    connection.execute(
-        "INSERT INTO web_searches (day, count) VALUES (?, 1) ON CONFLICT (day) DO UPDATE SET count = count + 1",
-        (now.date().isoformat(),),
-    )
     connection.commit()
     day = f"{now:%A, %B} {now.day}"
     instructions = prompts.BRIEFING.format(rules=prompts.BRIEFING_RULES[topic])

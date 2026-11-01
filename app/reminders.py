@@ -36,18 +36,24 @@ def current_time() -> datetime:
 
 # ---------- The rules (pure: no database, easy to test) ----------
 
-def todays_times(times: list[str], now: datetime) -> list[datetime]:
-    """The reminder times for one pill that Buddy can still remind her of:
-    later today, or in the last 2 hours (just after midnight, that can be
-    last night's late pill). A time that passed long before (8 AM for a pill
-    added at noon) gets no reminder, so it can never count as "missed"."""
+def todays_times(times: list[str], now: datetime, since: str = "") -> list[datetime]:
+    """The reminder times for one pill today.
+
+    A daily pill set up before today (`since`, when it was added) gets every
+    time today: a dose she never marked shows as not taken, so her family
+    can see it, and the ones still to come are upcoming. Just after
+    midnight, last night's late pill (within the last 2 hours) is offered too.
+    A pill added today only gets the times from then on: 8 AM for a pill
+    added at noon gets no reminder, so it can never count as not taken."""
     earliest = now - MISSED_AFTER
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    set_up_before_today = bool(since) and datetime.fromisoformat(since) < start_of_today
     due_times = []
     for day in sorted({earliest.date(), now.date()}):
         for text in times:
             hour, minute = (int(part) for part in text.split(":"))
             due = datetime.combine(day, time(hour, minute))
-            if due > earliest:
+            if due > earliest or (set_up_before_today and day == now.date()):
                 due_times.append(due)
     return sorted(due_times)
 
@@ -166,7 +172,7 @@ def reminder_words(due_pills: list[dict], her_name: str = "") -> str:
 def active_pills(connection) -> list[dict]:
     """Her pills (not removed), with their times as a list."""
     rows = connection.execute(
-        "SELECT id, name, label_dose, times FROM medications WHERE active = 1 ORDER BY name COLLATE NOCASE"
+        "SELECT id, name, label_dose, times, created_at FROM medications WHERE active = 1 ORDER BY name COLLATE NOCASE"
     ).fetchall()
     return [dict(row, times=json.loads(row["times"])) for row in rows]
 
@@ -180,7 +186,7 @@ def make_todays_reminders(connection, now: datetime) -> None:
     again for a dose she already took. Later times are created first.
     """
     for pill in active_pills(connection):
-        for due in reversed(todays_times(pill["times"], now)):
+        for due in reversed(todays_times(pill["times"], now, pill["created_at"])):
             on_that_day = connection.execute(
                 "SELECT COUNT(*) FROM med_events WHERE medication_id = ? AND due_at LIKE ?",
                 (pill["id"], due.date().isoformat() + "%"),

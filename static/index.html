@@ -34,6 +34,8 @@
   <!-- Installable: an icon on her home screen or desktop, opening full screen
        (static/manifest.webmanifest; the icons are Buddy's own orb). -->
   <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/buddy-192.png">
   <link rel="apple-touch-icon" href="/static/icons/buddy-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Buddy">
@@ -159,6 +161,12 @@
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><circle cx="12" cy="12" r="3"></circle><path d="m16 16-1.9-1.9"></path></svg>
           Find my things
         </a>
+        <!-- "Message Maria": her words, read back, sent to the family page
+             with one tap (the Family screen). The name fills in from her profile. -->
+        <a id="chip-message" class="chip" href="#/family">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+          <span id="chip-message-label">Message family</span>
+        </a>
       </nav>
 
       <!-- Today, as a clean list (screens.js fills in the details). -->
@@ -167,6 +175,16 @@
         <!-- A tap anywhere on a row does what its button or link says
              (screens.js), so the targets are big for shaky hands. -->
         <ul class="rows" role="list">
+          <!-- A message from her family she hasn't seen yet (screens.js):
+               first in the list, and read to her on the Family screen. -->
+          <li id="today-message" class="row" hidden>
+            <svg class="icon row-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+            <span class="row-text">
+              <span id="today-message-title" class="row-title">A message from your family</span>
+              <span id="today-message-text" class="row-meta"></span>
+            </span>
+            <a class="row-link" href="#/family">Family<svg class="icon row-link-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
+          </li>
           <!-- Today's weather in her town, from the web (Meta's web search,
                app/briefing.py). Hidden until there is one. -->
           <li id="today-weather" class="row" hidden>
@@ -317,13 +335,30 @@
         <p id="pills-undo" class="form-status" role="status"></p>
         <form id="pill-form" class="card form" novalidate>
           <h3 id="pill-form-title" class="card-title">Add a pill</h3>
+          <!-- A photo of the bottle (screens.js, app/labels.py): Buddy fills in
+               the name and the label as printed; each is checked against the
+               bottle before saving. The times are always typed here. -->
+          <div class="form-actions">
+            <button id="pill-photo" class="pill-button pill-button--quiet" type="button">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+              Take a photo of the bottle
+            </button>
+          </div>
+          <input id="pill-photo-input" type="file" accept="image/*" capture="environment" hidden>
+          <p id="pill-photo-status" class="note" role="status" aria-live="polite">Or take a photo of the bottle: Buddy fills in the name and the label as printed, and you check them. The photo goes to Buddy’s AI to read, and isn’t kept.</p>
           <div class="field">
             <label for="pill-name">Name, as on the bottle</label>
             <input id="pill-name" name="name" type="text" autocomplete="off" spellcheck="false" maxlength="80">
+            <label id="pill-name-check" class="checked-row" hidden>
+              <input name="name_checked" type="checkbox"> I checked the name against the bottle
+            </label>
           </div>
           <div class="field">
             <label for="pill-label">Label, word for word</label>
             <input id="pill-label" name="label_dose" type="text" autocomplete="off" spellcheck="false" maxlength="200">
+            <label id="pill-label-check" class="checked-row" hidden>
+              <input name="label_checked" type="checkbox"> I checked the label against the bottle
+            </label>
           </div>
           <fieldset id="pill-times" class="times">
             <legend>Times of day</legend>
@@ -376,6 +411,9 @@
         <div id="scam-checked-photo" hidden></div>
         <h2 id="scam-verdict" class="verdict-pill" tabindex="-1"></h2>
         <p id="scam-explanation" class="verdict-explanation"></p>
+        <!-- What the web said about a number or address in it (fixed words
+             from app/scam.py, never the number itself), with the sites. -->
+        <p id="scam-lookup" class="verdict-lookup" hidden></p>
         <div id="scam-flags-block">
           <h3 class="verdict-heading">Warning signs</h3>
           <ul id="scam-flags" class="verdict-list"></ul>
@@ -433,11 +471,62 @@
     <section class="screen document" data-screen="family" aria-labelledby="family-title" hidden>
       <header class="screen-head">
         <h1 id="family-title" class="display" tabindex="-1">Family</h1>
-        <p class="lead">Call the people who help you.</p>
+        <p class="lead">Call the people who help you, send them a message, or send today’s postcard.</p>
       </header>
       <!-- Call buttons for family and doctor (screens.js). -->
       <div id="family-calls" class="call-list" aria-label="Call buttons"></div>
       <p id="family-calls-empty" class="empty">No phone numbers yet. A family member can add them in <a href="#/settings">Settings</a>, under “Names and phone numbers”.</p>
+
+      <!-- Message Maria (screens.js, app/routes/messages.py): her words,
+           said or typed, read back by Buddy, then sent to the family page
+           with one tap. The safety net runs first, and Buddy never sends
+           anything by itself (docs/SAFETY.md 9c). -->
+      <section class="family-message" aria-labelledby="message-title">
+        <h2 id="message-title" class="doc-heading">Send a message</h2>
+        <p class="note">Say it, read it over, then tap Send. It goes to the family page.</p>
+        <form id="message-form" class="message-form" novalidate>
+          <label for="message-text" class="message-label">Your message</label>
+          <textarea id="message-text" name="text" rows="3" maxlength="1000" autocomplete="off"
+                    placeholder="Like “The tulips came up this morning. Come and see them Sunday.”"></textarea>
+          <p id="message-status" class="note" role="status" aria-live="polite"></p>
+          <!-- After "Say it", her recording goes along with the words (screens.js). -->
+          <p id="message-voice-note" class="note message-voice-note" hidden>
+            <span id="message-voice-words">Maria will hear your voice too.</span>
+            <button id="message-voice-off" class="text-button" type="button">Just the words</button>
+          </p>
+          <div class="form-actions">
+            <button class="pill-button pill-button--quiet pill-button--hero" type="button" data-say-it="message-status">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+              <span>Say it</span>
+            </button>
+            <button id="message-send" class="pill-button pill-button--ink pill-button--hero" type="submit">Send to family</button>
+          </div>
+        </form>
+        <!-- Today's messages both ways. A new one from the family is marked
+             New, and Buddy reads it to her as their words ("Maria wrote: …"). -->
+        <p id="sent-note" class="note" role="status"></p>
+        <ul id="sent-list" class="sent-list" role="list"></ul>
+      </section>
+
+      <!-- Today's postcard (screens.js, app/postcards.py): one cheerful thing
+           she said today, word for word, painted like the Memory book. The
+           family sees it only once she taps Send. -->
+      <section class="postcard-part" aria-labelledby="postcard-title">
+        <h2 id="postcard-title" class="doc-heading">Today’s postcard</h2>
+        <p id="postcard-note" class="note" role="status" aria-live="polite"></p>
+        <figure id="postcard" class="postcard" hidden>
+          <div id="postcard-picture" class="memory-picture postcard-picture" data-status="painting"></div>
+          <figcaption class="postcard-words">
+            <p id="postcard-sentence" class="postcard-sentence" tabindex="-1"></p>
+            <p id="postcard-meta" class="postcard-meta"></p>
+          </figcaption>
+        </figure>
+        <div class="form-actions">
+          <button id="postcard-send" class="pill-button pill-button--ink pill-button--hero" type="button" hidden>Send postcard to family</button>
+          <button id="postcard-again" class="pill-button pill-button--quiet pill-button--hero" type="button" hidden>Try again</button>
+        </div>
+        <p class="note">Buddy’s AI picks one cheerful thing you said today, keeps your words exactly as you said them, and paints a picture for it. Never anything about your health.</p>
+      </section>
 
       <!-- The family update (screens.js): exactly the words that will be
            sent. She sends it herself, from her own email app. -->
@@ -450,7 +539,7 @@
         <pre id="update-text" class="update-text" aria-busy="true"></pre>
         <p id="update-status" class="empty" role="status" hidden></p>
         <div class="form-actions">
-          <a id="update-send" class="pill-button pill-button--ink pill-button--hero">Send to family</a>
+          <a id="update-send" class="pill-button pill-button--ink pill-button--hero">Email to family</a>
           <button id="update-copy" class="pill-button pill-button--quiet pill-button--hero" type="button">Copy</button>
         </div>
         <p class="note">This opens your email with the update written for you. Nothing is sent until you press Send there.</p>
@@ -719,6 +808,10 @@
           <details class="faq-item">
             <summary class="faq-question">Who can see my diary?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
             <p class="faq-answer">It is kept on this computer. Your doctor sees it on the notes you print or bring, and your family sees only the update you choose to send.</p>
+          </details>
+          <details class="faq-item">
+            <summary class="faq-question">Who sees my messages and my postcard?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+            <p class="faq-answer">Only the people with an account on your family page, and only what you send. Buddy never sends anything by itself.</p>
           </details>
           <details class="faq-item">
             <summary class="faq-question">How do I make the words bigger, or the voice slower?<svg class="icon faq-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
@@ -1071,6 +1164,15 @@
           <div class="form-actions">
             <a id="data-export" class="pill-button pill-button--quiet" href="/api/data/export" download>Export everything</a>
             <button id="data-delete" class="pill-button pill-button--quiet" type="button">Delete everything</button>
+          </div>
+          <!-- The demo week, started over (herdata.js, app/demo.py): shown only in
+               demo mode (no Stripe key), so a real family's data is never one tap away. -->
+          <div id="demo-reset-box" class="demo-reset" hidden>
+            <p class="group-note">Demo mode. “Reset the demo week” saves a copy of what is here, then fills Buddy with Rose’s made-up week again, ending today.</p>
+            <div class="form-actions">
+              <button id="demo-reset" class="pill-button pill-button--quiet" type="button">Reset the demo week</button>
+            </div>
+            <p id="demo-reset-status" class="form-status" role="status" aria-live="polite"></p>
           </div>
           <p class="group-note">Export makes one zip file: her database and her memory book pictures. Delete empties Buddy as on its first day. It can’t be undone, so export first.</p>
         </div>

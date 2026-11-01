@@ -16,7 +16,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from app import db, memories, voice
+from app import db, memories, voice, voice_messages
 from app.config import get_settings
 
 README = """Grandma Buddy: everything the app wrote down, exported on {date}.
@@ -28,6 +28,7 @@ grandma-buddy.db   The database: her profile, diary, pills and reminders,
                    It is a SQLite file: any SQLite viewer opens it, and the
                    app can use it again as data/grandma_buddy.db.
 memories/          The memory book's paintings and her own photos.
+voices/            Voice messages her family recorded for her.
 
 Nothing here was ever sent anywhere but Meta's standard models, to be
 answered. This export never includes the app's .env file (the API key).
@@ -47,11 +48,11 @@ def export_zip() -> bytes:
     packed_file = io.BytesIO()
     with zipfile.ZipFile(packed_file, "w", zipfile.ZIP_DEFLATED) as packed:
         packed.writestr("grandma-buddy.db", database)
-        pictures = memories.pictures_dir()
-        if pictures.is_dir():
-            for path in sorted(pictures.iterdir()):
-                if path.is_file():
-                    packed.write(path, f"memories/{path.name}")
+        for folder, inside in ((memories.pictures_dir(), "memories"), (voice_messages.voices_dir(), "voices")):
+            if folder.is_dir():
+                for path in sorted(folder.iterdir()):
+                    if path.is_file():
+                        packed.write(path, f"{inside}/{path.name}")
         packed.writestr("README.txt", README.format(date=f"{datetime.now():%B} {datetime.now().day}, {datetime.now().year}"))
     return packed_file.getvalue()
 
@@ -72,6 +73,7 @@ def delete_everything() -> None:
     finally:
         connection.close()
     shutil.rmtree(memories.pictures_dir(), ignore_errors=True)
+    shutil.rmtree(voice_messages.voices_dir(), ignore_errors=True)
     for backup in Path(get_settings().database_path).parent.glob("backup-*.db"):
         backup.unlink(missing_ok=True)
     voice.speech.cache_clear()  # sentences made in her name, kept in memory
