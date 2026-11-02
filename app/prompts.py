@@ -124,6 +124,32 @@ PHOTO_MEMORY = """An older adult who lives alone chose an old photo of hers to s
 No advice, no guessing beyond what is plainly there, plain everyday words."""
 
 # Added on her 4th answer in a "Something hurts" talk (app/companion.py).
+# Added when her words ask for advice ("Should I take…", "Is this serious?"):
+# measured Nov 1, right after a talk about a memory, the model once went on
+# with the memory and never answered her question (app/companion.py).
+ADVICE_ASKED = (
+    "\n\nHer last words may be a question for a doctor or pharmacist. If it is about her health, medicine, food, or "
+    "how she feels, answer only that, the no-advice way described above, and don't go back to the earlier topic in "
+    "this reply. If it isn't about her health, simply answer her question."
+)
+
+# Added when her words ask about today's weather, news, or scores: measured
+# Nov 1, right after a talk about her tulips, the model once chatted about
+# the tulips instead of looking the weather up (app/companion.py).
+LOOK_UP_ASKED = (
+    "\n\nHer last words ask about today's weather, what's happening in town, or a game. Call look_up_today for it "
+    "first, and answer with what it found, never a guess. If it finds nothing, say so kindly."
+)
+
+# Added when her words ask about the weather and plain code has fetched it
+# already (Open-Meteo, free): the model gets the forecast instead of a tool to
+# call, which it sometimes skipped (measured Nov 1).
+WEATHER_IN_HAND = (
+    "\n\nShe is asking about the weather. Today's weather for {town}, from Open-Meteo: \"{weather}\" Tell her exactly "
+    "that, in your own warm words, keeping its numbers as they are, then one gentle question or nothing more. Don't "
+    "call look_up_today for the weather: it is already here."
+)
+
 LAST_DIARY_ANSWER = (
     "\nThis is her last answer in this talk. If she told you something hurts, call log_symptom now and say "
     "\"I've written that down for your doctor.\" Don't ask her another question. If nothing hurts, just say "

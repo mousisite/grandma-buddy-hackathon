@@ -1,13 +1,15 @@
-# Tests for "what's happening today" (app/briefing.py): today's weather, a
-# gentle local story, or sports, looked up with Meta's web search (the
-# Responses API's built-in web_search tool) near her town. Meta is always
-# FAKE here. Made-up town and stories only.
+# Tests for "what's happening today" (app/briefing.py): today's weather from
+# Open-Meteo (its geocoder and forecast, faked here), and a gentle local story
+# or sports, looked up with Meta's web search (the Responses API's built-in
+# web_search tool) near her town. Meta and Open-Meteo are always FAKE here.
+# Made-up town and stories only.
 
 import json
 from datetime import datetime
 from types import SimpleNamespace as N
 
 import pytest
+import requests
 from fastapi.testclient import TestClient
 
 from app import briefing, db, meta_client, reminders, tools
@@ -130,38 +132,38 @@ def connection(safe_test_setup):
     opened.close()
 
 
-def test_the_weather_is_looked_up_once_then_kept_for_three_hours(monkeypatch, connection, clock):
-    searches = Searches(monkeypatch)
-    first = briefing.look_up(connection, "weather", TOWN)
-    assert first == {"text": "It's sunny in Portland today, with a high of 62.", "sites": ["weather.gov"]}
+def test_a_look_up_is_made_once_then_kept_for_three_hours(monkeypatch, connection, clock):
+    searches = Searches(monkeypatch, text="The farmers market opens Saturday at 9.",
+                        sources=[{"title": "Market", "url": "https://www.kgw.com/market"}])
+    first = briefing.look_up(connection, "news", TOWN)
+    assert first == {"text": "The farmers market opens Saturday at 9.", "sites": ["kgw.com"], "from": "From the web:"}
     clock.set(10, 59)
-    assert briefing.look_up(connection, "weather", TOWN) == first
+    assert briefing.look_up(connection, "news", TOWN) == first
     assert len(searches.calls) == 1
     clock.set(11, 1)
-    briefing.look_up(connection, "weather", TOWN)
+    briefing.look_up(connection, "news", TOWN)
     assert len(searches.calls) == 2
     question, instructions, town = searches.calls[0]
     assert "Friday, October 30" in question and town == TOWN
 
 
 def test_each_topic_gets_only_its_own_instructions(monkeypatch, connection, clock):
-    # One set of instructions for all three made the real model answer all
-    # three at once ("…the Trail Blazers lost…" in the weather).
+    # One set of instructions for both made the real model answer both at
+    # once ("…the Trail Blazers lost…" in the news).
     searches = Searches(monkeypatch)
-    for topic in ("weather", "news", "sports"):
+    for topic in ("news", "sports"):
         briefing.look_up(connection, topic, TOWN)
-    weather, news, sports = (instructions for _, instructions, _ in searches.calls)
-    assert "high and low" in weather and "score" not in weather and "festival" not in weather
-    assert "festival" in news and "high and low" not in news
+    news, sports = (instructions for _, instructions, _ in searches.calls)
+    assert "festival" in news and "score" not in news
     assert "score" in sports and "festival" not in sports
-    assert all("Don't say what you are going to do" in text for text in (weather, news, sports))
+    assert all("Don't say what you are going to do" in text for text in (news, sports))
 
 
 def test_an_answer_that_wasnt_found_on_the_web_is_not_used(monkeypatch, connection, clock):
     Searches(monkeypatch, searched=False)
-    assert briefing.look_up(connection, "weather", TOWN) is None
+    assert briefing.look_up(connection, "news", TOWN) is None
     Searches(monkeypatch, sources=[])
-    assert briefing.look_up(connection, "weather", TOWN) is None
+    assert briefing.look_up(connection, "news", TOWN) is None
 
 
 def test_three_sites_at_most_are_named_each_once(monkeypatch, connection, clock):
@@ -169,13 +171,13 @@ def test_three_sites_at_most_are_named_each_once(monkeypatch, connection, clock)
     urls = ["https://www.weather.gov/a", "https://forecast.weather.gov/b", "https://www.weather.gov/c",
             "https://kgw.com/d", "https://koin.com/e", "https://wweek.com/f"]
     Searches(monkeypatch, sources=[{"title": "", "url": url} for url in urls])
-    assert briefing.look_up(connection, "weather", TOWN)["sites"] == ["weather.gov", "forecast.weather.gov", "kgw.com"]
+    assert briefing.look_up(connection, "news", TOWN)["sites"] == ["weather.gov", "forecast.weather.gov", "kgw.com"]
 
 
 def test_links_are_taken_out_and_two_sentences_at_most_are_kept(monkeypatch, connection, clock):
     Searches(monkeypatch, text="It's sunny today ([weather.gov](https://www.weather.gov/pqr)). "
                                "The high is 62. The low is 48. More at https://example.com/forecast")
-    assert briefing.look_up(connection, "weather", TOWN)["text"] == "It's sunny today. The high is 62."
+    assert briefing.look_up(connection, "news", TOWN)["text"] == "It's sunny today. The high is 62."
 
 
 def test_sentences_about_health_or_with_advice_are_left_out(monkeypatch, connection, clock):
@@ -193,29 +195,108 @@ def test_no_more_than_thirty_searches_a_day(monkeypatch, connection, clock):
     searches = Searches(monkeypatch)
     for hour in range(31):  # a new look every 3 hours would never get this far: force it
         connection.execute("DELETE FROM briefings")
-        briefing.look_up(connection, "weather", TOWN)
+        briefing.look_up(connection, "news", TOWN)
     assert len(searches.calls) == briefing.MAX_SEARCHES_A_DAY == 30
 
 
 def test_when_a_new_look_fails_the_last_one_from_today_is_kept(monkeypatch, connection, clock):
     Searches(monkeypatch)
-    morning = briefing.look_up(connection, "weather", TOWN)
+    morning = briefing.look_up(connection, "news", TOWN)
 
     def no_internet(*args):
         raise meta_client.MetaError("Web search failed: APIConnectionError")
 
     monkeypatch.setattr(meta_client, "search", no_internet)
     clock.set(12)  # over 3 hours later: a new look is due, and it fails
-    assert briefing.look_up(connection, "weather", TOWN) == morning
-    clock.set(8, day=31)  # but yesterday's weather is never shown
+    assert briefing.look_up(connection, "news", TOWN) == morning
+    clock.set(8, day=31)  # but yesterday's news is never shown
     with pytest.raises(meta_client.MetaError):
-        briefing.look_up(connection, "weather", TOWN)
+        briefing.look_up(connection, "news", TOWN)
 
 
 def test_without_her_town_nothing_is_looked_up(monkeypatch, connection, clock):
     searches = Searches(monkeypatch)
+    meteo = OpenMeteo(monkeypatch)
+    assert briefing.look_up(connection, "news", "") is None
     assert briefing.look_up(connection, "weather", "") is None
-    assert searches.calls == []
+    assert searches.calls == [] and meteo.calls == []
+
+
+# ---------- Today's weather, from Open-Meteo ----------
+
+PLACES = [
+    {"name": "Portland", "admin1": "Maine", "country_code": "US", "latitude": 43.66, "longitude": -70.26},
+    {"name": "Portland", "admin1": "Oregon", "country_code": "US", "latitude": 45.52, "longitude": -122.68},
+]
+CLOUDY = {"text": "Cloudy today, with a high of 48 and a low of 41.", "sites": ["Open-Meteo.com"], "from": "Weather from"}
+
+
+class OpenMeteo:
+    """A fake briefing._http.get: Open-Meteo's geocoder, then its forecast."""
+
+    def __init__(self, monkeypatch, code=3, high=47.7, low=40.5, rain=1, places=PLACES, fail=False):
+        self.code, self.high, self.low, self.rain, self.places, self.fail = code, high, low, rain, places, fail
+        self.calls = []
+        monkeypatch.setattr(briefing._http, "get", self)
+
+    def __call__(self, url, params=None, timeout=None):
+        self.calls.append((url, params))
+        if self.fail:
+            raise requests.ConnectionError("no internet")
+        if "geocoding" in url:
+            return N(raise_for_status=lambda: None, json=lambda: {"results": self.places})
+        daily = {"weather_code": [self.code], "temperature_2m_max": [self.high], "temperature_2m_min": [self.low],
+                 "precipitation_probability_max": [self.rain]}
+        return N(raise_for_status=lambda: None, json=lambda: {"daily": daily})
+
+
+@pytest.mark.parametrize("code, high, low, rain, words", [
+    (3, 47.7, 40.5, 1, "Cloudy today, with a high of 48 and a low of 41."),
+    (0, 71.2, 50.0, 0, "Clear skies today, with a high of 71 and a low of 50."),
+    (61, 55.4, 44.9, 80, "Light rain today, with a high of 55 and a low of 45. The chance of rain is 80%."),
+    (2, 60.0, 48.0, 45, "Partly cloudy today, with a high of 60 and a low of 48. The chance of rain is 45%."),
+    (999, 60.0, 48.0, 10, "Changeable weather today, with a high of 60 and a low of 48."),
+])
+def test_the_weather_is_said_in_plain_words_from_a_fixed_table(code, high, low, rain, words):
+    assert briefing.weather_words(code, high, low, rain) == words
+
+
+def test_the_weather_comes_from_open_meteo_for_her_own_portland(monkeypatch, connection, clock):
+    meteo = OpenMeteo(monkeypatch)
+    assert briefing.look_up(connection, "weather", TOWN) == CLOUDY
+    geocode, forecast = meteo.calls
+    assert geocode[1]["name"] == "Portland"  # only the town's name goes out, never hers
+    assert (forecast[1]["latitude"], forecast[1]["longitude"]) == (45.52, -122.68), "Oregon, not Maine"
+    assert forecast[1]["temperature_unit"] == "fahrenheit" and forecast[1]["forecast_days"] == 1
+
+
+def test_the_weather_is_kept_for_three_hours_and_is_never_a_web_search(monkeypatch, connection, clock):
+    meteo = OpenMeteo(monkeypatch)
+    searches = Searches(monkeypatch)
+    first = briefing.look_up(connection, "weather", TOWN)
+    clock.set(10, 59)
+    assert briefing.look_up(connection, "weather", TOWN) == first
+    assert len(meteo.calls) == 2  # the geocoder and the forecast, once
+    clock.set(11, 1)
+    briefing.look_up(connection, "weather", TOWN)
+    assert len(meteo.calls) == 4
+    assert searches.calls == [] and briefing.searches_today(connection, clock.now) == 0
+
+
+def test_a_town_open_meteo_doesnt_know_has_no_weather(monkeypatch, connection, clock):
+    OpenMeteo(monkeypatch, places=[])
+    assert briefing.look_up(connection, "weather", "Nowhere, Oregon") is None
+
+
+def test_when_open_meteo_cant_be_reached_the_last_forecast_from_today_is_kept(monkeypatch, connection, clock):
+    OpenMeteo(monkeypatch)
+    morning = briefing.look_up(connection, "weather", TOWN)
+    OpenMeteo(monkeypatch, fail=True)
+    clock.set(12)  # over 3 hours later: a new look is due, and it fails
+    assert briefing.look_up(connection, "weather", TOWN) == morning
+    clock.set(8, day=31)  # but yesterday's weather is never shown
+    with pytest.raises(briefing.WeatherError):
+        briefing.look_up(connection, "weather", TOWN)
 
 
 # ---------- Buddy's tool, the Home row, and her town ----------
@@ -227,10 +308,10 @@ def tool_context(connection, town=TOWN):
 
 
 def test_buddy_can_look_up_the_weather_and_shows_where_it_came_from(monkeypatch, connection, clock):
-    Searches(monkeypatch)
+    OpenMeteo(monkeypatch)
     result, actions = tools.run_tool("look_up_today", json.dumps({"topic": "weather"}), tool_context(connection))
-    assert result == {"ok": True, "found": "It's sunny in Portland today, with a high of 62.", "from": ["weather.gov"]}
-    assert actions == [{"type": "sources", "sites": ["weather.gov"]}]
+    assert result == {"ok": True, "found": "Cloudy today, with a high of 48 and a low of 41.", "from": ["Open-Meteo.com"]}
+    assert actions == [{"type": "sources", "sites": ["Open-Meteo.com"], "from": "Weather from"}]
 
 
 def test_only_the_weather_news_or_sports_can_be_looked_up(monkeypatch, connection, clock):
@@ -252,25 +333,21 @@ def test_her_town_is_part_of_her_profile():
     assert client.get("/api/profile").json()["city"] == TOWN
 
 
-NOTHING = {"text": "", "sites": []}
+NOTHING = {"text": "", "sites": [], "from": ""}
 
 
 def test_home_gets_the_weather(monkeypatch, clock):
-    Searches(monkeypatch)
+    OpenMeteo(monkeypatch)
     client = TestClient(app)
     # No town yet is normal, not an error (a browser logs every 404 as one): nothing to show.
     assert client.get("/api/briefing/weather").json() == NOTHING
     client.put("/api/profile", json={"city": TOWN})
-    assert client.get("/api/briefing/weather").json() == {
-        "text": "It's sunny in Portland today, with a high of 62.", "sites": ["weather.gov"]}
+    assert client.get("/api/briefing/weather").json() == CLOUDY
     assert client.get("/api/briefing/horoscope").status_code == 404
 
 
-def test_when_the_search_fails_home_just_shows_no_weather(monkeypatch, clock):
-    def no_internet(*args):
-        raise meta_client.MetaError("Web search failed: APIConnectionError")
-
-    monkeypatch.setattr(meta_client, "search", no_internet)
+def test_when_open_meteo_cant_be_reached_home_just_shows_no_weather(monkeypatch, clock):
+    OpenMeteo(monkeypatch, fail=True)
     client = TestClient(app)
     client.put("/api/profile", json={"city": TOWN})
     answer = client.get("/api/briefing/weather")
@@ -285,4 +362,4 @@ def test_a_talk_shows_where_the_news_came_from(monkeypatch, clock):
     use_fake(monkeypatch, tool_call("c1", "look_up_today", {"topic": "news"}),
              reply("There's a parade on Saturday at 10!"))
     body = chat(client, "Anything happening in town?")
-    assert {"type": "sources", "sites": ["kgw.com"]} in body["actions"]
+    assert {"type": "sources", "sites": ["kgw.com"], "from": "From the web:"} in body["actions"]

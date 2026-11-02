@@ -4,9 +4,9 @@
 # real can end up in a committed picture. Saved to static/landing/*.png at
 # phone size (390 by 844, drawn at 2x so they stay crisp on any screen).
 #
-# The memory book page is painted with the real Muse Image when a key is
-# set up (one page: about 2 cents, Muse Spark writing it included); without
-# a key it shows "Painting your picture…" instead.
+# The memory book page shows one of the bundled demo pictures (painted by
+# Muse Image for this project, scripts/demo_pictures/), so nothing is sent
+# to Meta and a run costs nothing, with or without a key.
 #   .venv\Scripts\python scripts\landing_shots.py
 
 import os
@@ -31,11 +31,11 @@ PORT = 8008
 REPLY = "What a lovely morning for the garden, Rose. Did Tom make it over on Sunday?"
 
 
-def seeded_database(folder: Path, paint: bool) -> Path:
-    """The demo week on a fresh database in a temporary folder."""
+def seeded_database(folder: Path) -> Path:
+    """The demo week on a fresh database in a temporary folder, bundled pictures included."""
     database = folder / "landing.db"
     env = dict(os.environ, DATABASE_PATH=str(database))
-    command = [sys.executable, str(ROOT / "scripts" / "seed_demo.py"), "--reset"] + ([] if paint else ["--no-paint"])
+    command = [sys.executable, str(ROOT / "scripts" / "seed_demo.py"), "--reset", "--no-paint"]
     subprocess.run(command, cwd=ROOT, env=env, check=True, stdout=subprocess.DEVNULL)
     return database
 
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     photos()  # the made-up bill for Read it to me
     OUT.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="buddy-landing-") as folder:
-        database = seeded_database(Path(folder), paint=with_key)
+        database = seeded_database(Path(folder))
         server = start_server(database, with_key)
         add_made_up_weather(database)  # after the server made its tables
         try:
@@ -116,5 +116,4 @@ if __name__ == "__main__":
         finally:
             server.terminate()
             server.wait()
-    print(f"{len(names)} screens saved to static/landing/: " + ", ".join(names)
-          + ("" if with_key else " (no key: the memory page shows no painting)"))
+    print(f"{len(names)} screens saved to static/landing/: " + ", ".join(names))

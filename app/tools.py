@@ -493,7 +493,7 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
         # Our code writes the question for one of three topics (app/briefing.py),
         # so the AI can't search for anything else.
         topic = args.get("topic")
-        if topic not in briefing.QUESTIONS:
+        if topic not in briefing.TOPICS:
             return {"ok": False, "error": "Only the weather, local news, or sports can be looked up."}, []
         town = (context["profile"].get("city") or "").strip()
         if not town:
@@ -501,12 +501,13 @@ def run_tool(name: str, raw_arguments: str, context: dict) -> tuple[dict, list[d
                                           "under Names and phone numbers."}, []
         try:
             found = briefing.look_up(connection, topic, town)
-        except meta_client.MetaError as problem:
+        except (meta_client.MetaError, briefing.WeatherError) as problem:
             print(f"Looking up today's {topic} failed: {problem}")  # never her words
             found = None
         if not found:
             return {"ok": False, "error": "Nothing good to share was found just now."}, []
-        return {"ok": True, "found": found["text"], "from": found["sites"]}, [{"type": "sources", "sites": found["sites"]}]
+        return ({"ok": True, "found": found["text"], "from": found["sites"]},
+                [{"type": "sources", "sites": found["sites"], "from": found["from"]}])
 
     if name == "open_screen":
         screen = args.get("screen")

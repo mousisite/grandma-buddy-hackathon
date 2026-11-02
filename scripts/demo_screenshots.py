@@ -67,7 +67,7 @@ def add_made_up_weather(database: Path) -> None:
     town = connection.execute("SELECT city FROM profile WHERE id = 1").fetchone()[0]
     connection.execute(
         "INSERT OR REPLACE INTO briefings (topic, city, text, sources, made_at) VALUES ('weather', ?, ?, ?, ?)",
-        (town, "Sunny, with a high of 62 and a low of 48.", '["weather.gov"]',
+        (town, "Cloudy today, with a high of 48 and a low of 41.", '["Open-Meteo.com"]',
          datetime.now().isoformat(timespec="seconds")),
     )
     connection.commit()

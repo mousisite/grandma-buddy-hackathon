@@ -2001,12 +2001,15 @@ def check_hands_free(browser) -> None:
     page.goto(f"http://localhost:{PORT}/", wait_until="networkidle")
     # Buddy's voice, faked: 1.5 seconds of "speaking" for each reply.
     page.evaluate(
-        "window.fakeSpeaking = false;"
+        "window.fakeSpeaking = false; window.spoken = [];"
         "window.isSpeaking = function () { return fakeSpeaking; };"
         "window.speak = function (text, options) {"
-        "  fakeSpeaking = true;"
+        "  spoken.push(text); fakeSpeaking = true;"
         "  setTimeout(function () { fakeSpeaking = false; if (options && options.onEnd) { options.onEnd(); } }, 1500);"
-        "}; 0")
+        "};"
+        # The fake microphone beeps and goes quiet; her voice counts as loud all
+        # the time here, so a turn ends only when the fake Meta says so.
+        "window.loudness = function () { return 1; }; 0")
     page.click("#start-talk")
     page.wait_for_function("handsFreeOn() && talkState === 'listening'", timeout=15000)
     assert page.text_content("#talk-label") == "Pause"
@@ -2039,6 +2042,66 @@ def check_hands_free(browser) -> None:
     page.wait_for_function("talkState === 'listening' && !fakeSpeaking", timeout=10000)
     assert her_sound_after(before["her"]), "listening again after Buddy spoke"
     check_layout(page, "hands-free listening at 390px")
+    # A slow tool (the weather): the page asks for events, the server sends
+    # a bridge line first, and Buddy says it at once, then the answer.
+    def events_chat(route):
+        chats.append(route.request.post_data_json)
+        assert "application/x-ndjson" in (route.request.headers.get("accept") or ""), "the page asks for events"
+        route.fulfill(status=200, content_type="application/x-ndjson", body=(
+            json.dumps({"type": "bridge", "text": "Let me look that up."}) + "\n"
+            + json.dumps({"type": "done", "reply": "Showers today, high near 59.", "show": None,
+                          "actions": [{"type": "sources", "sites": ["weather.gov"]}]}) + "\n"))
+
+    page.unroute("**/api/chat")
+    page.route("**/api/chat", events_chat)
+    relay["socket"].send(json.dumps({"type": "turn", "text": "What is the weather like?"}))
+    page.wait_for_function("document.getElementById('message').textContent.includes('Showers')")
+    assert page.evaluate("spoken.slice(-2)") == ["Let me look that up.", "Showers today, high near 59."], page.evaluate("spoken")
+    assert "weather.gov" in (page.text_content("#actions") or "")
+    page.unroute("**/api/chat")
+    page.route("**/api/chat", fake_chat)
+    page.wait_for_function("talkState === 'listening' && !fakeSpeaking", timeout=10000)
+    # Her turn ends in the page, before Meta says so: once she has been quiet
+    # and a live update has come 0.9 s after her last sound (Meta's live words
+    # trail her, so that update has her last word) and held still 0.3 s. Buddy
+    # gets her live words. Meta's own end of that turn (its number 7) is
+    # dropped, unless it has more words than were sent: those go to Buddy next.
+    relay["socket"].send(json.dumps({"type": "hearing", "turn": 7}))
+    relay["socket"].send(json.dumps({"type": "live", "text": "Is it going to"}))
+    page.wait_for_function("document.getElementById('you-said-text').textContent === 'Is it going to'")
+    before_quiet = len(chats)
+    held = []
+    page.unroute("**/api/chat")
+    page.route("**/api/chat", lambda route: held.append(route))  # Buddy "thinks" until the check answers
+    page.evaluate("window.loudness = function () { return 0; }")  # she stops talking
+    page.wait_for_timeout(1000)
+    assert not held, "a live update from before her last word must not end the turn"
+    relay["socket"].send(json.dumps({"type": "live", "text": "Is it going to rain"}))  # Meta's live words catch up
+    for _ in range(30):
+        if held:
+            break
+        page.wait_for_timeout(100)
+    assert held and held[0].request.post_data_json["text"] == "Is it going to rain", "her live words went to Buddy once they caught up and held still"
+    # While Buddy thinks, the orb shows it ("Let me think…", the swirl).
+    page.wait_for_function("talkState === 'working'")
+    assert page.get_attribute(".orb--voice", "data-buddy") == "thinking"
+    assert page.text_content("#buddy-label") == "Let me think…"
+    page.wait_for_timeout(500)
+    page.screenshot(path=str(OUT / "hands-free-thinking-390.png"))
+    chats.append(held[0].request.post_data_json)
+    held[0].fulfill(json={"reply": "It's sunny today, with a high of 62.", "show": None, "actions": []})
+    page.unroute("**/api/chat")
+    page.route("**/api/chat", fake_chat)
+    assert chats[-1]["text"] == "Is it going to rain", chats[-1]
+    relay["socket"].send(json.dumps({"type": "turn", "text": "Is it going to rain today?", "turn": 7}))
+    page.wait_for_function("talkState === 'listening' && !fakeSpeaking", timeout=10000)
+    for _ in range(15):
+        if len(chats) > before_quiet + 1:
+            break
+        page.wait_for_timeout(100)
+    assert chats[-1]["text"] == "today?", f"only the words Meta had beyond the sent ones go to Buddy: {chats[-1]}"
+    page.wait_for_function("talkState === 'listening' && !fakeSpeaking", timeout=10000)
+    page.evaluate("window.loudness = function () { return 1; }")
     # A pause in the middle of a sentence: Meta may end her turn at the
     # pause. The two parts reach Buddy together, so the safety net sees the
     # whole sentence ("my chest" … "hurts a lot").

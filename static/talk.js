@@ -389,6 +389,8 @@ function currentConversation() {
 }
 
 // Send her words to Buddy. The safety net answers first if it needs to.
+// The answer is asked for as events (Accept: application/x-ndjson), so a
+// bridge line ("Let me look that up.") can be said while a slow tool runs.
 function askBuddy(text) {
   if (OWN_TALKS[talkMode] && Date.now() - ownLastAnswer > OWN_TALK_IDLE_MS) {
     backToChat(); // left alone too long: this is ordinary talk again
@@ -396,7 +398,7 @@ function askBuddy(text) {
   ownLastAnswer = Date.now();
   return fetch("/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
     body: JSON.stringify({ conversation_id: currentConversation(), text: text, mode: talkMode }),
   })
     .catch(function () {
@@ -406,7 +408,7 @@ function askBuddy(text) {
       if (!response.ok) {
         throw problem("NotHeard");
       }
-      return response.json();
+      return readChatAnswer(response);
     })
     .then(function (answer) {
       // A diary or memory talk ends when the server says so (saved and
@@ -429,6 +431,51 @@ function askBuddy(text) {
         loadReminders(); // she may have told Buddy she took her pills
       }
     });
+}
+
+// Buddy's answer as the server sends it: one line of JSON per event, a
+// "bridge" line to say right away while a slow tool runs (plain words from
+// the server, never the AI's), then "done" with the whole answer. A plain
+// answer (one JSON object, with no events) is taken as it is.
+function readChatAnswer(response) {
+  var type = response.headers.get("content-type") || "";
+  if (type.indexOf("x-ndjson") < 0 || !response.body) {
+    return response.json();
+  }
+  var reader = response.body.getReader();
+  var decoder = new TextDecoder();
+  var leftover = "";
+  var answer = null;
+
+  function handle(line) {
+    if (!line.trim()) {
+      return;
+    }
+    var event = JSON.parse(line);
+    if (event.type === "bridge") {
+      say(event.text);
+      speak(event.text);
+    } else if (event.type === "done") {
+      delete event.type;
+      answer = event;
+    } else if (event.type === "problem") {
+      throw problem("NotHeard");
+    }
+  }
+
+  return reader.read().then(function step(result) {
+    leftover += decoder.decode(result.value || new Uint8Array(), { stream: !result.done });
+    var lines = leftover.split("\n");
+    leftover = result.done ? "" : lines.pop();
+    lines.forEach(handle);
+    if (result.done) {
+      if (!answer) {
+        throw problem("NotHeard");
+      }
+      return answer;
+    }
+    return reader.read().then(step);
+  });
 }
 
 // ---------- Call buttons ----------
@@ -490,10 +537,10 @@ function showActions(actions) {
       });
       row.appendChild(message);
     } else if (action.type === "sources") {
-      // Where Buddy read today's weather or news (Meta's web search).
+      // Where today's weather (Open-Meteo) or news (Meta's web search) came from.
       var from = document.createElement("p");
       from.className = "sources";
-      from.textContent = "From the web: " + action.sites.join(", ");
+      from.textContent = (action.from || "From the web:") + " " + action.sites.join(", ");
       row.appendChild(from);
     } else if (isCallLink(action.href)) {
       row.appendChild(callLink(action, "call-pill"));
@@ -623,6 +670,7 @@ function closeSafetyScreen() {
 // still has help one tap away.
 function talkProblem(reason) {
   var name = reason && reason.name;
+  document.getElementById("you-said").hidden = true; // her last words don't belong to this message
   if (name === "NotAllowedError" || name === "SecurityError") {
     say("I can’t hear you yet. At the top of the window, click the microphone or lock picture, choose Allow, then tap “Tap to talk” again. If you need help now, call below.");
   } else if (name === "NotFoundError" || name === "NotReadableError") {

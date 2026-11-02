@@ -121,9 +121,11 @@ def test_her_words_come_back_live_then_as_a_finished_turn(monkeypatch):
         assert socket.receive_json() == {"type": "ready"}
         socket.send_bytes(sound)
         # Only what the page needs, nothing else Meta sends.
-        assert socket.receive_json() == {"type": "hearing"}
+        # The turn's number comes too: the page ends a turn itself after a
+        # quiet moment, and must know which of Meta's turns to drop later.
+        assert socket.receive_json() == {"type": "hearing", "turn": 0}
         assert socket.receive_json() == {"type": "live", "text": "Hi buddy"}
-        assert socket.receive_json() == {"type": "turn", "text": "Hi Buddy, what's the weather?"}
+        assert socket.receive_json() == {"type": "turn", "text": "Hi Buddy, what's the weather?", "turn": 0}
     assert fake.received[0] == sound  # her sound went to Meta as it was
     assert fake.received[-1] == json.dumps({"type": "endStream"})  # leaving ends Meta's stream cleanly
     assert fake.closed

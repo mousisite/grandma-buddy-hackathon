@@ -20,9 +20,30 @@ var SPEECH_START_MS = 7000; // how long Buddy's voice may take to start after a 
 var SILENCE = new ArrayBuffer(2560); // 80 ms of quiet at 16 kHz, 16-bit
 // A turn that ends at a short pause may be the middle of her sentence
 // ("my chest" … "hurts a lot"): wait this long before Buddy answers, and
-// join the parts, so the safety net sees the whole sentence.
-var JOIN_MS = 800;
+// join the parts, so the safety net sees the whole sentence. (Meta already
+// waits about a second of quiet before it ends a turn, and the server joins
+// her last few messages for the safety net too, so half a second is enough.)
+var JOIN_MS = 500;
 var STILL_TALKING_MS = 6000; // she went on, but no end came: answer what we have
+// Her turn ends here, in the page, once she has been quiet after talking
+// (her microphone's loudness, with no library), without waiting for Meta to
+// say so (Meta took 0.5 to 4.7 seconds, measured Nov 1). Meta's live words
+// trail her: her last word shows up in a live update 0.5 to 1.1 seconds
+// after she said it (earlier updates may lack it), so the turn ends only
+// once a live update has come 0.65 seconds after her last sound (0.4
+// seconds is enough when it ends a sentence, with a full stop or a question
+// mark) and then held still for 0.5 seconds: about 1 to 1.6 seconds after
+// her last word. A short pause inside a sentence doesn't end it. Her live words
+// are what Buddy answers; Meta's own end of that turn is dropped when it
+// comes (unless it carries more words than were sent: those go to Buddy
+// next, never lost).
+var QUIET_TURN_MS = 700; // quiet at least this long after her last sound
+var LIVE_AFTER_QUIET_MS = 650; // and a live update came this long after her last sound (it has her last word)…
+var SENTENCE_AFTER_QUIET_MS = 400; // …or this long, when the words end a sentence
+var LIVE_SETTLED_MS = 500; // and her live words haven't changed for this long
+var SENTENCE_SETTLED_MS = 500; // (the same, in the sentence case)
+var ENDS_SENTENCE = /[.?!]["'\u2019]?$/;
+var LOUD = 0.05; // her voice, on the orb's 0 to 1 level (a quiet room stays under it)
 var handsFree = null; // while on: the session from startHandsFree()
 
 // Can this browser listen hands-free, and does she want it?
@@ -48,7 +69,9 @@ function buddyMaySpeak() {
 function startHandsFree() {
   var session = { socket: null, context: null, stream: null, ready: false, hearing: false,
     heardAt: Date.now(), replyAt: 0, buddySpoke: true, level: 0,
-    said: "", joinTimer: null, waiting: "" }; // said: her sentence so far; waiting: words for after Buddy's answer
+    said: "", joinTimer: null, waiting: "", // said: her sentence so far; waiting: words for after Buddy's answer
+    liveText: "", liveAt: 0, liveTurn: null, // her live words in this turn, when they last changed, Meta's number for it
+    lastLoudAt: 0, endedTurn: null, endedText: "", dropNextTurn: false }; // the turn ended here, and what was sent
   handsFree = session;
   setTalkState("working"); // "One moment…" while it gets ready
   return navigator.mediaDevices.getUserMedia({
@@ -137,6 +160,12 @@ function onSound(session, sound) {
     socket.send(hers ? sound : SILENCE);
   }
   session.level = hers ? loudness(sound) : 0;
+  if (hers && session.level > LOUD) {
+    session.lastLoudAt = Date.now();
+  }
+  if (hers && session.hearing && session.liveText && Date.now() - session.lastLoudAt > QUIET_TURN_MS && herLastWordIsIn(session)) {
+    endTurnHere(session); // she has been quiet long enough, and her last word is in: her turn is over
+  }
   if (isSpeaking()) {
     session.buddySpoke = true;
     session.heardAt = Date.now(); // a minute of quiet counts from when Buddy stopped
@@ -173,30 +202,97 @@ function onHeard(session, message) {
   session.heardAt = Date.now();
   if (message.type === "hearing") {
     session.hearing = true;
+    session.liveTurn = message.turn === undefined ? null : message.turn;
+    session.liveText = "";
+    session.lastLoudAt = Date.now(); // the quiet count starts now: she has just begun
     if (session.said) {
       // She goes on talking: wait for the rest of her sentence.
       clearTimeout(session.joinTimer);
       session.joinTimer = setTimeout(function () { answerHer(session); }, STILL_TALKING_MS);
     }
   } else if (message.type === "live") {
+    if (session.endedTurn !== null && session.endedTurn === session.liveTurn) {
+      return; // this turn was ended here already; its end from Meta brings any words that are missing
+    }
+    session.liveText = String(message.text || "");
+    session.liveAt = Date.now();
     showLiveWords((session.said ? session.said + " " : "") + message.text);
   } else if (message.type === "turn") {
-    session.hearing = false;
     var words = String(message.text || "").trim();
-    if (talkState === "working") {
-      // Buddy is thinking about her last words: these wait their turn, never lost.
-      session.waiting = (session.waiting ? session.waiting + " " : "") + words;
-      return;
+    var endedHere = session.dropNextTurn || (message.turn !== undefined && message.turn !== null && message.turn === session.endedTurn);
+    if (endedHere) {
+      // Meta's end of a turn that ended here: only words it has beyond what
+      // was sent (she went on while Buddy started thinking) go to Buddy.
+      session.dropNextTurn = false;
+      session.endedTurn = null;
+      words = wordsAfter(session.endedText, words);
+      session.endedText = "";
+      if (!words) {
+        return;
+      }
     }
-    if (talkState === "idle" && words) {
-      stopSpeaking(); // she talked over Buddy: Buddy stops and listens
-      setTalkState("listening");
-    }
-    session.said = (session.said ? session.said + " " : "") + words;
-    session.said = session.said.trim();
-    clearTimeout(session.joinTimer);
-    session.joinTimer = setTimeout(function () { answerHer(session); }, JOIN_MS);
+    turnHeard(session, words, JOIN_MS);
   }
+}
+
+// Her turn is over (Meta said so, or she has been quiet long enough): Buddy
+// answers after joinMs, in case she goes on.
+function turnHeard(session, words, joinMs) {
+  session.hearing = false;
+  if (talkState === "working") {
+    // Buddy is thinking about her last words: these wait their turn, never lost.
+    session.waiting = (session.waiting ? session.waiting + " " : "") + words;
+    return;
+  }
+  if (talkState === "idle" && words) {
+    stopSpeaking(); // she talked over Buddy: Buddy stops and listens
+    setTalkState("listening");
+  }
+  session.said = (session.said ? session.said + " " : "") + words;
+  session.said = session.said.trim();
+  clearTimeout(session.joinTimer);
+  session.joinTimer = setTimeout(function () { answerHer(session); }, joinMs);
+}
+
+// Do her live words have her last word yet? A live update that came long
+// enough after her last sound, and has held still since.
+function herLastWordIsIn(session) {
+  var cameAfterQuiet = session.liveAt - session.lastLoudAt;
+  var heldStill = Date.now() - session.liveAt;
+  if (cameAfterQuiet >= LIVE_AFTER_QUIET_MS && heldStill > LIVE_SETTLED_MS) {
+    return true;
+  }
+  return ENDS_SENTENCE.test(session.liveText.trim()) && cameAfterQuiet >= SENTENCE_AFTER_QUIET_MS && heldStill > SENTENCE_SETTLED_MS;
+}
+
+// She has been quiet long enough: her live words so far are her turn, and
+// Buddy answers at once (no join wait: she has already been quiet).
+function endTurnHere(session) {
+  var words = session.liveText.trim();
+  session.endedTurn = session.liveTurn;
+  session.endedText = words;
+  session.dropNextTurn = session.liveTurn === null; // no turn numbers: drop Meta's next end instead
+  session.liveText = "";
+  turnHeard(session, words, 0);
+}
+
+// The words in full that come after the words already sent ("my knee hurts"
+// then "my knee hurts when I walk" gives "when I walk"), or "" when full
+// doesn't start with them.
+function wordsAfter(sent, full) {
+  var plain = function (text) { return text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean); };
+  var sentWords = plain(sent);
+  var fullWords = full.split(/\s+/).filter(Boolean);
+  if (!sentWords.length || fullWords.length <= sentWords.length) {
+    return "";
+  }
+  var fullPlain = plain(full);
+  for (var i = 0; i < sentWords.length; i++) {
+    if (fullPlain[i] !== sentWords[i]) {
+      return "";
+    }
+  }
+  return fullWords.slice(sentWords.length).join(" ");
 }
 
 // Her sentence is complete: Buddy answers it.

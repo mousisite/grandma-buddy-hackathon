@@ -16,9 +16,24 @@ from websockets.asyncio.client import connect as ws_connect  # tests replace thi
 
 from app.config import get_settings
 
-BASE_URL = "https://api.meta.ai/v1"
-REALTIME_URL = "wss://api.meta.ai/v1/asr/realtime"  # live speech-to-text (hands-free talking)
+
+
+def base_url() -> str:
+    """Where Meta's API is: https://api.meta.ai/v1, unless META_API_URL in
+    .env says otherwise (scripts/check_failures.py points it at a dead
+    address to see every "Meta is down" message)."""
+    return get_settings().meta_api_url
+
+
+def realtime_url() -> str:
+    """The live speech-to-text socket, next to the API: wss://api.meta.ai/v1/asr/realtime."""
+    http = base_url()
+    socket = "wss://" + http[len("https://"):] if http.startswith("https://") else "ws://" + http[len("http://"):]
+    return socket + "/asr/realtime"
+
+
 TIMEOUT_SECONDS = 60
+TALK_TIMEOUT_SECONDS = 20  # a talk reply: past this Buddy says it is having trouble (one real call once took 29 s)
 RETRIES = 3  # extra tries when Meta says it is too busy (HTTP 429)
 PAINT_TIMEOUT_SECONDS = 180  # painting takes longer than talking
 PICTURE_SIZE = "1536x1024"  # a landscape page picture (3:2)
@@ -32,24 +47,34 @@ class MetaError(Exception):
     """Meta's API answered with a problem. The screen shows a kind message instead."""
 
 
+_clients: dict[str, OpenAI] = {}  # the one connection, by key (a new key makes a new one)
+_http = requests.Session()  # one connection for speech-to-text uploads, reused
+
+
 def _client() -> OpenAI:
-    """The connection for chat: the official openai package pointed at Meta.
+    """The connection for chat: the official openai package pointed at Meta,
+    made once and then reused, so a reply never waits for a new connection
+    to Meta to be set up (a few tenths of a second each time).
 
     Tests replace this function so they can never reach the real API.
     The package's own retries are off (max_retries=0): this file does its
     own waiting and retrying, so she never waits through both.
     """
-    return OpenAI(
-        base_url=BASE_URL,
-        api_key=get_settings().model_api_key,
-        timeout=TIMEOUT_SECONDS,
-        max_retries=0,
-    )
+    key = get_settings().model_api_key
+    if key not in _clients:
+        _clients.clear()  # a new key: the old connection is no good
+        _clients[key] = OpenAI(base_url=base_url(), api_key=key, timeout=TIMEOUT_SECONDS, max_retries=0)
+    return _clients[key]
 
 
 def chat(messages: list[dict], tools: list[dict] | None = None,
-         reasoning: str = "low", max_tokens: int = 3000) -> dict:
+         reasoning: str = "minimal", max_tokens: int = 3000) -> dict:
     """Ask Muse Spark for the next reply.
+
+    reasoning "minimal" keeps everyday talk quick. Measured Nov 1 with the
+    real companion prompt: at "low" the model thought for 850 to 1200 hidden
+    tokens (5 to 6 seconds a round), at "minimal" for 100 to 500 (2 to 3.5
+    seconds), with the same warm words and the same use of its tools.
 
     There is no tool_choice: Meta only supports "auto" (the default) and
     answers "none" or "required" with HTTP 400. To get words instead of a
@@ -68,8 +93,9 @@ def chat(messages: list[dict], tools: list[dict] | None = None,
     request = {
         "model": settings.chat_model,  # muse-spark-1.3, a standard model (never -contributor)
         "messages": messages,
-        "reasoning_effort": reasoning,  # "low" keeps everyday talk quick
+        "reasoning_effort": reasoning,  # "minimal" for talk (see above); "medium" for a scam check
         "max_completion_tokens": max_tokens,
+        "timeout": TALK_TIMEOUT_SECONDS,  # she never waits more than this for one reply
     }
     if tools:
         request["tools"] = tools
@@ -290,8 +316,8 @@ def transcribe(wav_bytes: bytes, keywords: list[str]) -> str:
         request_settings["keywords"] = keywords
 
     for attempt in range(RETRIES + 1):
-        response = requests.post(
-            f"{BASE_URL}/asr/transcribe",
+        response = _http.post(  # the kept connection: no new one per recording
+            f"{base_url()}/asr/transcribe",
             headers={
                 "Authorization": f"Bearer {settings.model_api_key}",
                 "Accept": "application/json",
@@ -337,7 +363,7 @@ async def open_listening(keywords: list[str]):
         "keywords": keywords,  # names she is likely to say (family, doctor, pills)
     }
     try:
-        socket = await ws_connect(REALTIME_URL, open_timeout=10, max_size=2**20)
+        socket = await ws_connect(realtime_url(), open_timeout=10, max_size=2**20)
         await socket.send(json.dumps(handshake))
         answer = json.loads(await asyncio.wait_for(socket.recv(), timeout=10))
     except (OSError, asyncio.TimeoutError, ValueError, websockets.exceptions.WebSocketException) as problem:

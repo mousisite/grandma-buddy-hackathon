@@ -9,7 +9,7 @@
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
-from app import db, demo, memories
+from app import db, demo, memories, public_demo
 from app.config import get_settings
 
 router = APIRouter()
@@ -27,7 +27,7 @@ def demo_state():
         seeded = db.get_profile(connection)["name"] == demo.DEMO_NAME
     finally:
         connection.close()
-    return {"demo": demo.demo_mode(), "seeded": seeded}
+    return {"demo": demo.demo_mode(), "seeded": seeded, "public": public_demo.on()}
 
 
 def paint_pages(pages: list[int]) -> None:

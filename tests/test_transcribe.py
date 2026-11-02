@@ -115,7 +115,9 @@ def test_meta_client_sends_the_request_meta_expects(monkeypatch):
         sent.append((url, kwargs))
         return FakeResponse(200, {"transcript": "  Hello there.  ", "turns": []})
 
-    monkeypatch.setattr(requests, "post", fake_post)
+    # One connection (a requests session) is kept and reused, so each
+    # recording doesn't open a new one.
+    monkeypatch.setattr(meta_client._http, "post", fake_post)
 
     transcript = meta_client.transcribe(b"RIFF-wav-bytes", ["Maria", "Vitamin D"])
 
@@ -146,7 +148,7 @@ def test_meta_client_waits_and_retries_when_meta_is_busy(monkeypatch):
         return replies.pop(0)
 
     waits = []
-    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(meta_client._http, "post", fake_post)
     monkeypatch.setattr(meta_client.time, "sleep", waits.append)
 
     assert meta_client.transcribe(b"RIFF", []) == "Hi"
@@ -157,7 +159,7 @@ def test_meta_client_waits_and_retries_when_meta_is_busy(monkeypatch):
 
 
 def test_meta_client_raises_meta_error_when_meta_fails(monkeypatch):
-    monkeypatch.setattr(requests, "post", lambda url, **kwargs: FakeResponse(500))
+    monkeypatch.setattr(meta_client._http, "post", lambda url, **kwargs: FakeResponse(500))
 
     with pytest.raises(meta_client.MetaError):
         meta_client.transcribe(b"RIFF", [])

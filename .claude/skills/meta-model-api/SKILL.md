@@ -48,7 +48,7 @@ reply = resp.choices[0].message.content
 Rules:
 
 - Roles: `developer` (preferred for system prompts; `system` is treated the same), `user`, `assistant`, `tool`.
-- `reasoning_effort`: `"minimal"`, `"low"`, `"medium"`, `"high"`, or `"xhigh"`. `"none"` returns HTTP 400. Use `"low"` for conversation and `"medium"` for scam checks and doctor notes.
+- `reasoning_effort`: `"minimal"`, `"low"`, `"medium"`, `"high"`, or `"xhigh"`. `"none"` returns HTTP 400. Use `"minimal"` for conversation and `"medium"` for scam checks and doctor notes. Measured Nov 1 on the real companion prompt (3.5k tokens): `"low"` thinks for 850 to 1200 hidden tokens a round (5 to 6 seconds), `"minimal"` for 100 to 500 (2 to 3.5 seconds), with the same words and the same tool calls. Prompt length barely matters next to that.
 - Use `max_completion_tokens`. (`max_tokens` is still accepted; `max_output_tokens` is rejected on this endpoint.)
 - These return HTTP 400 on Chat Completions: `stop`, `n` greater than 1, `verbosity`, `logit_bias`, `prediction`, `web_search_options`, `modalities`, `audio`, `logprobs: true`, and `text.format` (that belongs to the Responses API).
 - Leave `temperature` at the default. Never set both `temperature` and `top_p`.
@@ -56,6 +56,9 @@ Rules:
 - `tool_choice`: only `"auto"` (the default) is supported. `"none"`, `"required"`, and named functions return HTTP 400 ("only `auto` is supported for `tool_choice`", seen October 27, 2026). So never send it. To get words instead of another tool call, add a short `developer` message at the end ("Now answer her in a few warm words. Don't call any tools.") and keep `tools` as they were; Meta accepts that after `tool` messages too.
 - Message order is validated strictly. An assistant message with `tool_calls` must be followed by one `tool` message per call, each with the matching `tool_call_id`, before the next assistant turn. Replay the whole assistant message, not just its text, or you get HTTP 400.
 - Non-streaming calls have a time limit (HTTP 504). If that happens, lower the reasoning effort or use `stream=True`.
+- `stream=True` works (checked Nov 1), but Muse Spark sends a message's words as ONE chunk after its hidden thinking (then a chunk per piece of each tool call), so nothing arrives any earlier than without streaming. The app doesn't stream from Meta; it streams its own events to the page instead (a fixed bridge line while a slow tool runs).
+- A reply that calls a tool needs a second round for the words. Tried Nov 1 and dropped: asking for the words in a second request at the same time (the developer message above, no tools run). Asked for words alone, Muse Spark sometimes narrates instead of answering ("I'll sit with her in it", "I'll get those call options ready"), about one reply in four, so the round after the tool, with the tool's answer in view, is the only reliable source of words.
+- Make one `OpenAI()` client and reuse it (`meta_client._clients`): each new client opens a new connection to Meta, a few tenths of a second per round.
 
 ## Function calling (companion tools)
 

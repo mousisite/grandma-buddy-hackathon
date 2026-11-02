@@ -1,0 +1,23 @@
+# Render "Blueprint": a public demo of Grandma Buddy (docs/DEPLOY.md).
+# Render reads this file when you make a Blueprint from the repository.
+services:
+  - type: web
+    name: grandma-buddy
+    runtime: docker
+    plan: starter            # $7 a month, always on; "free" also works but sleeps after 15 minutes
+    healthCheckPath: /api/ping
+    envVars:
+      - key: PUBLIC_DEMO
+        value: "1"
+      - key: ALLOWED_HOSTS
+        value: grandma-buddy.onrender.com   # change to your service's own address
+      - key: MODEL_API_KEY
+        sync: false          # a secret: Render asks you for it, and never shows it
+      - key: AI_CALLS_PER_VISITOR_HOUR
+        value: "40"
+      - key: AI_CALLS_PER_DAY
+        value: "600"
+      - key: DEMO_RESET_HOUR
+        value: "9"           # 9:00 UTC is 1:00 AM Pacific
+      - key: DATABASE_PATH
+        value: data/grandma_buddy.db

@@ -8,7 +8,7 @@ from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from app import accounts, db, demo, reminders
+from app import accounts, db, demo, memories, reminders
 from app.main import app
 
 SEEDED = datetime(2026, 10, 31, 15, 0)
@@ -73,7 +73,7 @@ def test_reset_starts_the_week_over_in_demo_mode_only(seeded, clock, monkeypatch
     from app import memories
     monkeypatch.setattr(memories, "make_page", lambda page: None)  # the paintings: a background job, never here
     client = TestClient(app)
-    assert client.get("/api/demo").json() == {"demo": True, "seeded": True}
+    assert client.get("/api/demo").json() == {"demo": True, "seeded": True, "public": False}
     client.post("/api/messages", json={"text": "A message that the reset will clear"})
     answer = client.post("/api/demo/reset")
     assert answer.status_code == 200 and answer.json()["backup"].startswith("backup-")
@@ -101,4 +101,29 @@ def test_without_the_demo_account_there_is_nothing_to_try(safe_test_setup, clock
     client = TestClient(app)
     assert client.get("/api/family/me").json() == {"signed_in": False, "demo": True, "demo_account": False}
     assert client.post("/api/family/demo-sign-in").status_code == 404
-    assert client.get("/api/demo").json() == {"demo": True, "seeded": False}
+    assert client.get("/api/demo").json() == {"demo": True, "seeded": False, "public": False}
+
+
+def test_the_demo_week_comes_with_its_pictures(safe_test_setup, clock):
+    """The three Memory book paintings are bundled (scripts/demo_pictures/),
+    so a fresh install or a public demo never paints: nothing to paint comes
+    back, every page is ready, and its picture file is there."""
+    connection = db.get_connection(safe_test_setup)
+    to_paint = demo.seed(connection, clock.now)
+    connection.commit()
+    pages = connection.execute("SELECT id, status, picture FROM memories ORDER BY id").fetchall()
+    assert to_paint == []
+    assert [page["status"] for page in pages] == ["ready", "ready", "ready"]
+    for page in pages:
+        assert page["picture"] == f"{page['id']}.webp"
+        assert (memories.pictures_dir() / page["picture"]).stat().st_size > 10_000
+    connection.close()
+
+
+def test_the_demo_week_can_be_painted_fresh_instead(safe_test_setup, clock):
+    connection = db.get_connection(safe_test_setup)
+    to_paint = demo.seed(connection, clock.now, pictures=False)
+    connection.commit()
+    assert len(to_paint) == 3
+    assert [row["status"] for row in connection.execute("SELECT status FROM memories")] == ["no_picture"] * 3
+    connection.close()

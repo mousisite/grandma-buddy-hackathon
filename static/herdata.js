@@ -33,6 +33,11 @@ function startHerData() {
     .then(function (response) { return response.json(); })
     .then(function (state) {
       resetBox.hidden = !state.demo;
+      if (state.public) {
+        // A public demo on the web: her data isn't taken or wiped there.
+        document.getElementById("data-export").hidden = true;
+        document.getElementById("data-delete").hidden = true;
+      }
     })
     .catch(function () {});
   reset.addEventListener("click", function () {

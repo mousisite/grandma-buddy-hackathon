@@ -18,9 +18,23 @@ import re
 import threading
 from datetime import date
 
-from app import db, guard, meta_client, prompts, reminders, safety, tools
+from app import briefing, db, guard, meta_client, prompts, reminders, safety, tools
 
 MAX_TOOL_ROUNDS = 3
+# (Tried Nov 1 and dropped: a second, words-only request in parallel with
+# the tool round, to skip the round after a tool. Asked for words alone, the
+# model sometimes wrote about her instead of to her, "I'll sit with her in
+# it", which no rule can catch. So a reply after a tool always comes from
+# the round after it, with the tool's answer in view.)
+# While a slow tool runs, Buddy says this right away (plain words, never the
+# AI's), so she isn't left in silence. The page gets it as an event
+# (app/routes/companion.py); it is never kept as part of the reply.
+BRIDGES = {
+    "look_up_today": "Let me look that up.",
+    "get_pills_due": "Let me check your pills.",
+    "mark_pill_taken": "Let me mark that down.",
+    "save_memory": "Let me write that down.",
+}
 DIARY_MAX_ANSWERS = 4  # her first answer plus up to three follow-ups
 MEMORY_MAX_ANSWERS = 3  # her memory plus one or two follow-ups
 LAST_ANSWER = {"diary": (DIARY_MAX_ANSWERS, prompts.LAST_DIARY_ANSWER),
@@ -75,6 +89,14 @@ def words_only(messages: list[dict]) -> str:
     return meta_client.chat(messages + [{"role": "developer", "content": WORDS_NOW}], tools=tools.TOOLS)["content"] or ""
 
 
+def say_bridge(context: dict, tool_names: list[str]) -> None:
+    """A slow tool is about to run: say its bridge line, once per reply."""
+    words = next((BRIDGES[name] for name in tool_names if name in BRIDGES), "")
+    if words and context.get("on_bridge") and not context.get("bridged"):
+        context["bridged"] = True
+        context["on_bridge"](words)
+
+
 def ask_the_ai(messages: list[dict], context: dict, buttons: list[dict]) -> str:
     """Ask Muse Spark, running any tools it asks for. Returns its words."""
     for _ in range(MAX_TOOL_ROUNDS):
@@ -88,6 +110,8 @@ def ask_the_ai(messages: list[dict], context: dict, buttons: list[dict]) -> str:
         # Meta needs the whole assistant message back, then one tool answer
         # per call, before the next turn.
         messages.append(answer["message"])
+        names = [call["name"] for call in answer["tool_calls"]]
+        say_bridge(context, names)
         for call in answer["tool_calls"]:
             result, new_buttons = tools.run_tool(call["name"], call["arguments"], context)
             add_buttons(buttons, new_buttons)  # the AI may ask for the same buttons twice
@@ -99,6 +123,19 @@ def ask_the_ai(messages: list[dict], context: dict, buttons: list[dict]) -> str:
     return words_only(messages)
 
 
+def todays_weather(connection, profile: dict) -> dict | None:
+    """Today's forecast for her town (app/briefing.py, Open-Meteo), or None
+    without a town or when it can't be fetched just now."""
+    town = (profile.get("city") or "").strip()
+    if not town:
+        return None
+    try:
+        return briefing.look_up(connection, "weather", town)
+    except (meta_client.MetaError, briefing.WeatherError) as problem:
+        print(f"Today's weather couldn't be fetched: {problem}")  # never her words
+        return None
+
+
 def add_buttons(buttons: list[dict], more: list[dict]) -> None:
     """Add buttons, skipping any that are already there."""
     for button in more:
@@ -106,8 +143,10 @@ def add_buttons(buttons: list[dict], more: list[dict]) -> None:
             buttons.append(button)
 
 
-def answer(connection, profile: dict, conversation_id: str, text: str, mode: str) -> dict:
-    """Buddy's reply to her words, ready for the screen. Saves it too."""
+def answer(connection, profile: dict, conversation_id: str, text: str, mode: str, on_bridge=None) -> dict:
+    """Buddy's reply to her words, ready for the screen. Saves it too.
+    on_bridge (optional) is called with a fixed line to say while a slow
+    tool runs (BRIDGES), so the page can speak it at once."""
     crisis = db.crisis_recently(connection)
     prompt = prompts.companion_prompt(profile, mode, crisis, memory_for_prompt(connection))
     # A "Something hurts" talk ends at her 4th answer and a memory talk at
@@ -116,10 +155,22 @@ def answer(connection, profile: dict, conversation_id: str, text: str, mode: str
     last_answer = bool(limit) and len(db.her_recent_words(connection, conversation_id, limit=limit)) >= limit
     if last_answer:
         prompt += last_words
+    buttons: list[dict] = []
+    if guard.seeks_advice(text):
+        prompt += prompts.ADVICE_ASKED  # answer her question first, the no-advice way
+    elif briefing.asks_about_today(text):
+        weather = todays_weather(connection, profile) if briefing.asks_about_weather(text) else None
+        if weather:
+            # The forecast is in hand (plain code, Open-Meteo): the model gets
+            # it to say, and the screen its source line, with no tool round.
+            prompt += prompts.WEATHER_IN_HAND.format(town=profile["city"].strip(), weather=weather["text"])
+            buttons.append({"type": "sources", "sites": weather["sites"], "from": weather["from"]})
+        else:
+            prompt += prompts.LOOK_UP_ASKED  # look today's weather, news, or game up before answering
     messages = [{"role": "developer", "content": prompt}]
     messages += db.recent_history(connection, limit=20)
-    context = {"connection": connection, "profile": profile, "conversation_id": conversation_id, "mode": mode}
-    buttons: list[dict] = []
+    context = {"connection": connection, "profile": profile, "conversation_id": conversation_id, "mode": mode,
+               "on_bridge": on_bridge}
 
     try:
         reply = spoken(ask_the_ai(messages, context, buttons)) or EMPTY_REPLY

@@ -285,15 +285,17 @@ def test_the_demo_week_is_made_up(safe_test_setup):
     assert profile["family_email"].endswith("@example.com")
 
 
-def test_the_memory_pages_are_painted_unless_told_not_to(safe_test_setup, monkeypatch):
+def test_the_memory_pages_come_with_pictures_and_are_painted_only_when_asked(safe_test_setup, monkeypatch):
     from app import meta_client
     painted = []
     monkeypatch.setattr(meta_client, "paint", lambda prompt: painted.append(prompt) or b"RIFF\x24\x00\x00\x00WEBPVP8 " + b"\x00" * 24)
     assert load_seed_script().main([]) == 0
-    assert len(painted) == 3  # the third page started from an old photo with no one in it
+    assert painted == []  # the bundled pictures (scripts/demo_pictures/): nothing to paint
     connection = db.get_connection(safe_test_setup)
     assert [row[0] for row in connection.execute("SELECT status FROM memories")] == ["ready", "ready", "ready"]
     connection.close()
+    assert load_seed_script().main(["--reset", "--paint"]) == 0
+    assert len(painted) == 3  # painted fresh on request (the third page from an old photo with no one in it)
 
 
 def test_the_demo_week_never_overwrites_data_without_reset(safe_test_setup):

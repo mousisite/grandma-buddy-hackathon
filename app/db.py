@@ -303,6 +303,16 @@ def init_db(db_path: str | None = None) -> None:
                 count INTEGER NOT NULL DEFAULT 0
             );
 
+            -- The public demo (app/public_demo.py): Meta calls made each day,
+            -- and the days the demo week was put back.
+            CREATE TABLE IF NOT EXISTS ai_calls (
+                day TEXT PRIMARY KEY,
+                count INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS demo_resets (
+                day TEXT PRIMARY KEY
+            );
+
             -- Each pill reminder exists once per time per day.
             CREATE UNIQUE INDEX IF NOT EXISTS med_events_once ON med_events (medication_id, due_at);
             """

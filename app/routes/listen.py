@@ -10,18 +10,20 @@
 # - Her sound is passed on as it is and never saved or printed. Only her
 #   words come back, and only on her own screen.
 #
-# To the page:  {"type": "ready"}        Meta is listening: send sound
-#               {"type": "hearing"}      she started talking
-#               {"type": "live", "text"} her words so far in this turn
-#               {"type": "turn", "text"} her finished turn
-#               {"type": "unavailable"}  no live speech-to-text: tap to talk instead
+# To the page:  {"type": "ready"}                Meta is listening: send sound
+#               {"type": "hearing", "turn"}      she started talking (Meta's number for this turn)
+#               {"type": "live", "text"}         her words so far in this turn
+#               {"type": "turn", "text", "turn"} her finished turn
+#               {"type": "unavailable"}          no live speech-to-text: tap to talk instead
+# The turn's number lets the page end a turn itself after a quiet moment
+# (static/listen.js) and then drop Meta's own end of that same turn.
 
 import asyncio
 import json
 
 from fastapi import APIRouter, WebSocket
 
-from app import db, meta_client, security
+from app import db, meta_client, public_demo, security
 from app.config import get_settings
 
 router = APIRouter()
@@ -47,6 +49,13 @@ async def listen(socket: WebSocket):
     listening["open"] = True
     try:
         await socket.accept()
+        # A public demo: live listening counts as one of the visitor's Meta
+        # calls; when their share is used up, she taps to talk instead.
+        host = socket.client.host if socket.client else ""
+        if await asyncio.to_thread(public_demo.ai_call_allowed, socket.headers, host):
+            await socket.send_json({"type": "unavailable"})
+            await socket.close()
+            return
         try:
             meta = await meta_client.open_listening(await asyncio.to_thread(db.get_keywords))
         except meta_client.MetaError as problem:
@@ -87,11 +96,11 @@ async def relay(socket: WebSocket, meta) -> None:
             event = json.loads(message)
             kind = event.get("type")
             if kind == "speechStart":
-                await socket.send_json({"type": "hearing"})
+                await socket.send_json({"type": "hearing", "turn": event.get("turnId")})
             elif kind == "transcript":
                 await socket.send_json({"type": "live", "text": str(event.get("transcript", ""))})
             elif kind == "speechComplete":
-                await socket.send_json({"type": "turn", "text": str(event.get("transcript", ""))})
+                await socket.send_json({"type": "turn", "text": str(event.get("transcript", "")), "turn": event.get("turnId")})
             elif kind == "error":
                 print(f"Live speech-to-text stopped: {event.get('errorType') or 'an error'}")  # never her words
 

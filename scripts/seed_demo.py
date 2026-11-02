@@ -11,7 +11,9 @@
 # --reset first saves a copy of the database (data\backup-<date>-<time>.db),
 # then wipes it, the Memory book pictures, and the voice messages, then adds
 # the demo week, ending today.
-# The 3 Memory book pictures cost about 3 cents; --no-paint skips them.
+# The 3 Memory book pages come with their pictures (scripts/demo_pictures/).
+# --paint paints them fresh with Muse Image instead (about 3 cents); --no-paint
+# leaves them without any.
 
 import sys
 from datetime import datetime
@@ -44,7 +46,7 @@ def main(args: list[str]) -> int:
         print(f"Saved a copy of the old data in {demo.back_up_and_wipe(path)}")
     connection = db.get_connection(path)
     try:
-        pages = demo.seed(connection, datetime.now())
+        pages = demo.seed(connection, datetime.now(), pictures="--paint" not in args)
         connection.commit()
     finally:
         connection.close()
@@ -54,7 +56,10 @@ def main(args: list[str]) -> int:
     print("today's postcard (ready to send), and this morning's talk about her tulips.")
     print(f"Family page: open /family and sign in as {demo.FAMILY_ACCOUNT['email']} with the password "
           f"{demo.FAMILY_ACCOUNT['password']} (Rose shares her diary in the demo), or tap \"Try the demo as Maria\".")
-    if "--no-paint" in args or not get_settings().model_api_key:
+    if not pages:
+        print("The 3 Memory book pages come with their pictures (scripts/demo_pictures/, painted by Muse Image for "
+              "this project). To paint them fresh instead: seed_demo.py --reset --paint (about 3 cents).")
+    elif "--no-paint" in args or not get_settings().model_api_key:
         print("The Memory book pages have no pictures yet: open a page and tap \"Paint it again\".")
     else:
         print("Painting the 3 Memory book pictures with Muse Image (about 3 cents)…")

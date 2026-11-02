@@ -4,15 +4,17 @@
 # Run it with: .venv\Scripts\python -m uvicorn app.main:app --reload
 # Then open http://localhost:8000 in Chrome or Edge.
 
+import asyncio
 import threading
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import db, security
+from app import db, public_demo, security
 from app.config import get_settings
 from app import voice
 from app.routes import (billing, briefing, checkin, companion, data, demo, diary, family, family_accounts, find, how,
@@ -31,6 +33,11 @@ async def lifespan(app: FastAPI):
     # the app opens at once and her first reply never waits for it.
     if voice.available():
         threading.Thread(target=voice.warm_up, daemon=True).start()
+    if public_demo.on():
+        # A public demo: the made-up week now (when the database is empty),
+        # and put back once a night (app/public_demo.py).
+        public_demo.reset_if_due(datetime.now())
+        threading.Thread(target=public_demo.keep_the_week_fresh, daemon=True).start()
     yield
     # Nothing to clean up when the server stops.
 
@@ -98,6 +105,24 @@ async def only_buddys_own_page(request, call_next):
 # The pages for the family member who sets Buddy up (docs/SPEC.md feature
 # 17): the landing, Privacy, and Terms. Plain files, served like Home.
 PAGES = {"/about": "about.html", "/privacy": "privacy.html", "/terms": "terms.html", "/family": "family.html"}
+
+
+@app.middleware("http")
+async def public_demo_rules(request, call_next):
+    """A public demo's rules (app/public_demo.py): no sign-ups and no data
+    changes (403, kind words), and each visitor's share of Meta's calls
+    (429, kind words). /api/chat is checked inside its route, after the
+    safety net. Nothing happens here at home."""
+    if public_demo.on():
+        words = public_demo.refused(request.method, request.url.path)
+        if words:
+            return JSONResponse({"detail": words}, status_code=403)
+        if public_demo.is_ai_call(request.method, request.url.path):
+            host = request.client.host if request.client else ""
+            words = await asyncio.to_thread(public_demo.ai_call_allowed, request.headers, host)
+            if words:
+                return JSONResponse({"detail": words}, status_code=429)
+    return await call_next(request)
 
 
 @app.middleware("http")

@@ -788,7 +788,7 @@ function showTodayWeather() {
       todayWeather = weather.text;
       row.hidden = !weather.text; // empty: no town yet, or nothing to share just now
       setText(document.getElementById("today-weather-text"), weather.text);
-      setText(document.getElementById("today-weather-from"), "From " + weather.sites.join(", "));
+      setText(document.getElementById("today-weather-from"), (weather.from || "From") + " " + weather.sites.join(", "));
     })
     .catch(function () {
       row.hidden = true; // no connection to our own server

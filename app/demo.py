@@ -162,8 +162,16 @@ def has_data(connection) -> bool:
     return any(connection.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone() for table in ("symptoms", "medications"))
 
 
-def seed(connection, now: datetime) -> list[int]:
-    """Add the demo week, ending today. Returns the Memory book pages to paint."""
+# The three Memory book paintings, made by Muse Image for this project and
+# kept small, so the demo week has its pictures without painting anything
+# (a fresh install, the public demo). pictures=False leaves the pages to be
+# painted instead (scripts/seed_demo.py --paint).
+DEMO_PICTURES = ROOT / "scripts" / "demo_pictures"
+
+
+def seed(connection, now: datetime, pictures: bool = True) -> list[int]:
+    """Add the demo week, ending today. Returns the Memory book pages still
+    to paint: none when the bundled pictures are used."""
     db.get_profile(connection)  # makes sure her profile row is there
     connection.execute(
         "UPDATE profile SET " + ", ".join(f"{field} = ?" for field in PROFILE) + " WHERE id = 1",
@@ -225,6 +233,8 @@ def seed(connection, now: datetime) -> list[int]:
     shutil.copyfile(PHOTO_PAGE["photo"], memories.pictures_dir() / f"photo-{photo_page}.webp")
     connection.execute("UPDATE memories SET photo = ? WHERE id = ?", (f"photo-{photo_page}.webp", photo_page))
     pages.append(photo_page)
+    if pictures:
+        pages = give_pictures(connection, pages)
     today = now.date().isoformat()
     for kind, fact, follow_up in FACTS:
         connection.execute("INSERT INTO facts (created_at, updated_at, kind, fact, follow_up, follow_up_on) "
@@ -253,6 +263,21 @@ def seed(connection, now: datetime) -> list[int]:
         shutil.copyfile(card["picture"], memories.pictures_dir() / f"postcard-{postcard}.webp")
         connection.execute("UPDATE postcards SET picture = ? WHERE id = ?", (f"postcard-{postcard}.webp", postcard))
     return pages
+
+
+def give_pictures(connection, pages: list[int]) -> list[int]:
+    """Each page gets its bundled painting (the first page the first file,
+    and so on) and is ready. Returns the pages left without one."""
+    left = []
+    for number, memory_id in enumerate(pages, start=1):
+        bundled = DEMO_PICTURES / f"{number}.webp"
+        if not bundled.exists():
+            left.append(memory_id)
+            continue
+        name = f"{memory_id}.webp"
+        shutil.copyfile(bundled, memories.pictures_dir() / name)
+        memories.set_status(connection, memory_id, "ready", picture=name)
+    return left
 
 
 def back_up_and_wipe(path: str) -> Path:
@@ -285,7 +310,7 @@ def reset(now: datetime | None = None) -> dict:
     backup = back_up_and_wipe(path)
     connection = db.get_connection(path)
     try:
-        pages = seed(connection, now or datetime.now())
+        pages = seed(connection, now or datetime.now())  # with the bundled pictures: nothing left to paint
         connection.commit()
     finally:
         connection.close()

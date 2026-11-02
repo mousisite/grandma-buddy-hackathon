@@ -30,6 +30,7 @@ def safe_test_setup(tmp_path, monkeypatch):
     monkeypatch.setattr(requests, "get", no_real_calls)
     monkeypatch.setattr(requests.Session, "request", no_real_calls)
     monkeypatch.setattr(meta_client, "_client", no_real_calls)
+    monkeypatch.setattr(meta_client, "_clients", {})  # no connection kept from another test
     monkeypatch.setattr(meta_client, "ws_connect", no_real_calls)  # live speech-to-text
 
     # The real voice model is big and slow to load: tests use a fake one.

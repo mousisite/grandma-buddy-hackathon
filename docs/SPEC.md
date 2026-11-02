@@ -146,8 +146,8 @@ Priority: **P0** must ship, **P1** should ship, **P2** nice to have. If we fall 
 
 ### 14. Today's weather, news, and sports (P1)
 
-- "What's the weather today?", "Anything happening in town?", "How did the Blazers do?": Buddy looks it up on the web with Meta's web search (the Responses API's `web_search` tool) near her town, and says it in one or two warm sentences, with where it read it under its words ("From the web: weather.gov").
-- Home's Today list starts with today's weather ("Sunny, with a high of 62 and a low of 48.", from weather.gov), read aloud by a tap anywhere on its row. Every Today row is tappable as a whole, with a chevron on its link.
+- "What's the weather today?": the forecast for her town from Open-Meteo (free, no key, the same source every time), said in plain words from a fixed table ("Cloudy today, with a high of 48 and a low of 41."), with "Weather from Open-Meteo.com" under it. "Anything happening in town?", "How did the Blazers do?": Buddy looks it up on the web with Meta's web search (the Responses API's `web_search` tool) near her town, and says it in one or two warm sentences, with where it read it under its words ("From the web: kgw.com").
+- Home's Today list starts with today's weather ("Cloudy today, with a high of 48 and a low of 41." and a small "Weather from Open-Meteo.com" line), read aloud by a tap anywhere on its row. Every Today row is tappable as a whole, with a chevron on its link.
 - A family member types her town in Settings, under Names and phone numbers. Only the town is sent.
 - Only the weather, local news, and sports can be looked up (never health, medicine, or food), and every answer is checked by plain code first (docs/SAFETY.md section 8c).
 - Done when: the request and the checks are tested with a fake Meta, and `scripts/check_briefing.py` gets real answers with sources for all three.

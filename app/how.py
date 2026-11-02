@@ -96,9 +96,10 @@ FEATURES = [
     {
         "name": "Today's weather and news",
         "what": "Buddy tells you today's weather, one cheerful thing happening in your town, or how your teams "
-                "did, and shows where it read it.",
+                "did, and shows where it came from.",
         "models": ["chat_model"],
-        "here": "Looked up with Meta's web search. Only your town is sent.",
+        "here": "The weather comes from Open-Meteo, a free weather service, in Buddy's own plain words. The news and "
+                "the scores are looked up with Meta's web search. Only your town is sent.",
     },
     {
         "name": "Family update",

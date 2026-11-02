@@ -6,14 +6,18 @@
 #   returns the fixed screen right away, and the AI is never asked.
 #   Otherwise Buddy's AI companion answers (app/companion.py).
 
+import json
+import queue
 import sqlite3
+import threading
 from datetime import timedelta
 
 import requests
-from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app import companion, db, memories, meta_client, prompts, reminders, safety, tools
+from app import companion, db, memories, meta_client, prompts, public_demo, reminders, safety, tools
 
 router = APIRouter()
 
@@ -48,12 +52,52 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/api/chat")
-def chat(request: ChatRequest, background: BackgroundTasks):
-    """Her words in, Buddy's answer out. The safety net always goes first."""
+def chat(request: ChatRequest, background: BackgroundTasks, http: Request, accept: str = Header(default="")):
+    """Her words in, Buddy's answer out. The safety net always goes first.
+
+    Asked for events (Accept: application/x-ndjson, as the page does), the
+    answer comes as lines of JSON: {"type": "bridge", "text"} to say at once
+    while a slow tool runs (plain words from app/companion.py, never the
+    AI's), then {"type": "done", ...the answer}. A safety screen comes as
+    "done" right away, with the AI never asked. Otherwise the answer is one
+    JSON object, as before."""
     text = request.text.strip()
     if not text or request.mode not in MODES or len(request.conversation_id) > 80:
         raise HTTPException(status_code=400, detail="I didn't catch that. Please try again.")
+    # In a public demo, her share of Meta's calls is checked after the safety
+    # net, right before the AI (app/public_demo.py): never for a safety screen.
+    visitor = (http.headers, http.client.host if http.client else "")
+    if "application/x-ndjson" in accept:
+        return StreamingResponse(answer_events(text, request, background, visitor), media_type="application/x-ndjson")
+    return answer_her(text, request, background, visitor=visitor)
 
+
+def answer_events(text: str, request: ChatRequest, background: BackgroundTasks, visitor=None):
+    """The answer as events, one line each, from a thread that does the work
+    (so a bridge line reaches the page while the AI is still thinking)."""
+    events: queue.Queue = queue.Queue()
+
+    def work() -> None:
+        try:
+            answer = answer_her(text, request, background,
+                                on_bridge=lambda words: events.put({"type": "bridge", "text": words}), visitor=visitor)
+            events.put({"type": "done", **answer})
+        except HTTPException as problem:
+            events.put({"type": "problem", "detail": problem.detail})
+        except Exception as problem:  # never her words
+            print(f"Chat failed: {type(problem).__name__}")
+            events.put({"type": "problem", "detail": "Please try again in a moment."})
+        finally:
+            events.put(None)
+
+    threading.Thread(target=work, daemon=True).start()
+    while (event := events.get()) is not None:
+        yield json.dumps(event, ensure_ascii=False) + "\n"
+
+
+def answer_her(text: str, request: ChatRequest, background: BackgroundTasks, on_bridge=None, visitor=None) -> dict:
+    """Her words through the safety net first, then Buddy's answer. visitor
+    (headers, address) is who is asking, for a public demo's share of calls."""
     # 1. The safety net on her whole message, before anything else, even
     #    before the database. It needs no database, AI, or internet.
     result = safety.check(text)
@@ -99,8 +143,15 @@ def chat(request: ChatRequest, background: BackgroundTasks):
         # Saved before the slow AI call, so nothing else waits on this database.
         connection.commit()
 
+        # A public demo: is this visitor's share of Meta's calls used up? Then
+        # kind words instead of the AI (the safety net above never waits on this).
+        words = public_demo.ai_call_allowed(*visitor) if visitor else None
+        if words:
+            return {"reply": words, "show": None, "actions": [], "diary_saved": False, "diary_done": False,
+                    "memory_saved": None, "memory_done": False}
+
         # 2. Nothing urgent: Buddy's AI companion answers (app/companion.py).
-        answer = companion.answer(connection, profile, request.conversation_id, saved_text, request.mode)
+        answer = companion.answer(connection, profile, request.conversation_id, saved_text, request.mode, on_bridge)
         if answer["memory_saved"]:
             # After she has her answer: write the Memory book page and paint it.
             background.add_task(memories.make_page, answer["memory_saved"])

@@ -26,11 +26,17 @@ Meta has no text-to-speech model, so Buddy speaks with an open voice model that 
 | phonemizer | [bootphon/phonemizer](https://github.com/bootphon/phonemizer) | GPL-3.0 | None (a separate package, used as is) |
 | espeak-ng, through espeakng-loader | [espeak-ng/espeak-ng](https://github.com/espeak-ng/espeak-ng), [thewh1teagle/espeakng-loader](https://github.com/thewh1teagle/espeakng-loader) | GPL-3.0 | None (a separate package, used as is) |
 
+## Weather data
+
+Today's weather on Home and in a talk comes from [Open-Meteo](https://open-meteo.com) (its geocoder and its forecast API; free for non-commercial use, data under CC BY 4.0: "Weather data by Open-Meteo.com"). The app sends only the town's name, then that spot's coordinates, and shows "Weather from Open-Meteo.com" under the words. No code from Open-Meteo is in this repository.
+
 ## Test photos
 
-`scripts/find_photos/` holds 4 photos (a living room, a kitchen counter, a sofa, and a writing desk) that `scripts/check_find.py` uses to try Find my things with the real SAM 3.1. They were painted with Meta's Muse Image for this project during the hackathon, from prompts in that script: rooms and a desk only, with no people and no writing. They are not photos of any real home.
+`scripts/find_photos/` holds 5 photos (a living room, a kitchen counter, a sofa, a writing desk, and a desk with reading glasses and house keys, `desk-keys.webp`) that `scripts/check_find.py` and `scripts/check_photos.py` use to try Find my things with the real SAM 3.1. They were painted with Meta's Muse Image for this project during the hackathon, from prompts in those scripts: rooms and desks only, with no people and no writing. The README's Find my things screenshot shows `desk-keys.webp`. They are not photos of any real home.
 
 `scripts/memory_photos/bench.webp` (made by `scripts/check_photo_memory.py` the first time it runs) is a made-up "old photo" painted with Meta's Muse Image for this project: two small figures seen from behind on a park bench, no faces, no real person. It tests the person check for a memory page from an old photo.
+
+`scripts/demo_pictures/1.webp`, `2.webp`, and `3.webp` are the three Memory book paintings Meta's Muse Image made for the demo week's made-up stories (summers at an aunt's farm, a church hall dance, a first kitchen), kept small, so the demo week comes with its pictures and nothing is painted on a fresh install or a public demo. Made for this project during the hackathon; no real place or person.
 
 `scripts/memory_photos/tulips.webp` is the postcard Meta's Muse Image painted for this project in `scripts/check_messages.py` (red tulips by a garden gate, two small figures far away, no faces, no writing). `scripts/demo_screenshots.py` uses it as today's postcard in its copy of the demo data, so no painting is bought for screenshots.
 

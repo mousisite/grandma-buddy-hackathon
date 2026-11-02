@@ -657,9 +657,11 @@ h2:focus,
   color: var(--text-2);
 }
 
-/* On phones the Home chips become a grid of tiles, two across, icon above
-   words: big, even targets, and no name gets squeezed onto two lines. */
-@media (max-width: 767px) {
+/* On phones and tablets the Home chips become a grid of tiles, two across,
+   icon above words: big, even targets, and no name gets squeezed onto two
+   lines (at 768px the column beside the sidebar is too narrow for pills:
+   "Check a message" broke in two). */
+@media (max-width: 1023px) {
   .home .chips {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -684,8 +686,8 @@ h2:focus,
   }
 }
 
-/* From 768px the chips stay pills, two by two and the same width. */
-@media (min-width: 768px) {
+/* From 1024px the chips stay pills, two by two and the same width. */
+@media (min-width: 1024px) {
   .home .chips {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -768,6 +770,20 @@ h2:focus,
   font-weight: 600;
   text-decoration: none;
   transition: background-color var(--fast) var(--ease);
+}
+
+/* On a narrow phone the words get more of the row: a little less padding
+   around the row and its link (the weather line wrapped onto four lines). */
+@media (max-width: 420px) {
+  .row {
+    padding-left: var(--s-3);
+    padding-right: var(--s-2);
+  }
+
+  .row-link,
+  .row-done {
+    padding: 0 var(--s-2);
+  }
 }
 
 /* "Start" in the Today list is a button that looks like the row links. */

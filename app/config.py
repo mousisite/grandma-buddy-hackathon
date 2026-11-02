@@ -24,6 +24,7 @@ class Settings:
     """All settings for Grandma Buddy. See .env.example for what each one means."""
 
     model_api_key: str = ""  # Meta Model API key. Empty means "not set up yet".
+    meta_api_url: str = "https://api.meta.ai/v1"  # where Meta's API is (a check can point it at a dead address)
     chat_model: str = "muse-spark-1.3"  # conversation model (standard, never -contributor)
     transcribe_model: str = "muse-voice-transcribe-1.0"  # speech-to-text model
     image_model: str = "muse-image-1.0"  # paints the Memory book pictures (standard, never -contributor)
@@ -35,6 +36,12 @@ class Settings:
     # The Family plan's checkout, in Stripe's TEST mode only (sk_test_…).
     # Empty means demo mode: no real charge, no card fields.
     stripe_secret_key: str = ""
+    # The public demo on a host (docs/DEPLOY.md): the made-up week, reset
+    # nightly, a share of Meta's calls per visitor and per day, no sign-ups.
+    public_demo: bool = False
+    ai_calls_per_visitor_hour: int = 40
+    ai_calls_per_day: int = 600
+    demo_reset_hour: int = 3  # the server's clock (UTC on most hosts)
 
 
 def get_settings() -> Settings:
@@ -45,6 +52,7 @@ def get_settings() -> Settings:
     """
     settings = Settings(
         model_api_key=os.getenv("MODEL_API_KEY", ""),
+        meta_api_url=os.getenv("META_API_URL", "https://api.meta.ai/v1").strip().rstrip("/"),
         chat_model=os.getenv("CHAT_MODEL", "muse-spark-1.3"),
         transcribe_model=os.getenv("TRANSCRIBE_MODEL", "muse-voice-transcribe-1.0"),
         image_model=os.getenv("IMAGE_MODEL", "muse-image-1.0"),
@@ -55,6 +63,10 @@ def get_settings() -> Settings:
             name.strip().lower() for name in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,::1").split(",") if name.strip()
         ),
         stripe_secret_key=os.getenv("STRIPE_SECRET_KEY", "").strip(),
+        public_demo=os.getenv("PUBLIC_DEMO", "").strip().lower() in ("1", "true", "yes", "on"),
+        ai_calls_per_visitor_hour=int(os.getenv("AI_CALLS_PER_VISITOR_HOUR", "40")),
+        ai_calls_per_day=int(os.getenv("AI_CALLS_PER_DAY", "600")),
+        demo_reset_hour=int(os.getenv("DEMO_RESET_HOUR", "3")),
     )
     # Payments only ever run in Stripe's test mode, so nothing is ever really
     # charged. A live key refuses to start (and is never printed).
