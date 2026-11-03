@@ -77,7 +77,7 @@ This repository was created on October 26, 2026, the kickoff day. I planned the 
 
 You need Python 3.12 or newer, Chrome or Edge, and a Meta Model API key from [dev.meta.ai](https://dev.meta.ai).
 
-**The short way:** double-click `start.bat`. The first time it makes the Python environment, installs the packages, and opens `.env` for your key; after that it loads the made-up demo week (only into an empty database), starts the server, and opens Buddy in your browser as soon as the server answers (double-clicking it again while Buddy runs just opens the browser). Close its window to stop Buddy.
+**The short way:** double-click `start.bat`. The first time it makes the Python environment, installs the packages, and opens `.env` for your key; the second time it adds Buddy's natural voice (a 354 MB download, once; the browser's voice speaks until it is there); after that it loads the made-up demo week (only into an empty database), starts the server, and opens Buddy in your browser as soon as the server answers (double-clicking it again while Buddy runs just opens the browser). Close its window to stop Buddy.
 
 **By hand,** in PowerShell, in the project folder:
 
@@ -101,7 +101,7 @@ Start it once only. On Windows a second server on the same port starts without a
 ## Tests
 
 ```powershell
-.venv\Scripts\python -m pytest                          # 800+ tests; Meta is always faked, no test can reach the internet
+.venv\Scripts\python -m pytest                          # 844 tests; Meta is always faked, no test can reach the internet
 .venv\Scripts\python -m playwright install chromium     # once: the browser the checks below drive
 .venv\Scripts\python scripts\browser_checks\home.py     # every screen and flow in a real browser, no key needed
 .venv\Scripts\python scripts\check_failures.py         # every failure state (Meta down, no internet, a blocked microphone, a blurry photo, the server stopped), with screenshots
@@ -126,10 +126,11 @@ The same 42 made-up turns (small talk, loneliness, her grandchildren, the weathe
 | minimal | 93% (39 of 42) | 95% | 97% | 4.91 | 3.4 s | 200 tokens | $0.34 |
 | low | 95% (40 of 42) | 98% | 97% | 4.91 | 6.1 s | 627 tokens | $0.41 |
 | medium | 90% (38 of 42) | 90% | 100% | 4.82 | 9.1 s | 1,185 tokens | $0.46 |
+| minimal, after the scam fix (the confirming run) | 98% (41 of 42) | 98% | 100% | 4.88 | 3.6 s | 240 tokens | $0.35 |
 
-![Pass rate, warmth, reply time, and cost at each reasoning effort](docs/eval/chart.svg)
+![Pass rate, warmth, reply time, and cost at each reasoning effort, the comparison run before the scam fix](docs/eval/chart.svg)
 
-More reasoning did not help: medium thought six times longer than minimal, took 9 seconds a reply instead of 3, cost more, and scored lowest, because it chatted about a scam story instead of warning her. Low beat minimal by a single turn at twice the wait. Buddy stays on **minimal**. The run's real finding, Buddy answering a scam story with a gentle question, became a plain-code nudge; the confirming run at minimal then passed 41 of 42 (the one miss: a correct refusal that echoed the word "vitamins", which the guard rightly blocks). Muse Glimmer, Meta's small fast model, is open-weight only and not on the Model API, so small talk could not be routed to it.
+More reasoning did not help: medium thought six times longer than minimal, took 9 seconds a reply instead of 3, cost more, and scored lowest, because it chatted about a scam story instead of warning her. Low beat minimal by a single turn at twice the wait. Buddy stays on **minimal**. The run's real finding, Buddy answering a scam story with a gentle question, became a plain-code nudge; the confirming run at minimal then passed 41 of 42 (98%, warmth 4.88, 3.6 s a reply; the one miss: a correct refusal that echoed the word "vitamins", which the guard rightly blocks). Muse Glimmer, Meta's small fast model, is open-weight only and not on the Model API, so small talk could not be routed to it.
 
 ## What's next
 

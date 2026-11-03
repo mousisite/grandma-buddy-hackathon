@@ -46,6 +46,17 @@ if not exist ".env" (
   exit /b 0
 )
 
+rem Buddy's natural voice (Kokoro, Apache-2.0): the kokoro-onnx package, then the
+rem voice model, about 354 MB, once. Without them Buddy speaks with the browser's voice.
+.venv\Scripts\python -c "import kokoro_onnx" >nul 2>nul || (
+  echo Adding Buddy's natural voice ^(once^)...
+  .venv\Scripts\python -m pip install -q kokoro-onnx==0.6.1 --no-deps --ignore-requires-python
+)
+if not exist "models\kokoro-v1.0.onnx" (
+  echo Downloading Buddy's voice, about 354 MB ^(once^). Buddy uses the browser's voice until it is here.
+  .venv\Scripts\python scripts\get_voice.py || echo The voice download didn't finish. Buddy will use the browser's voice; run scripts\get_voice.py later.
+)
+
 rem The made-up demo week for "Rose", only when there is nothing in the database yet.
 .venv\Scripts\python scripts\seed_demo.py --no-paint >nul 2>nul
 
