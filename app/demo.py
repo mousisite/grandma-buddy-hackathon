@@ -314,4 +314,44 @@ def reset(now: datetime | None = None) -> dict:
         connection.commit()
     finally:
         connection.close()
+    remember_choice("D")  # the demo week is what this computer wants
     return {"backup": backup.name, "pages": pages}
+
+
+# ---------- The first start: the demo week, or a real person ----------
+
+CHOICE_FILE = "start-choice"  # next to the database: "D" (Rose's demo week) or "F" (fresh, for a real person)
+
+
+def choice_path() -> Path:
+    return Path(get_settings().database_path).parent / CHOICE_FILE
+
+
+def start_choice() -> str | None:
+    """What the first start chose: "D" (Rose's demo week), "F" (fresh, for a
+    real person), or None when nobody has been asked yet. start.bat asks
+    once and writes the same file."""
+    try:
+        first = choice_path().read_text(encoding="utf-8").strip()[:1].upper()
+    except OSError:
+        return None
+    return first if first in ("D", "F") else None
+
+
+def remember_choice(choice: str) -> None:
+    """Keep the choice next to the database, so it is never asked again and
+    scripts/seed_demo.py knows whether an empty database gets the demo week."""
+    path = choice_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(choice + "\n", encoding="utf-8")
+
+
+def start_fresh() -> dict:
+    """ "Start fresh for a real person" in Settings, Her data: a backup, then
+    everything emptied as on the first day, and "F" remembered, so the welcome
+    flow opens and the demo week never comes back by itself."""
+    path = get_settings().database_path
+    db.init_db(path)
+    backup = back_up_and_wipe(path)
+    remember_choice("F")
+    return {"backup": backup.name}

@@ -57,7 +57,28 @@ if not exist "models\kokoro-v1.0.onnx" (
   .venv\Scripts\python scripts\get_voice.py || echo The voice download didn't finish. Buddy will use the browser's voice; run scripts\get_voice.py later.
 )
 
-rem The made-up demo week for "Rose", only when there is nothing in the database yet.
+rem The very first start (no database yet): Rose's made-up demo week, or a real
+rem person? The answer is kept in data\start-choice, so it is never asked again.
+rem Later, Settings, Her data has "Reset the demo week" and "Start fresh for a real person".
+if exist "data\grandma_buddy.db" goto :chosen
+if exist "data\start-choice" goto :chosen
+echo.
+choice /C DF /N /M "Load the made-up demo week for Rose (D), or start fresh for a real person (F)? [D/F] "
+if "%ERRORLEVEL%"=="2" goto :fresh
+if "%ERRORLEVEL%"=="1" goto :demo
+goto :chosen
+:fresh
+if not exist "data" mkdir data
+echo F> data\start-choice
+echo Starting fresh: Buddy will ask her name on its first screen.
+goto :chosen
+:demo
+if not exist "data" mkdir data
+echo D> data\start-choice
+:chosen
+
+rem The made-up demo week for "Rose", only when chosen and nothing is in the database yet
+rem (scripts/seed_demo.py reads data\start-choice and does nothing after an F).
 .venv\Scripts\python scripts\seed_demo.py --no-paint >nul 2>nul
 
 echo Starting Grandma Buddy at http://localhost:%PORT% ...

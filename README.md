@@ -77,7 +77,7 @@ This repository was created on October 26, 2026, the kickoff day. I planned the 
 
 You need Python 3.12 or newer, Chrome or Edge, and a Meta Model API key from [dev.meta.ai](https://dev.meta.ai).
 
-**The short way:** double-click `start.bat`. The first time it makes the Python environment, installs the packages, and opens `.env` for your key; the second time it adds Buddy's natural voice (a 354 MB download, once; the browser's voice speaks until it is there); after that it loads the made-up demo week (only into an empty database), starts the server, and opens Buddy in your browser as soon as the server answers (double-clicking it again while Buddy runs just opens the browser). Close its window to stop Buddy.
+**The short way:** double-click `start.bat`. The first time it makes the Python environment, installs the packages, and opens `.env` for your key; the second time it adds Buddy's natural voice (a 354 MB download, once; the browser's voice speaks until it is there); then it asks once, in its window, whether to load the made-up demo week for Rose (D) or start fresh for a real person (F), remembers the answer, starts the server, and opens Buddy in your browser as soon as the server answers (double-clicking it again while Buddy runs just opens the browser). Close its window to stop Buddy.
 
 **By hand,** in PowerShell, in the project folder:
 
@@ -93,6 +93,8 @@ python -m venv .venv                                     # once: the project's P
 Before the first start, copy `.env.example` to `.env` and put your key on its `MODEL_API_KEY=` line. Then open http://localhost:8000 in Chrome or Edge and allow the microphone. http://localhost:8000/about is the landing page for the family member setting Buddy up; http://localhost:8000/family is the family page ("Try the demo as Maria" with the demo week loaded). To start the demo week over, run `scripts\seed_demo.py --reset` (a backup is saved first) or use Settings, Her data, "Reset the demo week". Without the natural voice, Buddy speaks with the browser's own voice (Edge has the warmest ones). An optional Stripe *test* key on the `STRIPE_SECRET_KEY=` line turns the family page's demo-mode plan into a real test-mode checkout; a live key refuses to start.
 
 Start it once only. On Windows a second server on the same port starts without a word of complaint, and then both answer slowly (Buddy's voice took 7 seconds a sentence that way). If Buddy is already running, stop it first with Ctrl+C in its window; `start.bat` checks for this itself and just opens the browser.
+
+Later, Settings, Her data has both ways: "Reset the demo week" and "Start fresh for a real person" (each saves a copy first).
 
 ## A live demo on the web
 

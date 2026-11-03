@@ -4,8 +4,11 @@
 # - POST /api/demo/reset  start the demo week over (a backup first), ending today;
 #                         the Memory book pictures are painted in the background
 #                         when an API key is set (about 3 cents)
-# Outside demo mode both answer 404: a real family's data is never one tap
-# from being wiped.
+# - POST /api/demo/fresh  "Start fresh for a real person": a backup, an empty
+#                         Buddy, the welcome flow next, and the demo week never
+#                         loaded by itself again (refused on a public demo)
+# Outside demo mode all three answer 404: a real family's data is never one
+# tap from being wiped.
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
@@ -51,3 +54,10 @@ def reset_demo(background: BackgroundTasks):
     if painting:
         background.add_task(paint_pages, made["pages"])
     return {"ok": True, "backup": made["backup"], "painting": painting}
+
+
+@router.post("/api/demo/fresh")
+def start_fresh():
+    """ "Start fresh for a real person" in Settings, Her data."""
+    only_in_demo_mode()
+    return {"ok": True, **demo.start_fresh()}

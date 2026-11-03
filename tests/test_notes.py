@@ -318,3 +318,28 @@ def test_reset_keeps_a_backup_then_starts_from_an_empty_database(safe_test_setup
     assert len(backups) == 1
     assert counts(str(backups[0]))["symptoms"] == 6  # the old data, kept in the backup
     assert counts(safe_test_setup)["symptoms"] == 5  # wiped, then the demo week again
+
+
+def test_the_seed_script_leaves_a_fresh_start_alone(safe_test_setup, capsys):
+    """start.bat runs the script on every start; after "F" it must not load Rose."""
+    import importlib.util
+    from pathlib import Path
+
+    from app import demo
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "seed_demo.py"
+    spec = importlib.util.spec_from_file_location("seed_demo_fresh", path)
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    demo.remember_choice("F")
+    assert script.main(["--no-paint"]) == 0
+    connection = db.get_connection(safe_test_setup)
+    assert not demo.has_data(connection)
+    connection.close()
+    assert "fresh start" in capsys.readouterr().out.lower()
+    # Asked for in so many words, the week still loads, and the choice becomes D.
+    assert script.main(["--reset", "--no-paint"]) == 0
+    connection = db.get_connection(safe_test_setup)
+    assert demo.has_data(connection)
+    connection.close()
+    assert demo.start_choice() == "D"

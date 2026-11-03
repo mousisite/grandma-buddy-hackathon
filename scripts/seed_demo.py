@@ -32,6 +32,10 @@ at, seed, has_data, back_up_and_wipe = demo.at, demo.seed, demo.has_data, demo.b
 
 def main(args: list[str]) -> int:
     path = get_settings().database_path
+    if demo.start_choice() == "F" and "--reset" not in args:
+        print("A fresh start for a real person was chosen (data/start-choice), so the demo week stays out.")
+        print("To load it anyway (a backup is saved first): .venv\\Scripts\\python scripts\\seed_demo.py --reset")
+        return 0
     db.init_db(path)
     connection = db.get_connection(path)
     try:
@@ -50,6 +54,7 @@ def main(args: list[str]) -> int:
         connection.commit()
     finally:
         connection.close()
+    demo.remember_choice("D")  # this computer wants the demo week
     print("Added a made-up week for Rose, ending today: 2 pills (this morning's taken), 5 check-ins, a knee that comes")
     print("and goes, 2 questions for Dr. Lee, 1 checked scam text, 3 Memory book pages (one from an old photo), what")
     print("Buddy has learned about her, 4 messages with Maria (one of hers still new), yesterday's postcard (sent),")

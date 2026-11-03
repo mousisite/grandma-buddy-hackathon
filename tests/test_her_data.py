@@ -149,3 +149,11 @@ def test_the_page_installs_and_registers_the_worker():
     assert 'rel="manifest"' in index and 'rel="apple-touch-icon"' in index
     assert "serviceWorker" in (STATIC_DIR / "app.js").read_text(encoding="utf-8")
     assert (STATIC_DIR / "offline.html").is_file()
+
+
+def test_delete_everything_remembers_a_fresh_start(client, her_data):
+    """After a real person deletes everything, start.bat must not bring Rose back."""
+    from app import demo
+
+    assert client.post("/api/data/delete", json={"confirm": "DELETE"}).status_code == 200
+    assert demo.start_choice() == "F"

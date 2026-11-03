@@ -40,6 +40,7 @@ REFUSED = (
     ("POST", "/api/family/account", NO_SIGN_UP),
     ("GET", "/api/data/export", NO_DATA_CHANGES),
     ("POST", "/api/data/delete", NO_DATA_CHANGES),
+    ("POST", "/api/demo/fresh", NO_DATA_CHANGES),  # the public demo always keeps Rose's week
 )
 HOUR = 3600
 _visitors: dict[str, list[float]] = {}  # each visitor's recent AI calls (when, in seconds)

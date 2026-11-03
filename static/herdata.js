@@ -37,6 +37,7 @@ function startHerData() {
         // A public demo on the web: her data isn't taken or wiped there.
         document.getElementById("data-export").hidden = true;
         document.getElementById("data-delete").hidden = true;
+        document.getElementById("demo-fresh").hidden = true; // the public demo keeps Rose's week
       }
     })
     .catch(function () {});
@@ -58,6 +59,31 @@ function startHerData() {
             reset.disabled = false;
             resetStatus.textContent = typeof problem.detail === "string" ? problem.detail
               : "I couldn’t reset it just now. Please try again.";
+          });
+      });
+  });
+
+  // "Start fresh for a real person": a backup, an empty Buddy, the welcome
+  // screen next (app.js opens it when no name is saved), and the demo week
+  // never loaded by itself again (app/demo.py remembers "F").
+  var fresh = document.getElementById("demo-fresh");
+  fresh.addEventListener("click", function () {
+    askFirst("Start fresh for a real person?",
+      "A copy of what is here is saved first. Then Buddy is emptied, as on its first day, and opens its welcome screen so you can set it up for her. The demo week won’t come back on the next start.",
+      "Yes, start fresh", function () {
+        document.getElementById("confirm-dialog").close();
+        fresh.disabled = true;
+        resetStatus.textContent = "Clearing the demo week…";
+        api("/api/demo/fresh", "POST", {})
+          .then(function () {
+            resetStatus.textContent = "Done. Opening the welcome screen…";
+            try { localStorage.removeItem("checkin-seen"); } catch (e) {}
+            setTimeout(function () { window.location.replace("/"); }, 1200);
+          })
+          .catch(function (problem) {
+            fresh.disabled = false;
+            resetStatus.textContent = typeof problem.detail === "string" ? problem.detail
+              : "I couldn’t clear it just now. Please try again.";
           });
       });
   });

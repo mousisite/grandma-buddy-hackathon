@@ -127,3 +127,53 @@ def test_the_demo_week_can_be_painted_fresh_instead(safe_test_setup, clock):
     assert len(to_paint) == 3
     assert [row["status"] for row in connection.execute("SELECT status FROM memories")] == ["no_picture"] * 3
     connection.close()
+
+
+# ---------- The first start: the demo week, or a real person ----------
+
+def test_the_first_start_choice_is_kept_next_to_the_database(safe_test_setup):
+    from pathlib import Path
+
+    from app.config import get_settings
+
+    assert demo.start_choice() is None
+    demo.remember_choice("F")
+    assert demo.start_choice() == "F"
+    assert demo.choice_path() == Path(get_settings().database_path).parent / "start-choice"
+    demo.remember_choice("D")
+    assert demo.start_choice() == "D"
+
+
+def test_start_fresh_for_a_real_person_backs_up_wipes_and_remembers(seeded, clock):
+    from pathlib import Path
+
+    client = TestClient(app)
+    assert client.get("/api/demo").json()["seeded"] is True
+    answer = client.post("/api/demo/fresh")
+    assert answer.status_code == 200 and answer.json()["backup"].startswith("backup-")
+    assert (Path(seeded).parent / answer.json()["backup"]).exists()
+    assert client.get("/api/demo").json()["seeded"] is False  # Rose is gone: the welcome flow opens
+    connection = db.get_connection(seeded)
+    assert not demo.has_data(connection)
+    connection.close()
+    assert demo.start_choice() == "F"  # start.bat never loads the demo week by itself again
+
+
+def test_start_fresh_is_demo_mode_only_and_never_on_the_public_demo(seeded, clock, monkeypatch):
+    from app import public_demo
+
+    client = TestClient(app)
+    monkeypatch.setenv("PUBLIC_DEMO", "1")
+    refused = client.post("/api/demo/fresh")
+    assert refused.status_code == 403 and refused.json()["detail"] == public_demo.NO_DATA_CHANGES
+    assert client.get("/api/demo").json()["seeded"] is True  # the week stays
+    monkeypatch.delenv("PUBLIC_DEMO")
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_123")  # not demo mode: nothing to clear
+    assert client.post("/api/demo/fresh").status_code == 404
+
+
+def test_reset_remembers_that_the_demo_week_was_chosen(seeded, clock, monkeypatch):
+    monkeypatch.setattr(memories, "make_page", lambda page: None)
+    demo.remember_choice("F")
+    assert TestClient(app).post("/api/demo/reset").status_code == 200
+    assert demo.start_choice() == "D"

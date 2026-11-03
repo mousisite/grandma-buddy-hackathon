@@ -46,4 +46,4 @@ All of it is in `app/public_demo.py` and switched on only by `PUBLIC_DEMO=1`:
 - "Grandma Buddy only answers on this computer." on every page: `ALLOWED_HOSTS` doesn't match the service's address (step 6).
 - Buddy can't hear anything: the address must be `https://` (Render's always is), and the browser must allow the microphone.
 - A judge says Buddy "is resting": a share is used up. Raise `AI_CALLS_PER_VISITOR_HOUR` in the Environment tab (and deploy), or wait an hour.
-- To start the week over right now: Settings, Her data, **Reset the demo week** (it is there in a public demo too).
+- To start the week over right now: Settings, Her data, **Reset the demo week** (it is there in a public demo too). "Start fresh for a real person" is refused on a public demo: the week stays.

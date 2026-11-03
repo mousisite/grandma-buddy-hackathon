@@ -9,7 +9,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
-from app import her_data
+from app import demo, her_data
 
 router = APIRouter()
 
@@ -31,4 +31,5 @@ def delete_everything(request: DeleteRequest):
     if request.confirm != "DELETE":
         raise HTTPException(status_code=400, detail="Type DELETE to delete everything.")
     her_data.delete_everything()
+    demo.remember_choice("F")  # start.bat won't bring Rose back
     return {"ok": True}
