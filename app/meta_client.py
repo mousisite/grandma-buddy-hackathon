@@ -138,6 +138,15 @@ def structured(messages: list[dict], name: str, schema: dict, reasoning: str = "
     raise MetaError(f"{name} did not come back as a filled-in form, twice")
 
 
+def list_models() -> list[str]:
+    """The model IDs this key can use (GET /v1/models), newest first. Muse
+    Glimmer never appears: it is open-weight only, not on the Model API."""
+    try:
+        return [model.id for model in _client().models.list().data]
+    except openai.APIError as problem:
+        raise MetaError(f"listing models failed: {type(problem).__name__}")
+
+
 def _create(request: dict):
     """Send one Chat Completions request, waiting and retrying when Meta is busy."""
     if not get_settings().model_api_key:

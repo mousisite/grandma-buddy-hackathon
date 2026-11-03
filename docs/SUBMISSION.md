@@ -41,6 +41,10 @@ Everything runs on her own computer: a small Python server, a plain web page, an
 
 Standard models only (never a contributor model), because the app handles health information.
 
+## How we tested it
+
+Three verification layers, as Meta's workshops put it: mandatory rule checks (plain code before the AI on every message, and again on every reply), an AI judge (Muse Spark with a strict JSON rubric), and a human in the loop (the family checks every pill label, she decides every call, a person read every test reply). A 42-turn test set ran at reasoning effort minimal, low, and medium: minimal was the fastest (3.4 s a reply), the cheapest, as warm as low (4.91 of 5), and after one fix it passed 41 of 42; medium thought six times longer and scored lowest. Buddy uses minimal. The write-up with the chart is docs/EVAL.md. 844 automated tests, every Meta call faked.
+
 ## Built during the hackathon
 
 The repository was created on October 26, 2026, the kickoff day, and all of the app's code was written between October 26 and November 4; the commit history shows it. The Day 1 skeleton (server, database, first screen) was made with Muse Code, Meta's coding agent; everything after that with Claude Code. The idea, the plan, and the agent instructions were written before the event. Third-party pieces and their licenses are listed in THIRD_PARTY_NOTICES.md.

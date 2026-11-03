@@ -115,3 +115,15 @@ def test_fixed_texts_match_docs_safety():
     )
     assert guard.MISSED_DOSE_TEXT == "Please check the label or call your pharmacist about what to do."
     assert guard.SIDE_EFFECT_TEXT == "Please call your doctor or pharmacist today and tell them."
+
+
+def test_more_ways_of_asking_for_advice_are_heard():
+    """Found by the Buddy eval (Nov 2): these two got no doctor or family buttons."""
+    assert guard.seeks_advice("What can I do about my swollen ankles?")
+    assert guard.seeks_advice("Is my cough something to worry about?")
+    assert guard.seeks_advice("What should I do about my sore knee?")
+
+
+def test_a_compress_or_a_hot_water_bottle_is_a_remedy():
+    assert guard.check_reply("Try a warm compress on it, Rose.") == "advice"
+    assert guard.check_reply("A hot water bottle on your back might help.") == "advice"

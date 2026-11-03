@@ -187,11 +187,19 @@ def transcribe(wav_bytes: bytes, keywords: list[str]) -> str:
 - Capture Float32 samples with an `AudioWorklet` (fall back to `ScriptProcessorNode` if needed), downsample to 16000 Hz, convert to Int16, and write a standard 44-byte RIFF/WAVE header (PCM format 1, 1 channel, 16000 Hz, 16 bits). Post it as a `Blob` with type `audio/wav`.
 - The microphone only works on `http://localhost` or HTTPS.
 
-## Costs (standard mode)
+## Costs (standard mode, read from dev.meta.ai/docs/pricing-rate-limits on Nov 2, 2026)
 
-- Muse Spark: about $1.25 per million input tokens and $4.25 per million output tokens.
-- Voice Transcribe: $0.18 per hour of audio.
-- Keep prompts short, trim history, and use low reasoning effort for small talk.
+- Muse Spark: $1.25 per million input tokens ($0.15 when the prefix is cached: the response's `prompt_tokens_details.cached_tokens` says how many) and $4.25 per million output tokens. Hidden reasoning tokens are output tokens, so a higher `reasoning_effort` costs more as well as taking longer.
+- Web search grounding: $2.50 per 1,000 queries on top of the tokens.
+- Muse Image: $0.01 per image. SAM 3.1: $2.50 per 1,000 images. Voice Transcribe: $0.18 per hour of audio.
+- Keep prompts short, trim history, and use `"minimal"` reasoning for talk: `scripts/eval_buddy.py` (Nov 2) scored the same 42 turns at minimal, low, and medium, and minimal passed every check, was the warmest, the fastest, and the cheapest (`docs/EVAL.md`).
+
+## Which models exist (Nov 2, 2026)
+
+`GET /v1/models` (`meta_client.list_models()`) lists for this key: muse-wonder-1.0, muse-spark-1.3, muse-spark-1.2, muse-spark-1.1, their `-contributor` variants, muse-image-1.0, muse-voice-transcribe-1.0, and sam-3.1.
+
+- **Muse Glimmer** (the small, fast model distilled from Spark) is open-weight only: Meta's models page says you run it on your own hardware (vLLM, llama.cpp, ExecuTorch), it is not on the Model API, and the catalog confirms it. So Buddy can't route small talk to it; everything stays on Muse Spark 1.3.
+- **Muse Wonder** (muse-wonder-1.0) is the bigger coding and agent model, $4 in and $20 out per million tokens: not for a companion's small talk.
 
 ## Testing
 

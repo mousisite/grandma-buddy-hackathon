@@ -3805,6 +3805,13 @@ label.group-row,
   color: var(--text-2);
 }
 
+/* "How we tested Buddy", a part of "How Buddy works". */
+.help-subheading {
+  font-size: var(--t-20, 1.25rem);
+  font-weight: 650;
+  margin-top: var(--s-4);
+}
+
 .help-intro a {
   color: var(--text);
   font-weight: 600;

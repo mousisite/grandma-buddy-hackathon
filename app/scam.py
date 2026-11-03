@@ -90,6 +90,29 @@ RED_FLAGS = [
 ]
 
 
+# A scam story told in a talk ("a man rang saying my grandson is in jail"):
+# someone asking her to send, pay, or share, or one of the classic hooks.
+# Found by the Buddy eval (Nov 2): without a nudge, Buddy asked gentle
+# questions instead of warning her. Plain code hears the story; the prompt
+# then tells Buddy to warn her in that same reply (prompts.SCAM_STORY_TOLD).
+STORY = re.compile(
+    r"\b(?:"
+    r"(?:ask\w*|want\w*|told|tell\w*|said|saying) me to (?:send|pay|buy|wire|give|share|confirm|read out|transfer)"
+    r"|gift cards?|processing fee|pay (?:a|the) fee|in jail|arrested|bail money|for bail"
+    r"|computer (?:has|had|got) a virus|won (?:a|the) (?:prize|lottery)|prize money"
+    r"|parcel .{0,30}?(?:fee|held|customs)"
+    r"|(?:confirm|verify|give|send|share|read out|update) (?:my|your|the) "
+    r"(?:password|pin|account|card number|bank details|social security)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def sounds_like_a_story(text: str) -> bool:
+    """True when her own words tell a scam story (see STORY)."""
+    return STORY.search(text) is not None
+
+
 def normalize(text: str) -> str:
     return text.lower().replace("’", "'").replace("‘", "'")
 

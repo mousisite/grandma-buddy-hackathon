@@ -127,6 +127,16 @@ No advice, no guessing beyond what is plainly there, plain everyday words."""
 # Added when her words ask for advice ("Should I take…", "Is this serious?"):
 # measured Nov 1, right after a talk about a memory, the model once went on
 # with the memory and never answered her question (app/companion.py).
+# Added when her words tell a scam story (scam.sounds_like_a_story): the eval
+# (Nov 2) found Buddy asking gentle questions instead of warning her.
+SCAM_STORY_TOLD = (
+    "\n\nHer last words sound like a scam story: someone asking her for money, a fee, gift cards, a password, or "
+    "her details, or a frightening claim (a grandchild in trouble, a virus on her computer, a prize, a held parcel). "
+    "In this reply say plainly that it sounds like a scam and that she should not send money or share anything, "
+    "offer to check the message together (open the scam checker) or to call {family}, and ask what it said. "
+    "Never repeat a phone number or a link."
+)
+
 ADVICE_ASKED = (
     "\n\nHer last words may be a question for a doctor or pharmacist. If it is about her health, medicine, food, or "
     "how she feels, answer only that, the no-advice way described above, and don't go back to the earlier topic in "

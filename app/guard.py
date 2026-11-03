@@ -75,7 +75,8 @@ GUESSING_A_CONDITION = re.compile(
 REMEDIES = re.compile(
     r"\b(ibuprofen|advil|motrin|aspirin|tylenol|acetaminophen|paracetamol|aleve|naproxen|antacids?|tums"
     r"|pepto|benadryl|antihistamines?|melatonin|supplements?|vitamins?|ice packs?|heating pads?|epsom"
-    r"|herbal|chamomile|painkillers?|pain relievers?|cough syrup)\b"
+    r"|herbal|chamomile|painkillers?|pain relievers?|cough syrup|(warm |cold |hot )?compress(es)?"
+    r"|hot water bottles?)\b"
 )
 
 # ---------- What counts as therapy or minimizing feelings ----------
@@ -115,7 +116,8 @@ def check_reply(reply: str, own_pills: list[str] | None = None) -> str | None:
 
 SEEKS_ADVICE = re.compile(
     r"\b(should i|can i take|what can i take|is it (ok|okay|safe|alright|all right) to"
-    r"|is (this|it|that) (serious|bad|dangerous)|do i need (to see|to go|a doctor)|what do i do about)\b"
+    r"|is (this|it|that) (serious|bad|dangerous)|do i need (to see|to go|a doctor)|what do i do about"
+    r"|what (can|should) i do (about|for) my|something to worry about|is my \w+( \w+)? (serious|bad|dangerous))\b"
 )
 SIDE_EFFECT = re.compile(r"\b((make|makes|made|making) me (feel )?(dizzy|sick|sleepy|tired|nause\w*|drowsy|itchy|woozy)|side effects?)\b")
 MISSED_DOSE = re.compile(

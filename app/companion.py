@@ -18,7 +18,7 @@ import re
 import threading
 from datetime import date
 
-from app import briefing, db, guard, meta_client, prompts, reminders, safety, tools
+from app import briefing, db, guard, meta_client, prompts, reminders, safety, scam, tools
 
 MAX_TOOL_ROUNDS = 3
 # (Tried Nov 1 and dropped: a second, words-only request in parallel with
@@ -156,7 +156,9 @@ def answer(connection, profile: dict, conversation_id: str, text: str, mode: str
     if last_answer:
         prompt += last_words
     buttons: list[dict] = []
-    if guard.seeks_advice(text):
+    if scam.sounds_like_a_story(text):
+        prompt += prompts.SCAM_STORY_TOLD.format(family=profile["family_name"].strip() or "your family")
+    elif guard.seeks_advice(text):
         prompt += prompts.ADVICE_ASKED  # answer her question first, the no-advice way
     elif briefing.asks_about_today(text):
         weather = todays_weather(connection, profile) if briefing.asks_about_weather(text) else None

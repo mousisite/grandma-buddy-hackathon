@@ -110,6 +110,27 @@ Start it once only. On Windows a second server on the same port starts without a
 
 The `scripts\check_*.py` scripts each make a few real Meta calls by hand and say what they cost: `check_voice.py` sends six spoken clips through live and batch transcription and the whole chat pipeline (the safety net, the no-advice reply, the tools) with every call counted and timed; `check_photos.py` runs Find my things, Read it to me, and Check a message in a real browser with screenshots. `scripts\demo_screenshots.py` and `scripts\readme_screenshots.py` take every screen's picture from the demo data.
 
+## How we tested Buddy
+
+Meta's workshops said two things we took as rules: verification means **mandatory rule checks, an AI judge, and a human in the loop**, and you should **test the reasoning efforts on a test set and pick the best for the cost**. [docs/EVAL.md](docs/EVAL.md) is the full write-up.
+
+- **Rule checks before the AI.** `app/safety.py` reads every message first. Emergency, poison, and crisis words open fixed screens with no AI call, even with no internet.
+- **Rule checks after the AI.** `app/guard.py` reads every reply before she hears it. A dose, an instruction, a guess at a condition, a remedy, or a coping technique is replaced with the fixed no-advice line.
+- **An AI judge.** Muse Spark with a strict JSON rubric grades every reply on a 42-turn test set (`scripts/eval_buddy.py`).
+- **A human in the loop.** Her family types and checks every pill label, she decides every call, and a person read every reply in the runs below.
+
+The same 42 made-up turns (small talk, loneliness, her grandchildren, the weather, asking for advice, emergencies, crisis words, "are you a person?", scam stories, near misses) at each reasoning effort, on Nov 2, 2026:
+
+| Reasoning effort | Pass rate | Rule checks | Judge: safe | Warmth (1 to 5) | Reply time | Hidden thinking a reply | Cost of the run |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| minimal | 93% (39 of 42) | 95% | 97% | 4.91 | 3.4 s | 200 tokens | $0.34 |
+| low | 95% (40 of 42) | 98% | 97% | 4.91 | 6.1 s | 627 tokens | $0.41 |
+| medium | 90% (38 of 42) | 90% | 100% | 4.82 | 9.1 s | 1,185 tokens | $0.46 |
+
+![Pass rate, warmth, reply time, and cost at each reasoning effort](docs/eval/chart.svg)
+
+More reasoning did not help: medium thought six times longer than minimal, took 9 seconds a reply instead of 3, cost more, and scored lowest, because it chatted about a scam story instead of warning her. Low beat minimal by a single turn at twice the wait. Buddy stays on **minimal**. The run's real finding, Buddy answering a scam story with a gentle question, became a plain-code nudge; the confirming run at minimal then passed 41 of 42 (the one miss: a correct refusal that echoed the word "vitamins", which the guard rightly blocks). Muse Glimmer, Meta's small fast model, is open-weight only and not on the Model API, so small talk could not be routed to it.
+
 ## What's next
 
 - **Faster first words.** Buddy's first word now comes about 5 to 9 seconds after hers (it was 10 to 19): the page ends her turn itself about a second after her last word (Meta took up to 4.7 seconds), and what's left is Muse Spark's thinking (2 to 4 seconds a round, two rounds when a tool is used) and the voice (half a second). Streaming the model's words would help once Meta sends them as they are written.

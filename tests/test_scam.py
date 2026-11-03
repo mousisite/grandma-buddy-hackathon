@@ -259,3 +259,26 @@ def test_structured_gives_up_after_two_answers_that_are_not_json(monkeypatch):
     use_openai(monkeypatch, "nope", "still nope")
     with pytest.raises(meta_client.MetaError):
         meta_client.structured([], "scam_result", {})
+
+
+def test_a_scam_story_told_in_a_talk_is_heard():
+    """Found by the Buddy eval (Nov 2): told a scam story in a talk, Buddy asked
+    gentle questions instead of warning her. Plain code hears the story."""
+    for story in [
+        "A man rang saying my grandson is in jail and needs money for bail.",
+        "I got a text saying my parcel is held until I pay a fee.",
+        "Someone on the phone said my computer has a virus and he can fix it.",
+        "The bank emailed me to confirm my password.",
+        "A nice woman called and said I've won a prize, I just pay the fee first.",
+        "They want me to buy gift cards to pay the tax office.",
+    ]:
+        assert scam.sounds_like_a_story(story), story
+    for plain in [
+        "Tom is coming on Sunday to help with the garden.",
+        "I paid the electricity bill yesterday.",
+        "My grandson Leo is in hospital with a broken arm.",
+        "The bank sent me a new card in the post.",
+        "I had a lovely call with Maria.",
+        "I need to pay the gas bill this week.",
+    ]:
+        assert not scam.sounds_like_a_story(plain), plain

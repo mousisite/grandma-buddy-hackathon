@@ -263,3 +263,18 @@ def test_a_talk_call_gives_up_after_twenty_seconds(monkeypatch):
     assert sent[0]["timeout"] == meta_client.TALK_TIMEOUT_SECONDS == 20
     meta_client.structured([{"role": "user", "content": "hi"}], "scam_result", {"type": "object"})
     assert "timeout" not in sent[1]  # the connection's usual 60 seconds
+
+
+# ---------- When she tells a scam story ----------
+
+def test_buddy_is_told_to_warn_her_about_a_scam_story(client, monkeypatch):
+    fake = FakeAI(reply("That sounds like a scam, Rose. Please don't send anything. Shall we call Maria?"),
+                  reply("Lovely."))
+    monkeypatch.setattr(meta_client, "chat", fake)
+    client.put("/api/profile", json={"preferred_name": "Rose", "family_name": "Maria", "family_phone": "555-0100"})
+    chat(client, "A man rang saying my grandson is in jail and needs money for bail.")
+    prompt = fake.calls[0][0]["content"]
+    assert prompts.SCAM_STORY_TOLD.split("{")[0].strip() in prompt
+    assert "or to call Maria" in prompt
+    chat(client, "The tulips came up this morning")
+    assert prompts.SCAM_STORY_TOLD.split("{")[0].strip() not in fake.calls[1][0]["content"]

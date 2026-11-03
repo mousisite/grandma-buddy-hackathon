@@ -134,6 +134,7 @@ grandma-buddy-hackathon/
   scripts/
     check_meta.py            one tiny real call to confirm the API key and billing work
     check_advice.py          hand-run: SAFETY.md advice phrases through the real AI (no advice given?)
+    eval_buddy.py            hand-run: 42 made-up turns at reasoning effort minimal, low, and medium, every reply scored by rule checks and by Muse Spark as a strict judge (docs/EVAL.md)
     check_diary.py           hand-run: two "Something hurts" talks through the real AI (entry saved, no advice?)
     check_pills.py           hand-run: pill questions through the real AI (no doses said, "I took my pills" recorded?)
     check_checkin.py         hand-run: a whole daily check-in through the real AI (mood, diary entry, pill taken, no advice?)
