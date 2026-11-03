@@ -51,7 +51,7 @@ The repository was created on October 26, 2026, the kickoff day, and all of the 
 
 ## How to try it (Windows)
 
-Clone the repository, put a Meta Model API key in `.env`, and double-click `start.bat`. It makes the Python environment, installs the packages and Buddy's natural voice, loads a made-up demo week for "Rose", and opens http://localhost:8000. Tests: `.venv\Scripts\python -m pytest` (815 tests, every Meta call faked).
+Clone the repository, put a Meta Model API key in `.env`, and double-click `start.bat`. It makes the Python environment, installs the packages and Buddy's natural voice, loads a made-up demo week for "Rose", and opens http://localhost:8000. Tests: `.venv\Scripts\python -m pytest` (850 tests, every Meta call faked).
 
 ## Short version (about 90 words)
 
