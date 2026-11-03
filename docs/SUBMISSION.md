@@ -22,7 +22,7 @@ Indie developer track. Theme "Build for Your World": built for my grandma.
 
 - Code (public): https://github.com/mousisite/grandma-buddy-hackathon
 - Demo video (3 minutes): (paste the unlisted YouTube link, tested in a private window)
-- Live demo: (paste the Render link if you deploy it, otherwise leave this out)
+- Live demo: https://grandma-buddy.onrender.com (a public demo with Rose's made-up week, put back every night; tap "Try the demo as Maria" at https://grandma-buddy.onrender.com/family to see the family page)
 
 ## Description
 
@@ -43,7 +43,7 @@ Standard models only (never a contributor model), because the app handles health
 
 ## How we tested it
 
-Three verification layers, as Meta's workshops put it: mandatory rule checks (plain code before the AI on every message, and again on every reply), an AI judge (Muse Spark with a strict JSON rubric), and a human in the loop (the family checks every pill label, she decides every call, a person read every test reply). A 42-turn test set ran at reasoning effort minimal, low, and medium: minimal was the fastest (3.6 s a reply), the cheapest, and warm (4.88 of 5), and after one fix it passed 41 of 42 (98%); medium thought six times longer and scored lowest. Buddy uses minimal. The write-up with the chart is docs/EVAL.md. 844 automated tests, every Meta call faked.
+Three verification layers, as Meta's workshops put it: mandatory rule checks (plain code before the AI on every message, and again on every reply), an AI judge (Muse Spark with a strict JSON rubric), and a human in the loop (the family checks every pill label, she decides every call, a person read every test reply). A 42-turn test set ran at reasoning effort minimal, low, and medium: minimal was the fastest (3.6 s a reply), the cheapest, and warm (4.88 of 5), and after one fix it passed 41 of 42 (98%); medium thought six times longer and scored lowest. Buddy uses minimal. The write-up with the chart is docs/EVAL.md. 850 automated tests, every Meta call faked.
 
 ## Built during the hackathon
 

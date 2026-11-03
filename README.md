@@ -98,12 +98,14 @@ Later, Settings, Her data has both ways: "Reset the demo week" and "Start fresh 
 
 ## A live demo on the web
 
+**Live now:** https://grandma-buddy.onrender.com. A public demo with Rose's made-up week, put back every night. Judges can tap **Try the demo as Maria** at https://grandma-buddy.onrender.com/family to see the family page.
+
 `docs/DEPLOY.md` has the click-by-click steps to put a public demo on Render from the `Dockerfile` and `render.yaml` here ($7 a month always on, or free with a minute's wake-up). It runs as a public demo (`PUBLIC_DEMO=1`): Rose's made-up week put back every night, a share of Buddy's thinking per visitor and a cap for the day so the key can't be drained, no sign-ups, and the key only as a host secret. The safety net never counts and is never stopped.
 
 ## Tests
 
 ```powershell
-.venv\Scripts\python -m pytest                          # 844 tests; Meta is always faked, no test can reach the internet
+.venv\Scripts\python -m pytest                          # 850 tests; Meta is always faked, no test can reach the internet
 .venv\Scripts\python -m playwright install chromium     # once: the browser the checks below drive
 .venv\Scripts\python scripts\browser_checks\home.py     # every screen and flow in a real browser, no key needed
 .venv\Scripts\python scripts\check_failures.py         # every failure state (Meta down, no internet, a blocked microphone, a blurry photo, the server stopped), with screenshots
