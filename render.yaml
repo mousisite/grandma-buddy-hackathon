@@ -4,13 +4,13 @@ services:
   - type: web
     name: grandma-buddy
     runtime: docker
-    # "pro" (2 CPU, 4 GB) for Buddy's natural voice: the Kokoro model takes
-    # about 550 MB of memory and, measured on one thread, 1.4 seconds for a
-    # short sentence and 3.5 for a long one, so one CPU ("standard") would
-    # leave her waiting; on two threads it is half that. If a sentence still
-    # takes too long on the live site, "pro plus" (4 CPU) with VOICE_THREADS=4.
-    # "starter" (512 MB) can't hold the model: the browser's voice speaks there.
-    plan: pro
+    # "pro plus" (4 CPU, 8 GB) for Buddy's natural voice. The Kokoro model
+    # takes about 550 MB; on one thread a short sentence takes 1.4 seconds,
+    # on two 0.8 (measured on "pro": her first words 0.9 to 1.25 s after the
+    # text), and four threads roughly halve that again. "standard" (1 CPU)
+    # would leave her waiting; "starter" (512 MB) can't hold the model at all,
+    # so the browser's voice speaks there.
+    plan: pro plus
     numInstances: 1          # one instance, one process: the voice's cache and shares live in one process
     healthCheckPath: /api/ping
     envVars:
@@ -25,7 +25,7 @@ services:
       - key: AI_CALLS_PER_DAY
         value: "600"
       - key: VOICE_THREADS
-        value: "2"           # ONNX Runtime threads for the voice: the plan's 2 CPUs
+        value: "4"           # ONNX Runtime threads for the voice: the plan's 4 CPUs
       - key: WEB_CONCURRENCY
         value: "1"           # one server process (Render's own default is 2 on this plan; see the Dockerfile)
       - key: VOICE_SENTENCES_PER_VISITOR_HOUR
