@@ -395,22 +395,24 @@ function pillSlot(title, reminders) {
   return slot;
 }
 
-// One pill. A pill to take now has a round check button ("I took this
-// one"); a taken pill shows a filled check.
+// One pill: a large row with a round check she can tick, and untick. A
+// tap on an empty check marks the pill taken (on time, a little early, or
+// late); a tap on a filled check undoes a tick made by mistake, and the
+// pill goes back to what the clock says: later today, time to take it now
+// (the card comes back), or not taken.
 function pillRow(reminder) {
   var item = document.createElement("li");
   item.className = "check-row check-row--" + reminder.status + (reminder.id === justTaken ? " check-row--new" : "");
-  var canTake = reminder.status === "due" || reminder.status === "snoozed";
-  var check = document.createElement(canTake ? "button" : "span");
+  var taken = reminder.status === "taken";
+  var check = document.createElement("button");
+  check.type = "button";
   check.className = "check";
   check.innerHTML = '<span class="check-circle">' + CHECK_ICON + "</span>";
-  if (canTake) {
-    check.type = "button";
-    check.setAttribute("aria-label", "I took this one: " + reminder.name);
-    check.addEventListener("click", function () {
-      takeOnePill(reminder, check);
-    });
-  }
+  check.setAttribute("aria-label", (taken ? "I didn’t take this one: " : "I took this one: ") + reminder.name);
+  check.dataset.reminder = String(reminder.id);
+  check.addEventListener("click", function () {
+    tickPill(reminder, check, !taken);
+  });
   item.appendChild(check);
   var text = document.createElement("div");
   text.className = "check-text";
@@ -424,17 +426,26 @@ function pillRow(reminder) {
   return item;
 }
 
-function takeOnePill(reminder, button) {
+// Her tap on a round check: taken, or not taken after all. The list is
+// drawn again with her answer, and her focus stays on the same pill (a
+// pill from last night that is unticked leaves today's list: then the
+// heading).
+function tickPill(reminder, button, taken) {
   button.disabled = true;
   var mine = ++reminderRequests;
-  api("/api/reminders/taken", "POST", { ids: [reminder.id] })
+  api("/api/reminders/" + (taken ? "taken" : "not-taken"), "POST", { ids: [reminder.id] })
     .then(function (state) {
-      justTaken = reminder.id;
+      justTaken = taken ? reminder.id : null;
       if (mine === reminderRequests) {
         showReminders(state);
       }
-      toast("Marked as taken");
-      focusScreenHeading(); // the button she tapped is gone
+      toast(taken ? "Marked as taken" : "Marked as not taken");
+      var same = document.querySelector('#pills-today .check[data-reminder="' + reminder.id + '"]');
+      if (same) {
+        same.focus({ preventScroll: true });
+      } else {
+        focusScreenHeading();
+      }
     })
     .catch(function () {
       button.disabled = false;

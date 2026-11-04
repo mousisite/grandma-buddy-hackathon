@@ -258,7 +258,7 @@ def counts(path):
 def test_the_demo_week_fills_every_screen(safe_test_setup):
     assert load_seed_script().main(["--no-paint"]) == 0
     found = counts(safe_test_setup)
-    assert found == dict(found, medications=2, moods=5, check_ins=5, symptoms=5, doctor_questions=2, scam_checks=1,
+    assert found == dict(found, medications=3, moods=5, check_ins=5, symptoms=5, doctor_questions=2, scam_checks=1,
                          memories=3, style_notes=3, talk_summaries=3)  # one page from an old photo
     connection = db.get_connection(safe_test_setup)
     taken = connection.execute("SELECT COUNT(*) FROM med_events WHERE status = 'taken'").fetchone()[0]

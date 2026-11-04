@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lower-third caption</title>
+<link rel="stylesheet" href="cards.css">
+<style>
+  /* A lower third for CapCut: everything but the pill is transparent
+     (scripts/video_cards.py screenshots it without a background). The
+     words come from the address: caption.html?text=Muse%20Image */
+  html, body { background: transparent; }
+  .pill {
+    position: absolute;
+    left: 96px;
+    bottom: 96px;
+    display: inline-flex;
+    align-items: center;
+    gap: 22px;
+    height: 104px;
+    padding: 0 44px 0 26px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 8px 24px rgba(28, 27, 25, 0.12);
+    color: var(--text);
+    font-size: 42px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+  }
+  .orb { --orb-size: 52px; flex: none; }
+  .orb-glow { display: none; }
+  .orb-blob { filter: blur(6px); }
+</style>
+</head>
+<body>
+  <p class="pill">
+    <span class="orb" aria-hidden="true">
+      <span class="orb-core">
+        <span class="orb-blob orb-blob--amber"></span>
+        <span class="orb-blob orb-blob--peach"></span>
+        <span class="orb-blob orb-blob--rose"></span>
+        <span class="orb-blob orb-blob--violet"></span>
+        <span class="orb-shine"></span>
+      </span>
+    </span>
+    <span id="text">Muse Image</span>
+  </p>
+  <script>
+    var words = new URLSearchParams(location.search).get("text");
+    if (words) { document.getElementById("text").textContent = words; }
+  </script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Title card</title>
+<link rel="stylesheet" href="cards.css">
+<style>
+  .card {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+  .orb { margin-bottom: 72px; }
+  .wordmark { font-size: 148px; }
+  .lead { font-size: 48px; margin-top: 20px; }
+  .tag { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="orb" aria-hidden="true">
+      <span class="orb-glow"></span>
+      <span class="orb-core">
+        <span class="orb-blob orb-blob--amber"></span>
+        <span class="orb-blob orb-blob--peach"></span>
+        <span class="orb-blob orb-blob--rose"></span>
+        <span class="orb-blob orb-blob--violet"></span>
+        <span class="orb-shine"></span>
+      </span>
+    </div>
+    <h1 class="wordmark">Grandma Buddy</h1>
+    <p class="lead">built for my grandma</p>
+    <p class="tag">Meta Global AI Developer Hackathon 2026</p>
+  </main>
+</body>
+</html>

@@ -1564,7 +1564,8 @@ button.row-link {
   border-top: 1px solid var(--border);
 }
 
-/* A 56px target around a 32px circle. */
+/* A 56px target around a 32px circle: a button on every pill, so a tick
+   can be undone with the same tap. */
 .check {
   display: grid;
   flex: none;
@@ -1579,19 +1580,19 @@ button.row-link {
   transition: transform var(--base) var(--spring);
 }
 
+.check:active {
+  transform: scale(0.94);
+}
+
 .check-circle {
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
-  border: 2px solid var(--field-edge);
+  border: 2px solid var(--text);
   border-radius: 50%;
   color: transparent;
   transition: background-color var(--base) var(--ease), border-color var(--base) var(--ease);
-}
-
-button.check .check-circle {
-  border-color: var(--text);
 }
 
 .check-circle .icon {

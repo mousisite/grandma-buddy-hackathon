@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>End card</title>
+<link rel="stylesheet" href="cards.css">
+<style>
+  .card {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .orb { --orb-size: 220px; margin-bottom: 56px; }
+  .wordmark { font-size: 104px; }
+  .links {
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 40px;
+    row-gap: 22px;
+    align-items: baseline;
+    margin-top: 64px;
+    padding-top: 48px;
+    border-top: 1px solid var(--border-strong);
+    min-width: 1120px;
+  }
+  .links dt {
+    color: var(--text-2);
+    font-size: 30px;
+    font-weight: 600;
+    text-align: right;
+  }
+  .links dd {
+    margin: 0;
+    font-size: 46px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .tag { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="orb" aria-hidden="true">
+      <span class="orb-glow"></span>
+      <span class="orb-core">
+        <span class="orb-blob orb-blob--amber"></span>
+        <span class="orb-blob orb-blob--peach"></span>
+        <span class="orb-blob orb-blob--rose"></span>
+        <span class="orb-blob orb-blob--violet"></span>
+        <span class="orb-shine"></span>
+      </span>
+    </div>
+    <h1 class="wordmark">Grandma Buddy</h1>
+    <dl class="links">
+      <dt>Try it</dt>
+      <dd>grandma-buddy.onrender.com</dd>
+      <dt>The code</dt>
+      <dd>github.com/mousisite/grandma-buddy-hackathon</dd>
+    </dl>
+    <p class="tag">Built in nine days on Meta's Muse models. MIT license.</p>
+  </main>
+</body>
+</html>

@@ -4,7 +4,8 @@
 #   label exactly as on the bottle, and the times of day). Removing only
 #   hides a pill, so "Undo" can bring it back and past records stay.
 # - /api/reminders: today's reminders for the banner and the Pills screen,
-#   and her answers: "I took it" and "Remind me in 10 minutes".
+#   and her answers: "I took it", "Remind me in 10 minutes", and a tick
+#   undone on the Pills screen (not taken after all).
 # The rules live in app/reminders.py.
 
 import json
@@ -217,6 +218,19 @@ def took_it(body: dict = Body(...)):
     connection = db.get_connection()
     try:
         reminders.mark_taken(connection, ids, reminders.current_time())
+        return todays_reminders(connection)
+    finally:
+        connection.close()
+
+
+@router.post("/api/reminders/not-taken")
+def did_not_take_it(body: dict = Body(...)):
+    """She unticked a pill on the Pills screen (a tick by mistake): the
+    reminder is open again, and the clock says what it is now."""
+    ids = reminder_ids(body)
+    connection = db.get_connection()
+    try:
+        reminders.mark_not_taken(connection, ids, reminders.current_time())
         return todays_reminders(connection)
     finally:
         connection.close()

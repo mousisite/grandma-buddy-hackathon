@@ -34,3 +34,16 @@ desktop.ini
 # Design plugin work files (mockups and review screenshots)
 .impeccable/mocks/
 .impeccable/review/
+
+# OBS takes for the demo video (big; the kit itself in video/ is kept)
+video/raw/
+
+# Reference videos downloaded for study only (other people's copyrighted work): never committed
+video/reference/
+# Remotion project packages
+video/remotion/node_modules/
+video/remotion/out/
+
+# HyperFrames artifacts and the clips copied into the Remotion project
+video/hyperframes-outro/.hyperframes/
+video/remotion/public/media/

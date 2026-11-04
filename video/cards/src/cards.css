@@ -1,0 +1,115 @@
+/* The demo video's cards, in Buddy's own fonts and colors (static/styles.css,
+   docs/DESIGN.md). Rendered to 1920x1080 PNGs by scripts/video_cards.py. */
+
+@font-face {
+  font-family: "Figtree";
+  src: url("../../../static/fonts/Figtree.ttf") format("truetype");
+  font-weight: 300 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url("../../../static/fonts/Newsreader.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+}
+
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --tint: #EFEEEA;
+  --border: rgba(28, 27, 25, 0.08);
+  --border-strong: rgba(28, 27, 25, 0.14);
+  --text: #1C1B19;
+  --text-2: #5C5953;
+  --orb-amber: #F6B042;
+  --orb-peach: #F78C5B;
+  --orb-rose: #E1607E;
+  --orb-violet: #8B6CF2;
+  --font: "Figtree", system-ui, sans-serif;
+  --font-serif: "Newsreader", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Buddy, the living orb, standing still (styles.css "Buddy, the orb"). */
+.orb {
+  --orb-size: 360px;
+  position: relative;
+  width: var(--orb-size);
+  height: var(--orb-size);
+  border-radius: 50%;
+  isolation: isolate;
+}
+.orb-glow {
+  position: absolute;
+  inset: -22%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(247, 140, 91, 0.55), rgba(225, 96, 126, 0.28) 55%, rgba(139, 108, 242, 0) 100%);
+  filter: blur(28px);
+  opacity: 0.55;
+}
+.orb-core {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  clip-path: circle(50%);
+  background: radial-gradient(circle at 40% 35%, #FFD8A8 0%, var(--orb-peach) 40%, var(--orb-rose) 72%, var(--orb-violet) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), inset 0 -18px 48px rgba(139, 108, 242, 0.35), inset 0 12px 32px rgba(255, 255, 255, 0.3);
+}
+.orb-blob {
+  position: absolute;
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  filter: blur(20px);
+}
+.orb-blob--amber { top: -14%; left: -8%; background: radial-gradient(circle, var(--orb-amber) 0%, rgba(246, 176, 66, 0) 68%); }
+.orb-blob--peach { top: 14%; right: -22%; background: radial-gradient(circle, var(--orb-peach) 0%, rgba(247, 140, 91, 0) 68%); }
+.orb-blob--rose { bottom: -18%; left: 6%; background: radial-gradient(circle, var(--orb-rose) 0%, rgba(225, 96, 126, 0) 68%); }
+.orb-blob--violet { right: -14%; bottom: -10%; background: radial-gradient(circle, var(--orb-violet) 0%, rgba(139, 108, 242, 0) 68%); }
+.orb-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 36%);
+}
+
+/* Words */
+.wordmark {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin: 0;
+}
+.lead {
+  font-weight: 500;
+  color: var(--text-2);
+  margin: 0;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}

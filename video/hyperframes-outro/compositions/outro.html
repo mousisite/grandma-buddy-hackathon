@@ -1,0 +1,214 @@
+<template>
+  <style>
+    /* Buddy's fonts, self-hosted (SIL Open Font License, THIRD_PARTY_NOTICES.md). */
+    @font-face {
+      font-family: "Figtree";
+      src: url("assets/fonts/Figtree.ttf") format("truetype");
+      font-weight: 300 900;
+    }
+    @font-face {
+      font-family: "Newsreader";
+      src: url("assets/fonts/Newsreader.ttf") format("truetype");
+      font-weight: 200 800;
+    }
+    #root {
+      position: absolute;
+      inset: 0;
+      font-family: "Figtree", sans-serif;
+      color: #1c1b19;
+      text-align: center;
+    }
+    /* Buddy, the orb: a core of warm light with a slow drift of color inside (styles.css "Buddy, the orb"). */
+    #outro-orb {
+      position: absolute;
+      left: 860px;
+      top: 118px;
+      width: 200px;
+      height: 200px;
+    }
+    #outro-orb .orb-glow {
+      position: absolute;
+      inset: -22%;
+      border-radius: 50%;
+      background: radial-gradient(closest-side, rgba(247, 140, 91, 0.55), rgba(225, 96, 126, 0.28) 55%, rgba(139, 108, 242, 0) 100%);
+      filter: blur(22px);
+      opacity: 0.55;
+    }
+    #outro-orb .orb-core {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #ffd8a8 0%, #f78c5b 40%, #e1607e 72%, #8b6cf2 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+        inset 0 -14px 36px rgba(139, 108, 242, 0.35),
+        inset 0 10px 26px rgba(255, 255, 255, 0.3);
+    }
+    #outro-orb .orb-flow {
+      position: absolute;
+      inset: 0;
+    }
+    #outro-orb .orb-blob {
+      position: absolute;
+      width: 78%;
+      height: 78%;
+      border-radius: 50%;
+      filter: blur(14px);
+    }
+    #outro-orb .amber { top: -14%; left: -8%; background: radial-gradient(circle, #f6b042 0%, rgba(246, 176, 66, 0) 68%); }
+    #outro-orb .peach { top: 14%; right: -22%; background: radial-gradient(circle, #f78c5b 0%, rgba(247, 140, 91, 0) 68%); }
+    #outro-orb .rose { bottom: -18%; left: 6%; background: radial-gradient(circle, #e1607e 0%, rgba(225, 96, 126, 0) 68%); }
+    #outro-orb .violet { right: -14%; bottom: -10%; background: radial-gradient(circle, #8b6cf2 0%, rgba(139, 108, 242, 0) 68%); }
+    #outro-orb .orb-shine {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 36%);
+    }
+    #outro-name {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 352px;
+      font-family: "Newsreader", serif;
+      font-weight: 400;
+      font-size: 108px;
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+    }
+    #outro-name .w {
+      display: inline-block;
+      margin: 0 0.11em;
+    }
+    #outro-lead {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 486px;
+      font-size: 36px;
+      font-weight: 500;
+      color: #5c5953;
+    }
+    #outro-built {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 576px;
+      font-size: 32px;
+      font-weight: 600;
+    }
+    #outro-models {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 638px;
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      list-style: none;
+    }
+    #outro-models li {
+      height: 56px;
+      line-height: 54px;
+      padding: 0 24px;
+      border: 1px solid rgba(28, 27, 25, 0.14);
+      border-radius: 999px;
+      background: #ffffff;
+      font-size: 28px;
+      font-weight: 600;
+      color: #5c5953;
+    }
+    #outro-links {
+      position: absolute;
+      left: 260px;
+      right: 260px;
+      top: 756px;
+      white-space: nowrap;
+      padding-top: 36px;
+      border-top: 1px solid rgba(28, 27, 25, 0.14);
+      display: grid;
+      grid-template-columns: 170px auto;
+      column-gap: 32px;
+      row-gap: 14px;
+      text-align: left;
+      align-items: baseline;
+    }
+    #outro-links dt {
+      font-size: 28px;
+      font-weight: 600;
+      color: #5c5953;
+      text-align: right;
+    }
+    #outro-links dd {
+      font-size: 42px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    #outro-tag {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 64px;
+      font-size: 28px;
+      font-weight: 600;
+      color: #5c5953;
+    }
+  </style>
+
+  <div id="root" data-composition-id="outro" data-width="1920" data-height="1080">
+    <div id="outro-orb" class="clip" data-start="0" data-duration="8" data-track-index="0">
+      <span class="orb-glow"></span>
+      <span class="orb-core">
+        <span class="orb-flow">
+          <span class="orb-blob amber"></span>
+          <span class="orb-blob peach"></span>
+          <span class="orb-blob rose"></span>
+          <span class="orb-blob violet"></span>
+        </span>
+        <span class="orb-shine"></span>
+      </span>
+    </div>
+    <h1 id="outro-name" class="clip" data-start="0.3" data-duration="7.7" data-track-index="1">
+      <span class="w">Grandma</span><span class="w">Buddy</span>
+    </h1>
+    <p id="outro-lead" class="clip" data-start="0.9" data-duration="7.1" data-track-index="2">
+      <span class="t">A voice companion for an older adult who lives alone</span>
+    </p>
+    <p id="outro-built" class="clip" data-start="2.0" data-duration="6" data-track-index="3">
+      <span class="t">Built in nine days on Meta's Muse models</span>
+    </p>
+    <ul id="outro-models" class="clip" data-start="2.6" data-duration="5.4" data-track-index="4">
+      <li>Muse Spark 1.3</li>
+      <li>Muse Voice Transcribe</li>
+      <li>SAM 3.1</li>
+      <li>Muse Image</li>
+      <li>Meta web search</li>
+    </ul>
+    <dl id="outro-links" class="clip" data-start="4.4" data-duration="3.6" data-track-index="5">
+      <dt><span class="t">Try it</span></dt>
+      <dd><span class="t">grandma-buddy.onrender.com</span></dd>
+      <dt><span class="t">The code</span></dt>
+      <dd><span class="t">github.com/mousisite/grandma-buddy-hackathon</span></dd>
+    </dl>
+    <p id="outro-tag" class="clip" data-start="5.0" data-duration="3" data-track-index="6">
+      <span class="t">Meta Global AI Developer Hackathon 2026</span>
+    </p>
+  </div>
+
+  <script>
+    // Arrivals land on long tails and then hold still; only the orb's
+    // colors keep drifting. Children are animated, never the timed clips.
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#outro-orb .orb-core", { opacity: 0.6, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.7, ease: "expo.out" }, 0);
+    tl.fromTo("#outro-orb .orb-glow", { opacity: 0 }, { opacity: 0.55, duration: 0.9, ease: "power2.out" }, 0.1);
+    tl.fromTo("#outro-orb .orb-flow", { rotation: 0 }, { rotation: 120, duration: 8, ease: "none" }, 0);
+    tl.fromTo("#outro-name .w", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, stagger: 0.07, ease: "power4.out" }, 0.3);
+    tl.fromTo("#outro-lead .t", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" }, 0.9);
+    tl.fromTo("#outro-built .t", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 2.0);
+    tl.fromTo("#outro-models li", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.45, stagger: 0.07, ease: "expo.out" }, 2.6);
+    tl.fromTo("#outro-links .t", { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.06, ease: "expo.out" }, 4.4);
+    tl.fromTo("#outro-tag .t", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 5.0);
+    window.__timelines["outro"] = tl;
+  </script>
+</template>

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rose says</title>
+<!--
+  The Rose player, for recording the demo video. Open this file in Edge
+  (double-click it; no server needed) and put its window beside Buddy.
+  Each big button plays one of Rose's lines (video/rose/*.wav, made by
+  scripts/video_voice.py) through the speakers, so Buddy's microphone
+  hears her. The lines are in the order of docs/DEMO_SCRIPT.md; the next
+  one is marked, and Replay says the last one again.
+  Keys, when this window has focus: Space plays the next line, R replays.
+-->
+<style>
+  @font-face {
+    font-family: "Figtree";
+    src: url("../static/fonts/Figtree.ttf") format("truetype");
+    font-weight: 300 900;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Newsreader";
+    src: url("../static/fonts/Newsreader.ttf") format("truetype");
+    font-weight: 200 800;
+    font-display: swap;
+  }
+  :root {
+    color-scheme: light;
+    --bg: #F7F7F5;
+    --surface: #FFFFFF;
+    --tint: #EFEEEA;
+    --border: rgba(28, 27, 25, 0.08);
+    --border-strong: rgba(28, 27, 25, 0.14);
+    --text: #1C1B19;
+    --text-2: #5C5953;
+    --primary: #1C1B19;
+    --on-primary: #FFFFFF;
+    --success: #1E7350;
+    --ring: rgba(28, 27, 25, 0.14);
+    --orb-amber: #F6B042;
+    --orb-peach: #F78C5B;
+    --orb-rose: #E1607E;
+    --orb-violet: #8B6CF2;
+    --font: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-serif: "Newsreader", Georgia, serif;
+    --r-card: 16px;
+    --r-pill: 999px;
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: var(--font);
+    font-size: 17px;
+    line-height: 1.5;
+    padding: 16px 16px 24px;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 4px 12px;
+  }
+  .orb {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex: none;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.85) 0, rgba(255, 255, 255, 0) 38%),
+      radial-gradient(circle at 70% 30%, var(--orb-peach) 0, rgba(247, 140, 91, 0) 55%),
+      radial-gradient(circle at 70% 75%, var(--orb-rose) 0, rgba(225, 96, 126, 0) 55%),
+      radial-gradient(circle at 25% 70%, var(--orb-violet) 0, rgba(139, 108, 242, 0) 60%),
+      var(--orb-amber);
+    box-shadow: 0 0 18px 2px rgba(246, 176, 66, 0.35);
+  }
+  h1 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .status {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background: var(--surface);
+    color: var(--text-2);
+    font-size: 15px;
+    min-height: 44px;
+  }
+  .status strong { color: var(--text); font-weight: 600; }
+  .lines { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .line {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 60px;
+    padding: 10px 14px 10px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 17px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 120ms var(--ease), background 120ms var(--ease), box-shadow 120ms var(--ease);
+  }
+  .line:hover { box-shadow: 0 0 0 4px var(--ring); }
+  .line:active { transform: scale(0.96); background: var(--tint); }
+  .line:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+  .line .n {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--tint);
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .line.next { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+  .line.next .n { background: var(--primary); color: var(--on-primary); }
+  .line.playing .n {
+    background: linear-gradient(135deg, var(--orb-amber), var(--orb-rose));
+    color: #fff;
+  }
+  .line.done .n { background: var(--tint); color: var(--success); }
+  .line small { display: block; color: var(--text-2); font-weight: 400; font-size: 13px; }
+  .spares { margin-top: 16px; }
+  .spares p { margin: 0 0 8px; color: var(--text-2); font-size: 13px; font-weight: 600; letter-spacing: 0.01em; }
+  .spare { min-height: 48px; }
+  .tools {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 16px 0 0;
+  }
+  .pill {
+    min-height: 56px;
+    padding: 0 18px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 120ms var(--ease), background 120ms var(--ease), box-shadow 120ms var(--ease);
+  }
+  .pill:hover { box-shadow: 0 0 0 4px var(--ring); }
+  .pill:active { transform: scale(0.96); }
+  .pill--ink { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .pill:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+  .hint { margin: 12px 0 0; color: var(--text-2); font-size: 13px; }
+  .warn {
+    margin: 12px 0 0;
+    padding: 10px 14px;
+    border-radius: var(--r-card);
+    background: #FFF4E5;
+    color: #9A5B00;
+    font-size: 15px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="orb" aria-hidden="true"></div>
+    <h1>Rose says</h1>
+  </header>
+
+  <p class="status" id="status" aria-live="polite">Next: <strong id="status-next">Hi Buddy, how are you today?</strong></p>
+
+  <ol class="lines" id="lines">
+    <li><button class="line" type="button" data-file="rose/01-hi-buddy.wav"><span class="n">1</span><span>Hi Buddy, how are you today?<small>0:00, after Talk to Buddy</small></span></button></li>
+    <li><button class="line" type="button" data-file="rose/02-whats-the-weather.wav"><span class="n">2</span><span>What's the weather like?<small>when Buddy is listening again</small></span></button></li>
+    <li><button class="line" type="button" data-file="rose/03-where-are-my-glasses.wav"><span class="n">3</span><span>Buddy, where are my glasses?<small>0:20, Find my things</small></span></button></li>
+    <li><button class="line" type="button" data-file="rose/04-headache.wav"><span class="n">4</span><span>Should I take something for my headache?<small>1:30, after Talk to Buddy</small></span></button></li>
+    <li><button class="line" type="button" data-file="rose/05-chest-tight.wav"><span class="n">5</span><span>My chest feels tight.<small>the emergency screen</small></span></button></li>
+    <li><button class="line" type="button" data-file="rose/06-tell-maria-tulips.wav"><span class="n">6</span><span>Tell Maria the tulips are up.<small>2:00, optional</small></span></button></li>
+  </ol>
+
+  <div class="spares">
+    <p>Spares</p>
+    <ol class="lines">
+      <li><button class="line spare" type="button" data-file="rose/spare-hello-buddy.wav" data-spare="1"><span class="n">+</span><span>Hello Buddy.</span></button></li>
+      <li><button class="line spare" type="button" data-file="rose/spare-thank-you-buddy.wav" data-spare="1"><span class="n">+</span><span>Thank you, Buddy.</span></button></li>
+    </ol>
+  </div>
+
+  <div class="tools">
+    <button class="pill pill--ink" type="button" id="play-next">Play next</button>
+    <button class="pill" type="button" id="replay" disabled>Replay</button>
+  </div>
+  <p class="hint">Space plays the next line, R replays. <button class="pill" type="button" id="start-over" style="min-height:36px;font-size:13px;padding:0 12px">Start over</button></p>
+  <p class="warn" id="warn">That line's file didn't play. Run <code>.venv\Scripts\python scripts\video_voice.py</code> to make the files, then open this page again.</p>
+
+  <audio id="player" preload="auto"></audio>
+
+<script>
+  // One <audio> element plays every line. The "next" marker moves down the
+  // demo's order each time a demo line finishes; the spares never move it.
+  var player = document.getElementById("player");
+  var buttons = Array.prototype.slice.call(document.querySelectorAll(".line"));
+  var demo = buttons.filter(function (b) { return !b.dataset.spare; });
+  var statusNext = document.getElementById("status-next");
+  var statusLine = document.getElementById("status");  // not "status": that name is the window's own
+  var replayButton = document.getElementById("replay");
+  var warn = document.getElementById("warn");
+  var nextIndex = 0;
+  var last = null;
+
+  function markNext() {
+    demo.forEach(function (b, i) { b.classList.toggle("next", i === nextIndex); });
+    if (nextIndex < demo.length) {
+      statusNext.textContent = demo[nextIndex].querySelector("span:last-child").firstChild.textContent;
+      statusLine.firstChild.textContent = "Next: ";
+    } else {
+      statusLine.firstChild.textContent = "All six lines played. ";
+      statusNext.textContent = "Use Start over, or a spare.";
+    }
+  }
+
+  function play(button) {
+    buttons.forEach(function (b) { b.classList.remove("playing"); });
+    button.classList.add("playing");
+    warn.style.display = "none";
+    last = button;
+    replayButton.disabled = false;
+    player.src = button.dataset.file;
+    player.currentTime = 0;
+    var playing = player.play();
+    if (playing && playing.catch) { playing.catch(function () { warn.style.display = "block"; }); }
+    statusLine.firstChild.textContent = "Playing: ";
+    statusNext.textContent = button.querySelector("span:last-child").firstChild.textContent;
+  }
+
+  player.addEventListener("ended", function () {
+    if (last) {
+      last.classList.remove("playing");
+      if (!last.dataset.spare) {
+        last.classList.add("done");
+        var i = demo.indexOf(last);
+        if (i >= nextIndex) { nextIndex = i + 1; }
+      }
+    }
+    markNext();
+  });
+  player.addEventListener("error", function () {
+    warn.style.display = "block";
+    if (last) { last.classList.remove("playing"); }
+    markNext();
+  });
+
+  buttons.forEach(function (b) { b.addEventListener("click", function () { play(b); }); });
+  document.getElementById("play-next").addEventListener("click", function () {
+    if (nextIndex < demo.length) { play(demo[nextIndex]); }
+  });
+  replayButton.addEventListener("click", function () { if (last) { play(last); } });
+  document.getElementById("start-over").addEventListener("click", function () {
+    nextIndex = 0;
+    last = null;
+    replayButton.disabled = true;
+    buttons.forEach(function (b) { b.classList.remove("done", "playing"); });
+    markNext();
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.target.tagName === "BUTTON" && event.key === " ") { return; }  // the focused button handles Space itself
+    if (event.key === " ") { event.preventDefault(); if (nextIndex < demo.length) { play(demo[nextIndex]); } }
+    if (event.key === "r" || event.key === "R") { if (last) { play(last); } }
+  });
+  markNext();
+</script>
+</body>
+</html>

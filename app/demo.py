@@ -6,7 +6,7 @@
 # always "this week":
 #
 #   - her profile: Maria (her daughter) and Daniel (her son), Dr. Lee;
-#   - 2 pills on a schedule, mostly taken this week, this morning's taken;
+#   - 3 pills on a schedule, mostly taken this week, this morning's taken;
 #   - 5 daily check-ins with mixed moods, today's done this morning;
 #   - a knee pain that comes and goes, in her own words, a note today;
 #   - 2 questions for Dr. Lee and 1 checked scam text;
@@ -53,6 +53,7 @@ PROFILE = {
 PILLS = [
     ("Lisinopril", "10 mg tablet, take 1 by mouth daily", ["08:00"]),
     ("Metformin", "500 mg tablet, take 1 by mouth twice daily with meals", ["08:00", "18:00"]),
+    ("Vitamin D", "1 softgel, take 1 by mouth daily", ["08:00"]),
 ]
 # Days ago, time, pill, the reminder she never answered (not taken).
 MISSED = {(4, "18:00", "Metformin"), (1, "08:00", "Lisinopril")}

@@ -197,9 +197,61 @@ def test_the_page_knows_when_no_pills_are_set_up(client, clock):
     assert client.get("/api/reminders").json()["has_pills"] is True
 
 
+@pytest.mark.parametrize("answer", ["taken", "snooze", "not-taken"])
 @pytest.mark.parametrize("body", [{"ids": "1"}, {"ids": ["a"]}, {"ids": list(range(25))}, {}])
-def test_odd_reminder_answers_are_refused(client, clock, body):
-    assert client.post("/api/reminders/taken", json=body).status_code == 400
+def test_odd_reminder_answers_are_refused(client, clock, body, answer):
+    assert client.post("/api/reminders/" + answer, json=body).status_code == 400
+
+
+# ---------- Ticking a pill off, and on again (the Pills screen) ----------
+
+def test_a_tick_by_mistake_is_undone_and_nothing_of_it_is_kept(client, clock):
+    add_pill(client)
+    clock.set(8, 5)
+    ids = [r["id"] for r in client.get("/api/reminders").json()["reminders"]]
+    client.post("/api/reminders/taken", json={"ids": ids})
+    assert statuses(client) == [("Lisinopril", "08:00", "taken")]
+    assert client.post("/api/reminders/not-taken", json={"ids": ids}).status_code == 200
+    assert statuses(client) == [("Lisinopril", "08:00", "due")]
+    assert client.get("/api/reminders").json()["due_words"].startswith("It’s time for your morning Lisinopril.")
+    # Taken again later, it says the new time, not the mistaken one.
+    clock.set(8, 20)
+    client.post("/api/reminders/taken", json={"ids": ids})
+    assert [(r["status"], r["acted_at"][11:16]) for r in client.get("/api/reminders").json()["reminders"]] == [("taken", "08:20")]
+
+
+def test_unticked_late_the_reminder_is_back_for_two_hours_before_it_counts_as_missed(client, clock):
+    add_pill(client)
+    clock.set(8, 5)
+    ids = [r["id"] for r in client.get("/api/reminders").json()["reminders"]]
+    client.post("/api/reminders/taken", json={"ids": ids})
+    clock.set(10, 30)
+    client.post("/api/reminders/not-taken", json={"ids": ids})
+    assert statuses(client) == [("Lisinopril", "08:00", "due")]  # on her screen again now, not missed at once
+    clock.set(12, 29)
+    assert statuses(client) == [("Lisinopril", "08:00", "due")]
+    clock.set(12, 30)
+    assert statuses(client) == [("Lisinopril", "08:00", "missed")]
+
+
+def test_a_pill_ticked_a_little_early_and_unticked_is_still_to_come(client, clock):
+    add_pill(client, times=["20:00"])
+    ids = [r["id"] for r in client.get("/api/reminders").json()["reminders"]]
+    client.post("/api/reminders/taken", json={"ids": ids})  # with dinner, before its time
+    assert statuses(client) == [("Lisinopril", "20:00", "taken")]
+    client.post("/api/reminders/not-taken", json={"ids": ids})
+    assert statuses(client) == [("Lisinopril", "20:00", "upcoming")]
+    clock.set(20, 0)
+    assert statuses(client) == [("Lisinopril", "20:00", "due")]
+
+
+def test_unticking_a_pill_she_never_took_changes_nothing(client, clock):
+    add_pill(client)
+    clock.set(8, 0)
+    ids = [r["id"] for r in client.get("/api/reminders").json()["reminders"]]
+    client.post("/api/reminders/snooze", json={"ids": ids})
+    client.post("/api/reminders/not-taken", json={"ids": ids})
+    assert statuses(client) == [("Lisinopril", "08:00", "snoozed")]
 
 
 # ---------- The AI's pill tools ----------

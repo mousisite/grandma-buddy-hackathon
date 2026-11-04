@@ -170,7 +170,7 @@ def _create(request: dict):
     return response
 
 
-def paint(prompt: str) -> bytes:
+def paint(prompt: str, size: str = PICTURE_SIZE) -> bytes:
     """Paint one picture with Muse Image (POST /v1/images/generations, the
     OpenAI Images format). Returns the picture's bytes (WebP by default).
     Costs $0.01 per picture, so it is called once per Memory book page."""
@@ -184,7 +184,7 @@ def paint(prompt: str) -> bytes:
                 model=settings.image_model,  # muse-image-1.0, a standard model
                 prompt=prompt,
                 n=1,
-                size=PICTURE_SIZE,
+                size=size,  # a page picture (3:2) unless the caller asks otherwise
                 extra_body={"tool_enablement": NO_LOOKUPS},  # a Meta extra, so it goes in extra_body
                 timeout=PAINT_TIMEOUT_SECONDS,
             )

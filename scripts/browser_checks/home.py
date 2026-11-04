@@ -481,7 +481,8 @@ def check_pills(page, problems: list[str]) -> None:
     """Pills, with the real server and a pill due right now: a refused entry
     is named; the reminder card repeats the label exactly; "I took it" and
     "Remind me in 10 minutes" work; the ring counts; Home follows; Change,
-    and Remove with "Are you sure?" and Undo, work; the round check works."""
+    and Remove with "Are you sure?" and Undo, work; the round check works,
+    and unticks a tick made by mistake."""
     now = datetime.now()
     time_now = now.strftime("%H:%M")
     part = part_of_day(now.hour)
@@ -567,6 +568,18 @@ def check_pills(page, problems: list[str]) -> None:
     page.wait_for_selector("#pills-undo:has-text('Vitamin D is back.')")
     page.wait_for_selector("[aria-label='Remove Vitamin D']")
     # Vitamin D is due again: its own round check in today's list.
+    page.click("[aria-label='I took this one: Vitamin D']")
+    page.wait_for_selector("#pill-banner", state="hidden")
+    page.wait_for_function("document.getElementById('pills-ring-count').textContent === '2'")
+    # Ticked by mistake? The same round check unticks it: the pill is due
+    # again (the card is back), her focus stays on that pill, and one more
+    # tap ticks it again.
+    page.click("[aria-label='I didn’t take this one: Vitamin D']")
+    page.wait_for_selector(".toast:has-text('Marked as not taken')")
+    page.wait_for_function("document.getElementById('pills-ring-count').textContent === '1'")
+    assert "Time to take it now" in (page.text_content("#pills-today .check-row--due .pill-status") or "")
+    assert page.evaluate("document.activeElement.getAttribute('aria-label')") == "I took this one: Vitamin D"
+    page.wait_for_selector("#pill-banner:not([hidden])")
     page.click("[aria-label='I took this one: Vitamin D']")
     page.wait_for_selector("#pill-banner", state="hidden")
     page.wait_for_function("document.getElementById('pills-ring-count').textContent === '2'")

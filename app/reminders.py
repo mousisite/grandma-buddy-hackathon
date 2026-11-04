@@ -9,7 +9,9 @@
 #   snoozed   she tapped "Remind me in 10 minutes"
 #   taken     she tapped "I took it", or told Buddy (also after it was missed)
 #   missed    2 hours went by without an answer
-# Only her answers (taken, snoozed) are written down. Everything else follows
+# A tick made by mistake is undone on the Pills screen (mark_not_taken): the
+# reminder is open again and the clock says what it is now. Only her answers
+# (taken, snoozed, a tick undone) are written down. Everything else follows
 # from the clock, so nothing has to run in the background.
 #
 # The words she hears repeat the label exactly as the family typed it
@@ -221,6 +223,19 @@ def reminders_now(connection, now: datetime) -> list[dict]:
 def mark_taken(connection, ids: list[int], now: datetime) -> None:
     connection.executemany(
         "UPDATE med_events SET status = 'taken', acted_at = ? WHERE id = ? AND status != 'taken'",
+        [(now.isoformat(timespec="seconds"), i) for i in ids],
+    )
+
+
+def mark_not_taken(connection, ids: list[int], now: datetime) -> None:
+    """She unticked a pill she had ticked by mistake (the Pills screen): the
+    reminder is open again, and the clock says what it is now. It is back on
+    her screen from this moment, so snooze_until (when it was last shown to
+    her) is set to now: 2 hours from now with no answer, it is missed, and
+    before its time it is simply upcoming. Nothing of the mistake is kept.
+    A reminder she never marked taken is left as it is."""
+    connection.executemany(
+        "UPDATE med_events SET status = 'due', snooze_until = ?, acted_at = '' WHERE id = ? AND status = 'taken'",
         [(now.isoformat(timespec="seconds"), i) for i in ids],
     )
 

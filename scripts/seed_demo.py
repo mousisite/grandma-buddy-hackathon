@@ -55,7 +55,7 @@ def main(args: list[str]) -> int:
     finally:
         connection.close()
     demo.remember_choice("D")  # this computer wants the demo week
-    print("Added a made-up week for Rose, ending today: 2 pills (this morning's taken), 5 check-ins, a knee that comes")
+    print("Added a made-up week for Rose, ending today: 3 pills (this morning's taken), 5 check-ins, a knee that comes")
     print("and goes, 2 questions for Dr. Lee, 1 checked scam text, 3 Memory book pages (one from an old photo), what")
     print("Buddy has learned about her, 4 messages with Maria (one of hers still new), yesterday's postcard (sent),")
     print("today's postcard (ready to send), and this morning's talk about her tulips.")

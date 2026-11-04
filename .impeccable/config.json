@@ -52,6 +52,15 @@
         ],
         "createdAt": "2026-10-30T05:04:35.165Z",
         "reason": "Claude triage: #find-image gets its src from find.js once she picks a photo; it sits inside #find-result, which stays hidden until then"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "video/rose-player.html"
+        ],
+        "createdAt": "2026-11-04T02:32:12.439Z",
+        "reason": "Claude: the 36px header orb copies the app's own living orb, which glows by design (docs/DESIGN.md, styles.css .orb-glow)"
       }
     ]
   }

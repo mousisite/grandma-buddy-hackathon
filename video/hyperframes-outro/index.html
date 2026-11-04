@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <!--
+      The demo video's end card, as a HyperFrames composition (HTML rendered
+      to video, frame by frame). One scene, compositions/outro.html, in
+      Buddy's own fonts and colors (static/styles.css). 8 seconds.
+      Check: npx hyperframes check    Render: npx hyperframes render --quality looks -o ../end-card.mp4
+    -->
+    <style>
+      :root {
+        --ground: #f7f7f5; /* the app's page color */
+        --ink: #1c1b19;
+        --ink-2: #5c5953;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--ground);
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      #ground {
+        position: absolute;
+        inset: 0;
+        background: var(--ground);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="8"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="ground"></div>
+      <div
+        id="outro"
+        data-composition-id="outro"
+        data-composition-src="compositions/outro.html"
+        data-start="0"
+        data-duration="8"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

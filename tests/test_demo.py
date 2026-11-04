@@ -39,7 +39,8 @@ def test_the_demo_week_ends_today_with_this_mornings_pills_taken(seeded, clock):
     client = TestClient(app)
     today = client.get("/api/reminders").json()
     assert [(r["name"], r["due_at"][11:16], r["status"]) for r in today["reminders"]] == [
-        ("Lisinopril", "08:00", "taken"), ("Metformin", "08:00", "taken"), ("Metformin", "18:00", "upcoming")]
+        ("Lisinopril", "08:00", "taken"), ("Metformin", "08:00", "taken"), ("Vitamin D", "08:00", "taken"),
+        ("Metformin", "18:00", "upcoming")]
     assert client.get("/api/check-in").json()["done"] is True
     assert any(entry["description"] == "My knee feels much better today" for entry in client.get("/api/diary?days=7").json())
     assert client.get("/api/messages").json()["unread"] == 1
@@ -54,19 +55,22 @@ def test_the_day_after_the_seed_her_daily_pills_are_still_there(seeded, clock):
     client = TestClient(app)
     today = client.get("/api/reminders").json()
     assert [(r["name"], r["due_at"][11:16], r["status"]) for r in today["reminders"]] == [
-        ("Lisinopril", "08:00", "missed"), ("Metformin", "08:00", "missed"), ("Metformin", "18:00", "upcoming")]
+        ("Lisinopril", "08:00", "missed"), ("Metformin", "08:00", "missed"), ("Vitamin D", "08:00", "missed"),
+        ("Metformin", "18:00", "upcoming")]
     update = client.get("/api/family/summary?date=2026-11-01").json()["text"]
-    assert "Pills: 0 of 3 taken. Missed: Lisinopril at 8:00 AM, Metformin at 8:00 AM. Still to come: Metformin at 6:00 PM." in update
+    assert ("Pills: 0 of 4 taken. Missed: Lisinopril at 8:00 AM, Metformin at 8:00 AM, Vitamin D at 8:00 AM. "
+            "Still to come: Metformin at 6:00 PM.") in update
 
 
 def test_a_pill_added_today_never_counts_as_not_taken_for_a_time_that_passed(seeded, clock):
     clock.now = NEXT_DAY
     client = TestClient(app)
-    added = client.post("/api/meds", json={"name": "Vitamin D", "label_dose": "1 softgel daily", "times": ["08:00", "20:00"]})
+    added = client.post("/api/meds", json={"name": "Calcium", "label_dose": "600 mg tablet, take 1 by mouth daily",
+                                           "times": ["08:00", "20:00"]})
     assert added.status_code == 200
     today = client.get("/api/reminders").json()
-    assert [(r["name"], r["due_at"][11:16], r["status"]) for r in today["reminders"] if r["name"] == "Vitamin D"] == [
-        ("Vitamin D", "20:00", "upcoming")]
+    assert [(r["name"], r["due_at"][11:16], r["status"]) for r in today["reminders"] if r["name"] == "Calcium"] == [
+        ("Calcium", "20:00", "upcoming")]
 
 
 def test_reset_starts_the_week_over_in_demo_mode_only(seeded, clock, monkeypatch):
