@@ -30,7 +30,8 @@ var NATURAL = "natural:"; // her choice in Settings: "natural:af_heart", or a br
 // picked before Buddy had natural voices doesn't hide them.)
 var VOICE_KEY = "buddy-voice";
 var NATURAL_WAIT_MS = 6000; // a sentence that takes longer is said with the browser voice
-var FIRST_WAIT_MS = 1800; // the first sentence of a reply: past this, the whole reply is said with the browser voice
+var FIRST_WAIT_MS = 3000; // the first sentence of a reply: past this, the whole reply is said with the browser voice
+// (Buddy opens with a short sentence, made on the server the moment the reply exists, so this is rarely reached.)
 var SAFETY_WAIT_MS = 2500; // a safety message never waits longer than this to be heard
 
 function canSpeak() {

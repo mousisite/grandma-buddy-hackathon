@@ -258,3 +258,11 @@ def test_a_real_ask_goes_before_the_rest_of_the_warm_up(monkeypatch, safe_test_s
     assert time.time() - started < 1.0  # one sentence at most to wait for, not the whole warm-up
     warming.join(10)
     assert voice.is_fixed("Let me look that up.")  # the rest was still made afterwards
+
+
+def test_the_voice_status_names_its_process_so_a_host_can_be_checked(client, kokoro):
+    """One server process is what the cache and the head start need; the
+    marker lets a live site be checked: the same value on every request."""
+    first = client.get("/api/voice").json()["process"]
+    assert isinstance(first, str) and len(first) == 6
+    assert client.get("/api/voice").json()["process"] == first == voice.PROCESS

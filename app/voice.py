@@ -23,6 +23,7 @@
 
 import io
 import re
+import secrets
 import threading
 import time
 import wave
@@ -50,6 +51,8 @@ DEFAULT_VOICE = "af_heart"
 MAX_TEXT = 600  # the page sends one sentence at a time
 CACHE_SIZE = 256  # sentences kept, about 100 KB each
 SENTENCE_END = re.compile(r"(?<=[.!?;])\s+")  # the page splits the same way (speech.js, sentencesOf)
+
+PROCESS = secrets.token_hex(3)  # this server process, for /api/voice: a host should run exactly one
 
 _engine = None
 _lock = threading.Lock()  # the model says one sentence at a time (its pronunciation part isn't made for two at once)

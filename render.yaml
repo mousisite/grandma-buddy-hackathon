@@ -11,6 +11,7 @@ services:
     # takes too long on the live site, "pro plus" (4 CPU) with VOICE_THREADS=4.
     # "starter" (512 MB) can't hold the model: the browser's voice speaks there.
     plan: pro
+    numInstances: 1          # one instance, one process: the voice's cache and shares live in one process
     healthCheckPath: /api/ping
     envVars:
       - key: PUBLIC_DEMO
@@ -25,6 +26,8 @@ services:
         value: "600"
       - key: VOICE_THREADS
         value: "2"           # ONNX Runtime threads for the voice: the plan's 2 CPUs
+      - key: WEB_CONCURRENCY
+        value: "1"           # one server process (Render's own default is 2 on this plan; see the Dockerfile)
       - key: VOICE_SENTENCES_PER_VISITOR_HOUR
         value: "300"         # each visitor's share of the natural voice (the safety words are never capped)
       - key: DEMO_RESET_HOUR

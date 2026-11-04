@@ -293,3 +293,13 @@ def test_the_first_sentence_of_a_reply_is_made_ahead_in_the_natural_voice(client
     assert ahead == ["Lovely to hear, Rose. Did Tom come by?"]
     stream(client, "The tulips came up")
     assert ahead == ["Lovely to hear, Rose. Did Tom come by?", "Lovely."]
+
+
+# ---------- A short first sentence, so the natural voice is ready in time ----------
+
+def test_buddy_is_told_to_open_with_a_short_sentence(client, monkeypatch):
+    fake = FakeAI(reply("Lovely. Did Tom come by?"))
+    monkeypatch.setattr(meta_client, "chat", fake)
+    chat(client, "Good morning Buddy")
+    prompt = fake.calls[0][0]["content"]
+    assert "first sentence short" in prompt and "under ten words" in prompt

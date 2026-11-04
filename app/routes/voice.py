@@ -30,6 +30,7 @@ def voice_status():
     return {
         "available": voice.available() and voice.ready(),
         "loading": voice.coming(),
+        "process": voice.PROCESS,  # the same on every request when the host runs one process, as it must
         "default": voice.DEFAULT_VOICE,
         "voices": [{"id": key, "name": name} for key, name in voice.VOICES.items()],
     }
