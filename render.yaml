@@ -4,7 +4,13 @@ services:
   - type: web
     name: grandma-buddy
     runtime: docker
-    plan: starter            # $7 a month, always on; "free" also works but sleeps after 15 minutes
+    # "pro" (2 CPU, 4 GB) for Buddy's natural voice: the Kokoro model takes
+    # about 550 MB of memory and, measured on one thread, 1.4 seconds for a
+    # short sentence and 3.5 for a long one, so one CPU ("standard") would
+    # leave her waiting; on two threads it is half that. If a sentence still
+    # takes too long on the live site, "pro plus" (4 CPU) with VOICE_THREADS=4.
+    # "starter" (512 MB) can't hold the model: the browser's voice speaks there.
+    plan: pro
     healthCheckPath: /api/ping
     envVars:
       - key: PUBLIC_DEMO
@@ -17,6 +23,10 @@ services:
         value: "40"
       - key: AI_CALLS_PER_DAY
         value: "600"
+      - key: VOICE_THREADS
+        value: "2"           # ONNX Runtime threads for the voice: the plan's 2 CPUs
+      - key: VOICE_SENTENCES_PER_VISITOR_HOUR
+        value: "300"         # each visitor's share of the natural voice (the safety words are never capped)
       - key: DEMO_RESET_HOUR
         value: "9"           # 9:00 UTC is 1:00 AM Pacific
       - key: DATABASE_PATH

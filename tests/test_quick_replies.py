@@ -278,3 +278,18 @@ def test_buddy_is_told_to_warn_her_about_a_scam_story(client, monkeypatch):
     assert "or to call Maria" in prompt
     chat(client, "The tulips came up this morning")
     assert prompts.SCAM_STORY_TOLD.split("{")[0].strip() not in fake.calls[1][0]["content"]
+
+
+# ---------- The natural voice starts on the first sentence before the page asks ----------
+
+def test_the_first_sentence_of_a_reply_is_made_ahead_in_the_natural_voice(client, monkeypatch):
+    from app import voice
+
+    ahead = []
+    monkeypatch.setattr(voice, "say_ahead", lambda text: ahead.append(text))
+    fake = FakeAI(reply("Lovely to hear, Rose. Did Tom come by?"), reply("Lovely."))
+    monkeypatch.setattr(meta_client, "chat", fake)
+    chat(client, "Good morning Buddy")
+    assert ahead == ["Lovely to hear, Rose. Did Tom come by?"]
+    stream(client, "The tulips came up")
+    assert ahead == ["Lovely to hear, Rose. Did Tom come by?", "Lovely."]

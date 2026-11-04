@@ -39,5 +39,6 @@ def safe_test_setup(tmp_path, monkeypatch):
 
     monkeypatch.setattr(voice, "load_engine", no_real_voice_model)
     monkeypatch.setattr(voice, "_engine", None)
+    monkeypatch.setattr(voice, "_warm", False)
     db.init_db(db_path)
     return db_path

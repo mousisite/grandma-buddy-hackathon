@@ -32,6 +32,7 @@ def kokoro(monkeypatch):
     fake = FakeKokoro()
     monkeypatch.setattr(voice, "available", lambda: True)
     monkeypatch.setattr(voice, "_engine", fake)
+    monkeypatch.setattr(voice, "_warm", True)
     voice.speech.cache_clear()
     yield fake
     voice.speech.cache_clear()
@@ -91,6 +92,7 @@ def test_without_the_voice_files_the_page_is_told_to_use_the_browser_voice(clien
 
 def test_a_broken_voice_model_answers_503_so_the_page_uses_the_browser_voice(client, monkeypatch, kokoro):
     monkeypatch.setattr(voice, "_engine", FakeKokoro(fails=True))
+    monkeypatch.setattr(voice, "_warm", True)
     assert speak(client).status_code == 503
 
 
@@ -99,3 +101,160 @@ def test_the_voices_on_offer_are_listed_with_the_default_first(client, kokoro):
     assert status["available"] is True and status["default"] == "af_heart"
     assert status["voices"][0] == {"id": "af_heart", "name": "Heart"}
     assert {one["id"] for one in status["voices"]} == set(voice.VOICES)
+
+
+# ---------- On a host: loading in the background, the cache, made ahead ----------
+
+class SlowKokoro(FakeKokoro):
+    """A beep that takes a moment, so two asks can overlap."""
+
+    def create(self, text, voice, speed, lang):
+        import time
+
+        time.sleep(0.15)
+        return super().create(text, voice, speed, lang)
+
+
+def test_while_the_model_loads_the_page_is_told_and_uses_the_browser_voice(client, monkeypatch):
+    monkeypatch.setattr(voice, "available", lambda: True)
+    monkeypatch.setattr(voice, "_engine", None)
+    status = client.get("/api/voice").json()
+    assert status["available"] is False and status["loading"] is True
+    assert speak(client).status_code == 503  # not ready yet: the browser's voice speaks meanwhile
+    assert client.get("/api/ping").status_code == 200  # the health check never waits for the model
+
+
+def test_warm_up_loads_the_model_and_makes_the_fixed_lines_ahead(monkeypatch, safe_test_setup):
+    from app import companion, guard, safety
+
+    fake = FakeKokoro()
+    monkeypatch.setattr(voice, "load_engine", lambda: fake)
+    monkeypatch.setattr(voice, "_engine", None)
+    voice.speech.cache_clear()
+    assert voice.ready() is False
+    voice.warm_up()
+    assert voice.ready() is True
+    made = {call["text"] for call in fake.calls}
+    for line in voice.fixed_lines(""):
+        for sentence in voice.sentences_of(line):
+            assert sentence in made, sentence
+    assert safety.EMERGENCY_MESSAGE.split(". ")[0] + "." in made
+    assert companion.TROUBLE_REPLY.split(". ")[0] + "." in made
+    assert guard.NO_ADVICE_REPLY.split(". ")[0] + "." in made
+    assert voice.is_fixed(safety.EMERGENCY_MESSAGE.split(". ")[0] + ".")
+    assert not voice.is_fixed("Did Tom come by on Sunday?")
+    before = len(fake.calls)
+    voice.speech(safety.EMERGENCY_MESSAGE.split(". ")[0] + ".", voice.DEFAULT_VOICE, 0.9)
+    assert len(fake.calls) == before  # already made: no work when she needs it
+
+
+def test_the_fixed_lines_include_her_family_name_when_there_is_one():
+    from app import safety
+
+    lines = voice.fixed_lines("Maria")
+    assert safety.fixed_message("crisis", "Maria") in lines
+    assert safety.fixed_message("emergency", "Maria") in lines
+    assert safety.fixed_message("poison_control", "Maria") in lines
+    assert all(line.strip() for line in lines) and len(lines) == len(set(lines))
+
+
+def test_the_same_new_sentence_asked_three_times_at_once_is_made_once(monkeypatch):
+    import threading
+
+    fake = SlowKokoro()
+    monkeypatch.setattr(voice, "available", lambda: True)
+    monkeypatch.setattr(voice, "_engine", fake)
+    voice.speech.cache_clear()
+    results = []
+    threads = [threading.Thread(target=lambda: results.append(voice.speech("Did Tom come by?", "af_heart", 0.9)))
+               for _ in range(3)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(5)
+    assert len(results) == 3 and results[0] == results[1] == results[2]
+    assert len(fake.calls) == 1
+    voice.speech.cache_clear()
+
+
+def test_the_first_sentence_of_a_reply_is_made_ahead_in_the_background(kokoro):
+    assert voice.first_sentence("Lovely to hear, Rose. Did Tom come by?") == "Lovely to hear, Rose."
+    assert voice.first_sentence("   ") == ""
+    thread = voice.say_ahead("Lovely to hear, Rose. Did Tom come by?")
+    assert thread is not None
+    thread.join(5)
+    assert [call["text"] for call in kokoro.calls] == ["Lovely to hear, Rose."]
+    voice.speech("Lovely to hear, Rose.", voice.DEFAULT_VOICE, 0.9)
+    assert len(kokoro.calls) == 1  # found ready
+
+
+def test_nothing_is_made_ahead_before_the_model_is_loaded(monkeypatch):
+    monkeypatch.setattr(voice, "_engine", None)
+    assert voice.say_ahead("Lovely to hear, Rose.") is None
+
+
+def test_onnx_threads_follow_the_setting(monkeypatch):
+    monkeypatch.setenv("VOICE_THREADS", "2")
+    assert voice.session_options().intra_op_num_threads == 2
+    monkeypatch.delenv("VOICE_THREADS")
+    assert voice.session_options().intra_op_num_threads == 0  # ONNX Runtime's own choice: every core
+
+
+def test_ready_means_the_warm_up_is_done_so_nobody_queues_behind_it(monkeypatch):
+    """Loaded but still making the fixed lines: the page keeps the browser
+    voice (503) instead of waiting behind the warm-up."""
+    monkeypatch.setattr(voice, "available", lambda: True)
+    monkeypatch.setattr(voice, "_engine", FakeKokoro())
+    monkeypatch.setattr(voice, "_warm", False)
+    assert voice.ready() is False
+    client = TestClient(app)
+    assert client.get("/api/voice").json() | {"x": 0} == client.get("/api/voice").json() | {"x": 0}
+    assert client.get("/api/voice").json()["loading"] is True
+    assert speak(client).status_code == 503
+    monkeypatch.setattr(voice, "_warm", True)
+    assert voice.ready() is True and speak(client).status_code == 200
+
+
+def test_a_small_host_keeps_the_browser_voice(monkeypatch, tmp_path):
+    """On a 512 MB plan the model can't load (it needs about 550 MB): the
+    voice stays off instead of crashing the server, and the page is told."""
+    limit = tmp_path / "memory.max"
+    monkeypatch.setattr(voice, "MEMORY_LIMIT_FILES", (str(limit),))
+    assert voice.memory_limit_bytes() is None and voice.can_load() is True  # no limit known
+    limit.write_text("536870912\n", encoding="utf-8")  # 512 MB
+    assert voice.memory_limit_bytes() == 536870912 and voice.can_load() is False
+    limit.write_text("max\n", encoding="utf-8")  # no limit (cgroup v2)
+    assert voice.memory_limit_bytes() is None and voice.can_load() is True
+    limit.write_text("4294967296\n", encoding="utf-8")  # 4 GB
+    assert voice.can_load() is True
+    limit.write_text("536870912\n", encoding="utf-8")
+    monkeypatch.setattr(voice, "available", lambda: True)
+    monkeypatch.setattr(voice, "_engine", None)
+    client = TestClient(app)
+    status = client.get("/api/voice").json()
+    assert status["available"] is False and status["loading"] is False  # not coming: the browser's voice it is
+
+
+def test_a_real_ask_goes_before_the_rest_of_the_warm_up(monkeypatch, safe_test_setup):
+    """Ready once the safety lines are made; the stock lines still being made
+    in the background give way to a real ask, so she never waits long."""
+    import threading
+    import time
+
+    fake = SlowKokoro()  # 0.15 s a sentence; the warm-up has a dozen
+    monkeypatch.setattr(voice, "load_engine", lambda: fake)
+    monkeypatch.setattr(voice, "_engine", None)
+    monkeypatch.setattr(voice, "_warm", False)
+    voice.speech.cache_clear()
+    warming = threading.Thread(target=voice.warm_up, daemon=True)
+    warming.start()
+    for _ in range(100):  # until the safety lines are made
+        if voice.ready():
+            break
+        time.sleep(0.05)
+    assert voice.ready() and not warming.is_alive() is False  # ready while the rest is still being made
+    started = time.time()
+    voice.speech("Did Tom come by on Sunday?", "af_heart", 0.9)
+    assert time.time() - started < 1.0  # one sentence at most to wait for, not the whole warm-up
+    warming.join(10)
+    assert voice.is_fixed("Let me look that up.")  # the rest was still made afterwards

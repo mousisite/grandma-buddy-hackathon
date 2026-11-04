@@ -29,15 +29,18 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 async def lifespan(app: FastAPI):
     # Runs once when the server starts: make sure the database exists.
     db.init_db(get_settings().database_path)
-    # Buddy's natural voice loads in the background (about 3 seconds), so
-    # the app opens at once and her first reply never waits for it.
-    if voice.available():
-        threading.Thread(target=voice.warm_up, daemon=True).start()
     if public_demo.on():
         # A public demo: the made-up week now (when the database is empty),
         # and put back once a night (app/public_demo.py).
         public_demo.reset_if_due(datetime.now())
         threading.Thread(target=public_demo.keep_the_week_fresh, daemon=True).start()
+    # Buddy's natural voice loads in the background (a few seconds) and makes
+    # the fixed lines ahead, so the app opens at once (/api/ping answers while
+    # it loads) and a safety message or her first reply never waits for it.
+    if voice.available() and voice.can_load():
+        threading.Thread(target=voice.warm_up, daemon=True).start()
+    elif voice.available():
+        print("The natural voice needs about 1.2 GB of memory; this host has less, so the browser's voice speaks.")
     yield
     # Nothing to clean up when the server stops.
 

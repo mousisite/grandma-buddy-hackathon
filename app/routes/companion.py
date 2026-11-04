@@ -17,7 +17,7 @@ from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, 
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app import companion, db, memories, meta_client, prompts, public_demo, reminders, safety, tools
+from app import companion, db, memories, meta_client, prompts, public_demo, reminders, safety, tools, voice
 
 router = APIRouter()
 
@@ -69,7 +69,9 @@ def chat(request: ChatRequest, background: BackgroundTasks, http: Request, accep
     visitor = (http.headers, http.client.host if http.client else "")
     if "application/x-ndjson" in accept:
         return StreamingResponse(answer_events(text, request, background, visitor), media_type="application/x-ndjson")
-    return answer_her(text, request, background, visitor=visitor)
+    answer = answer_her(text, request, background, visitor=visitor)
+    voice.say_ahead(answer.get("reply", ""))  # the natural voice starts on the first sentence now, before the page asks
+    return answer
 
 
 def answer_events(text: str, request: ChatRequest, background: BackgroundTasks, visitor=None):
@@ -81,6 +83,7 @@ def answer_events(text: str, request: ChatRequest, background: BackgroundTasks, 
         try:
             answer = answer_her(text, request, background,
                                 on_bridge=lambda words: events.put({"type": "bridge", "text": words}), visitor=visitor)
+            voice.say_ahead(answer.get("reply", ""))  # the natural voice starts on the first sentence now
             events.put({"type": "done", **answer})
         except HTTPException as problem:
             events.put({"type": "problem", "detail": problem.detail})

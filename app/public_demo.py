@@ -42,8 +42,11 @@ REFUSED = (
     ("POST", "/api/data/delete", NO_DATA_CHANGES),
     ("POST", "/api/demo/fresh", NO_DATA_CHANGES),  # the public demo always keeps Rose's week
 )
+VOICE_LIMIT = ("You've used this demo's share of Buddy's natural voice for now, so the browser's own voice will "
+               "speak for a while. Please try again in a little while.")
 HOUR = 3600
 _visitors: dict[str, list[float]] = {}  # each visitor's recent AI calls (when, in seconds)
+_speakers: dict[str, list[float]] = {}  # each visitor's recent sentences in the natural voice
 _lock = threading.Lock()
 
 
@@ -99,6 +102,24 @@ def ai_call_allowed(headers, client_host: str, now: float | None = None) -> str 
             connection.commit()
         finally:
             connection.close()
+        recent.append(moment)
+    return None
+
+
+def speak_allowed(headers, client_host: str, now: float | None = None) -> str | None:
+    """None when this visitor may have a sentence made in the natural voice
+    now (and it is counted); otherwise the kind words to show instead, and
+    the page speaks with the browser's voice. Always None at home. The
+    safety words and Buddy's fixed lines never come here (app/routes/voice.py)."""
+    if not on():
+        return None
+    moment = time.time() if now is None else now
+    visitor = visitor_of(headers, client_host)
+    with _lock:
+        recent = [when for when in _speakers.get(visitor, []) if moment - when < HOUR]
+        _speakers[visitor] = recent
+        if len(recent) >= get_settings().voice_sentences_per_visitor_hour:
+            return VOICE_LIMIT
         recent.append(moment)
     return None
 

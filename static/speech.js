@@ -30,6 +30,7 @@ var NATURAL = "natural:"; // her choice in Settings: "natural:af_heart", or a br
 // picked before Buddy had natural voices doesn't hide them.)
 var VOICE_KEY = "buddy-voice";
 var NATURAL_WAIT_MS = 6000; // a sentence that takes longer is said with the browser voice
+var FIRST_WAIT_MS = 1800; // the first sentence of a reply: past this, the whole reply is said with the browser voice
 var SAFETY_WAIT_MS = 2500; // a safety message never waits longer than this to be heard
 
 function canSpeak() {
@@ -135,10 +136,35 @@ var voiceStatus = fetch("/api/voice")
   .then(function (status) {
     naturalVoice = status;
     pickVoice();
+    if (status.loading) {
+      askAgainWhenReady(24); // the model is still loading on the server: look again, up to two minutes
+    }
   })
   .catch(function () {
     // No answer: the browser's voice it is.
   });
+
+// On a host the natural voice loads in the background after a start: the
+// browser's voice speaks until /api/voice says it is ready, then Buddy's
+// voices appear in Settings and the next reply is in Heart.
+function askAgainWhenReady(triesLeft) {
+  if (triesLeft <= 0) {
+    return;
+  }
+  setTimeout(function () {
+    fetch("/api/voice")
+      .then(function (response) { return response.json(); })
+      .then(function (status) {
+        if (status.available) {
+          naturalVoice = status;
+          pickVoice();
+        } else if (status.loading) {
+          askAgainWhenReady(triesLeft - 1);
+        }
+      })
+      .catch(function () {});
+  }, 5000);
+}
 
 // Have the natural voice make these words ahead of time (the server keeps
 // what it made), so when they are said there is no wait. Used for the demo
@@ -338,7 +364,7 @@ function speakNaturally(text, voiceId, options) {
     }).catch(function () { fallBack(index); });
   }
 
-  play(0, naturalSound(sentences[0], voiceId, waitMs));
+  play(0, naturalSound(sentences[0], voiceId, options.safety ? SAFETY_WAIT_MS : FIRST_WAIT_MS));
 }
 
 // The karaoke highlight for the natural voice: a sound file says nothing

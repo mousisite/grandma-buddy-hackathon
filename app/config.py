@@ -41,6 +41,8 @@ class Settings:
     public_demo: bool = False
     ai_calls_per_visitor_hour: int = 40
     ai_calls_per_day: int = 600
+    voice_threads: int = 0  # ONNX Runtime threads for the natural voice: 0 lets it use every core; 2 on a 2-CPU host
+    voice_sentences_per_visitor_hour: int = 300  # a public demo: each visitor's share of the natural voice
     demo_reset_hour: int = 3  # the server's clock (UTC on most hosts)
 
 
@@ -66,6 +68,8 @@ def get_settings() -> Settings:
         public_demo=os.getenv("PUBLIC_DEMO", "").strip().lower() in ("1", "true", "yes", "on"),
         ai_calls_per_visitor_hour=int(os.getenv("AI_CALLS_PER_VISITOR_HOUR", "40")),
         ai_calls_per_day=int(os.getenv("AI_CALLS_PER_DAY", "600")),
+        voice_threads=int(os.getenv("VOICE_THREADS", "0")),
+        voice_sentences_per_visitor_hour=int(os.getenv("VOICE_SENTENCES_PER_VISITOR_HOUR", "300")),
         demo_reset_hour=int(os.getenv("DEMO_RESET_HOUR", "3")),
     )
     # Payments only ever run in Stripe's test mode, so nothing is ever really

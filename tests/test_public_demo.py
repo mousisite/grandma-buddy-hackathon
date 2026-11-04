@@ -117,3 +117,44 @@ def test_at_home_nothing_is_refused_or_counted(safe_test_setup, monkeypatch):
     assert client.get("/api/demo").json()["public"] is False
     assert client.get("/api/data/export").status_code == 200
     assert public_demo.reset_if_due(datetime(2026, 11, 2, 3, 0)) is False  # no nightly reset at home
+
+
+# ---------- The natural voice's own share per visitor ----------
+
+def test_the_natural_voice_has_its_own_share_per_visitor(public):
+    from app.config import get_settings
+
+    headers = {"x-forwarded-for": "203.0.113.9"}
+    share = get_settings().voice_sentences_per_visitor_hour
+    assert share >= 100
+    assert all(public_demo.speak_allowed(headers, "", now=1000.0 + i) is None for i in range(share))
+    assert public_demo.speak_allowed(headers, "", now=2000.0) == public_demo.VOICE_LIMIT
+    assert public_demo.speak_allowed({"x-forwarded-for": "203.0.113.10"}, "", now=2000.0) is None  # someone else
+    assert public_demo.speak_allowed(headers, "", now=1000.0 + 5000) is None  # more than an hour later
+
+
+def test_at_home_the_voice_is_never_capped(safe_test_setup):
+    assert all(public_demo.speak_allowed({}, "127.0.0.1", now=1000.0 + i) is None for i in range(1000))
+
+
+def test_the_safety_words_are_spoken_past_the_voice_share(public, monkeypatch):
+    import numpy as np
+
+    from app import safety, voice
+
+    class Beep:
+        def create(self, text, voice, speed, lang):
+            return np.full(2400, 0.25, dtype=np.float32), 24000
+
+    monkeypatch.setattr(voice, "available", lambda: True)
+    monkeypatch.setattr(voice, "_engine", Beep())
+    monkeypatch.setattr(voice, "_warm", True)
+    voice.speech.cache_clear()
+    emergency = safety.EMERGENCY_MESSAGE.split(". ")[0] + "."
+    monkeypatch.setattr(voice, "is_fixed", lambda text: text == emergency)
+    monkeypatch.setattr(public_demo, "speak_allowed", lambda headers, host, now=None: public_demo.VOICE_LIMIT)
+    client = TestClient(app)
+    refused = client.post("/api/speak", json={"text": "Did Tom come by?"})
+    assert refused.status_code == 429 and refused.json()["detail"] == public_demo.VOICE_LIMIT
+    assert client.post("/api/speak", json={"text": emergency}).status_code == 200
+    voice.speech.cache_clear()
